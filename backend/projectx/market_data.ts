@@ -199,14 +199,3 @@ class MarketDataService {
 // Singleton instance
 export const marketDataService = new MarketDataService();
 
-// Auto-connect and subscribe to default symbols on module load
-(async () => {
-  try {
-    await marketDataService.connect();
-    await marketDataService.subscribeToSymbol("ES", true);  // E-Mini S&P 500
-    await marketDataService.subscribeToSymbol("NQ", true);  // E-mini NASDAQ-100
-    log.info("Market data service initialized with default symbols");
-  } catch (error) {
-    log.error("Failed to initialize market data service", { error });
-  }
-})();
