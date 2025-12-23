@@ -69,13 +69,10 @@ async function checkTiltRisk(userId: string, accountId: number): Promise<{
  * Guardian Cron Job - Runs every minute to monitor tilt risk
  * Automatically liquidates positions when high tilt risk is detected
  */
-export const guardianMonitor = new CronJob("guardian-monitor", {
-  schedule: "*/1 * * * *", // Every minute
-  title: "Guardian Risk Monitor",
-  handler: async () => {
-    log.info("Guardian: Starting tilt risk monitoring cycle");
+export const guardianMonitor = new CronJob("guardian-monitor", "*/1 * * * *", async () => {
+  log.info("Guardian: Starting tilt risk monitoring cycle");
 
-    try {
+  try {
     // Get all accounts with autopilot enabled
     const autopilotAccounts = await db.query<{
       user_id: string;
@@ -175,10 +172,9 @@ export const guardianMonitor = new CronJob("guardian-monitor", {
       totalAccounts: autopilotAccounts.length,
     });
 
-    } catch (error) {
-      log.error("Guardian: Critical error in monitoring cycle", {
-        error: error instanceof Error ? error.message : String(error),
-      });
-    }
-  },
+  } catch (error) {
+    log.error("Guardian: Critical error in monitoring cycle", {
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
 });
