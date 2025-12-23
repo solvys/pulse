@@ -9,7 +9,7 @@ const awsSecretAccessKey = secret("AWSSecretAccessKey");
 const awsRegion = secret("AWSRegion");
 const bedrockAgentId = secret("BedrockAgentId");
 const bedrockAgentAliasId = secret("BedrockAgentAliasId");
-const bedrockKnowledgeBaseId = secret("BedrockKnowledgeBaseId");
+const bedrockKnowledgeBaseId = secret("BedrockKnowledgeBaseId", { optional: true });
 
 /**
  * BedrockAgentClient handles interactions with Amazon Bedrock Agents.
@@ -79,16 +79,23 @@ export class BedrockAgentClient {
   }
 
   async retrieveAndGenerate(prompt: string, sessionId?: string): Promise<string> {
+    // Check if knowledge base is configured
+    const kbId = bedrockKnowledgeBaseId();
+    if (!kbId) {
+      log.info("BedrockKnowledgeBaseId not configured, falling back to direct model invocation");
+      return this.invokeModel(prompt, "anthropic.claude-3-sonnet-20240229-v1:0");
+    }
+
     const { agent } = this.getClients();
     const region = awsRegion();
     const modelArn = `arn:aws:bedrock:${region}::foundation-model/anthropic.claude-3-sonnet-20240229-v1:0`;
-    
+
     const command = new RetrieveAndGenerateCommand({
       input: { text: prompt },
       retrieveAndGenerateConfiguration: {
         type: "KNOWLEDGE_BASE",
         knowledgeBaseConfiguration: {
-          knowledgeBaseId: bedrockKnowledgeBaseId(),
+          knowledgeBaseId: kbId,
           modelArn: modelArn,
         },
       },
@@ -100,7 +107,9 @@ export class BedrockAgentClient {
       return response.output?.text || "No information found in Knowledge Base.";
     } catch (error) {
       log.error("Error invoking Bedrock Knowledge Base RAG", { error, sessionId });
-      return "I was unable to consult the Knowledge Base at this time.";
+      // Fallback to direct model invocation
+      log.info("Falling back to direct model invocation due to Knowledge Base error");
+      return this.invokeModel(prompt, "anthropic.claude-3-sonnet-20240229-v1:0");
     }
   }
 
