@@ -99,78 +99,67 @@ export const guardianMonitor = new CronJob("guardian-monitor", "*/1 * * * *", as
             log.warn("Guardian: HIGH TILT RISK detected - initiating emergency liquidation", {
               userId: account.user_id,
               accountId: account.projectx_account_id,
-              reason: tiltCheck.reason,
-              recommendation: tiltCheck.recommendation,
+              positionCount: openPositions.length,
             });
 
-            // Get all open positions for this account
-            const openPositions = await projectx.searchOpenPositions(account.projectx_account_id);
+            // Close all positions
+            for (const position of openPositions) {
+              try {
+                await projectx.closePosition(
+                  account.projectx_account_id,
+                  position.contractId
+                );
 
-            if (openPositions.length > 0) {
-              log.info("Guardian: Liquidating positions", {
-                userId: account.user_id,
-                accountId: account.projectx_account_id,
-                positionCount: openPositions.length,
-              });
+                log.info("Guardian: Position closed successfully", {
+                  userId: account.user_id,
+                  accountId: account.projectx_account_id,
+                  contractId: position.contractId,
+                  size: position.size,
+                });
 
-              // Close all positions
-              for (const position of openPositions) {
-                try {
-                  await projectx.closePosition(
-                    account.projectx_account_id,
-                    position.contractId
-                  );
-
-                  log.info("Guardian: Position closed successfully", {
-                    userId: account.user_id,
-                    accountId: account.projectx_account_id,
-                    contractId: position.contractId,
-                    size: position.size,
-                  });
-
-                  emergencyActions++;
-                } catch (error) {
-                  log.error("Guardian: Failed to close position", {
-                    error: error instanceof Error ? error.message : String(error),
-                    userId: account.user_id,
-                    accountId: account.projectx_account_id,
-                    contractId: position.contractId,
-                  });
-                }
+                emergencyActions++;
+              } catch (error) {
+                log.error("Guardian: Failed to close position", {
+                  error: error instanceof Error ? error.message : String(error),
+                  userId: account.user_id,
+                  accountId: account.projectx_account_id,
+                  contractId: position.contractId,
+                });
               }
-
-              // Record the emergency action in tilt_events
-              await db.exec`
-                INSERT INTO tilt_events (
-                  user_id, account_id, risk_level, reason, recommendation, acknowledged
-                ) VALUES (
-                  ${account.user_id}, ${account.projectx_account_id}, 'high',
-                  ${tiltCheck.reason}, ${tiltCheck.recommendation}, true
-                )
-              `;
-
-            } else {
-              log.info("Guardian: No open positions to liquidate", {
-                userId: account.user_id,
-                accountId: account.projectx_account_id,
-              });
             }
+
+            // Record the emergency action in tilt_events
+            await db.exec`
+              INSERT INTO tilt_events (
+                user_id, account_id, risk_level, reason, recommendation, acknowledged
+              ) VALUES (
+                ${account.user_id}, ${account.projectx_account_id}, 'high',
+                ${tiltCheck.reason}, ${tiltCheck.recommendation}, true
+              )
+            `;
+
+          } else {
+            log.info("Guardian: No open positions to liquidate", {
+              userId: account.user_id,
+              accountId: account.projectx_account_id,
+            });
           }
-
-        } catch (error) {
-          log.error("Guardian: Error monitoring account", {
-            error: error instanceof Error ? error.message : String(error),
-            userId: account.user_id,
-            accountId: account.projectx_account_id,
-          });
         }
-      }
 
-      log.info("Guardian: Monitoring cycle completed", {
-        monitoredAccounts,
-        emergencyActions,
-        totalAccounts: autopilotAccounts.length,
-      });
+      } catch (error) {
+        log.error("Guardian: Error monitoring account", {
+          error: error instanceof Error ? error.message : String(error),
+          userId: account.user_id,
+          accountId: account.projectx_account_id,
+        });
+      }
+    }
+
+    log.info("Guardian: Monitoring cycle completed", {
+      monitoredAccounts,
+      emergencyActions,
+      totalAccounts: autopilotAccounts.length,
+    });
 
     } catch (error) {
       log.error("Guardian: Critical error in monitoring cycle", {
