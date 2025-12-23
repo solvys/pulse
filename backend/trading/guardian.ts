@@ -8,10 +8,6 @@ import { db } from "../db";
 import log from "encore.dev/log";
 import * as projectx from "../projectx/projectx_client";
 
-// #region agent log - Hypothesis 1: Test CronJob constructor with object literal
-fetch('http://127.0.0.1:7245/ingest/7f0acc2c-8c83-40f0-80db-c91ba3178310',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'guardian.ts:7',message:'Testing CronJob constructor patterns',data:{importSuccessful:true,testingObjectLiteral:true},timestamp:Date.now(),sessionId:'debug-session',runId:'cron-syntax-test',hypothesisId:'H1'})}).catch(()=>{});
-// #endregion
-
 // Extract tilt check logic into a reusable function
 async function checkTiltRisk(userId: string, accountId: number): Promise<{
   tiltRisk: "low" | "medium" | "high";
