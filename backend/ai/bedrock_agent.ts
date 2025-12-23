@@ -1,5 +1,5 @@
 import { BedrockRuntimeClient, InvokeModelCommand } from "@aws-sdk/client-bedrock-runtime";
-import { BedrockAgentRuntimeClient, InvokeAgentCommand } from "@aws-sdk/client-bedrock-agent-runtime";
+import { BedrockAgentRuntimeClient, InvokeAgentCommand, RetrieveAndGenerateCommand } from "@aws-sdk/client-bedrock-agent-runtime";
 import { secret } from "encore.dev/config";
 import log from "encore.dev/log";
 
@@ -9,6 +9,7 @@ const awsSecretAccessKey = secret("AWSSecretAccessKey");
 const awsRegion = secret("AWSRegion");
 const bedrockAgentId = secret("BedrockAgentId");
 const bedrockAgentAliasId = secret("BedrockAgentAliasId");
+const bedrockKnowledgeBaseId = secret("BedrockKnowledgeBaseId");
 
 /**
  * BedrockAgentClient handles interactions with Amazon Bedrock Agents.
@@ -74,6 +75,32 @@ export class BedrockAgentClient {
     } catch (error) {
       log.error("Error invoking Bedrock agent", { error, sessionId });
       throw error;
+    }
+  }
+
+  async retrieveAndGenerate(prompt: string, sessionId?: string): Promise<string> {
+    const { agent } = this.getClients();
+    const region = awsRegion();
+    const modelArn = `arn:aws:bedrock:${region}::foundation-model/anthropic.claude-3-sonnet-20240229-v1:0`;
+    
+    const command = new RetrieveAndGenerateCommand({
+      input: { text: prompt },
+      retrieveAndGenerateConfiguration: {
+        type: "KNOWLEDGE_BASE",
+        knowledgeBaseConfiguration: {
+          knowledgeBaseId: bedrockKnowledgeBaseId(),
+          modelArn: modelArn,
+        },
+      },
+      sessionId: sessionId,
+    });
+
+    try {
+      const response = await agent.send(command);
+      return response.output?.text || "No information found in Knowledge Base.";
+    } catch (error) {
+      log.error("Error invoking Bedrock Knowledge Base RAG", { error, sessionId });
+      return "I was unable to consult the Knowledge Base at this time.";
     }
   }
 
