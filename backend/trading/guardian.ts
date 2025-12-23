@@ -69,115 +69,112 @@ async function checkTiltRisk(userId: string, accountId: number): Promise<{
  * Guardian Cron Job - Runs every minute to monitor tilt risk
  * Automatically liquidates positions when high tilt risk is detected
  */
-export const guardianMonitor = new CronJob("guardian-monitor", {
-  schedule: "*/1 * * * *",
-  handler: async () => {
-    log.info("Guardian: Starting tilt risk monitoring cycle");
+export const guardianMonitor = new CronJob("guardian-monitor", "*/1 * * * *", async () => {
+  log.info("Guardian: Starting tilt risk monitoring cycle");
 
-    try {
-      // Get all accounts with autopilot enabled
-      const autopilotAccounts = await db.query<{
-        user_id: string;
-        projectx_account_id: number;
-        max_daily_loss: number;
-        autopilot_enabled: boolean;
-      }>`
-        SELECT user_id, projectx_account_id, max_daily_loss, autopilot_enabled
-        FROM accounts
-        WHERE autopilot_enabled = true AND projectx_account_id IS NOT NULL
-      `;
+  try {
+    // Get all accounts with autopilot enabled
+    const autopilotAccounts = await db.query<{
+      user_id: string;
+      projectx_account_id: number;
+      max_daily_loss: number;
+      autopilot_enabled: boolean;
+    }>`
+      SELECT user_id, projectx_account_id, max_daily_loss, autopilot_enabled
+      FROM accounts
+      WHERE autopilot_enabled = true AND projectx_account_id IS NOT NULL
+    `;
 
-      let monitoredAccounts = 0;
-      let emergencyActions = 0;
+    let monitoredAccounts = 0;
+    let emergencyActions = 0;
 
-      for (const account of autopilotAccounts) {
-        try {
-          monitoredAccounts++;
+    for (const account of autopilotAccounts) {
+      try {
+        monitoredAccounts++;
 
-          // Check tilt risk for this account
-          const tiltCheck = await checkTiltRisk(account.user_id, account.projectx_account_id);
+        // Check tilt risk for this account
+        const tiltCheck = await checkTiltRisk(account.user_id, account.projectx_account_id);
 
-          if (tiltCheck.tiltRisk === "high") {
-            log.warn("Guardian: HIGH TILT RISK detected - initiating emergency liquidation", {
-              userId: account.user_id,
-              accountId: account.projectx_account_id,
-              reason: tiltCheck.reason,
-              recommendation: tiltCheck.recommendation,
-            });
-
-            // Get all open positions for this account
-            const openPositions = await projectx.searchOpenPositions(account.projectx_account_id);
-
-            if (openPositions.length > 0) {
-              log.info("Guardian: Liquidating positions", {
-                userId: account.user_id,
-                accountId: account.projectx_account_id,
-                positionCount: openPositions.length,
-              });
-
-              // Close all positions
-              for (const position of openPositions) {
-                try {
-                  await projectx.closePosition(
-                    account.projectx_account_id,
-                    position.contractId
-                  );
-
-                  log.info("Guardian: Position closed successfully", {
-                    userId: account.user_id,
-                    accountId: account.projectx_account_id,
-                    contractId: position.contractId,
-                    size: position.size,
-                  });
-
-                  emergencyActions++;
-                } catch (error) {
-                  log.error("Guardian: Failed to close position", {
-                    error: error instanceof Error ? error.message : String(error),
-                    userId: account.user_id,
-                    accountId: account.projectx_account_id,
-                    contractId: position.contractId,
-                  });
-                }
-              }
-
-              // Record the emergency action in tilt_events
-              await db.exec`
-                INSERT INTO tilt_events (
-                  user_id, account_id, risk_level, reason, recommendation, acknowledged
-                ) VALUES (
-                  ${account.user_id}, ${account.projectx_account_id}, 'high',
-                  ${tiltCheck.reason}, ${tiltCheck.recommendation}, true
-                )
-              `;
-
-            } else {
-              log.info("Guardian: No open positions to liquidate", {
-                userId: account.user_id,
-                accountId: account.projectx_account_id,
-              });
-            }
-          }
-
-        } catch (error) {
-          log.error("Guardian: Error monitoring account", {
-            error: error instanceof Error ? error.message : String(error),
+        if (tiltCheck.tiltRisk === "high") {
+          log.warn("Guardian: HIGH TILT RISK detected - initiating emergency liquidation", {
             userId: account.user_id,
             accountId: account.projectx_account_id,
+            reason: tiltCheck.reason,
+            recommendation: tiltCheck.recommendation,
           });
+
+          // Get all open positions for this account
+          const openPositions = await projectx.searchOpenPositions(account.projectx_account_id);
+
+          if (openPositions.length > 0) {
+            log.info("Guardian: Liquidating positions", {
+              userId: account.user_id,
+              accountId: account.projectx_account_id,
+              positionCount: openPositions.length,
+            });
+
+            // Close all positions
+            for (const position of openPositions) {
+              try {
+                await projectx.closePosition(
+                  account.projectx_account_id,
+                  position.contractId
+                );
+
+                log.info("Guardian: Position closed successfully", {
+                  userId: account.user_id,
+                  accountId: account.projectx_account_id,
+                  contractId: position.contractId,
+                  size: position.size,
+                });
+
+                emergencyActions++;
+              } catch (error) {
+                log.error("Guardian: Failed to close position", {
+                  error: error instanceof Error ? error.message : String(error),
+                  userId: account.user_id,
+                  accountId: account.projectx_account_id,
+                  contractId: position.contractId,
+                });
+              }
+            }
+
+            // Record the emergency action in tilt_events
+            await db.exec`
+              INSERT INTO tilt_events (
+                user_id, account_id, risk_level, reason, recommendation, acknowledged
+              ) VALUES (
+                ${account.user_id}, ${account.projectx_account_id}, 'high',
+                ${tiltCheck.reason}, ${tiltCheck.recommendation}, true
+              )
+            `;
+
+          } else {
+            log.info("Guardian: No open positions to liquidate", {
+              userId: account.user_id,
+              accountId: account.projectx_account_id,
+            });
+          }
         }
+
+      } catch (error) {
+        log.error("Guardian: Error monitoring account", {
+          error: error instanceof Error ? error.message : String(error),
+          userId: account.user_id,
+          accountId: account.projectx_account_id,
+        });
       }
-
-      log.info("Guardian: Monitoring cycle completed", {
-        monitoredAccounts,
-        emergencyActions,
-        totalAccounts: autopilotAccounts.length,
-      });
-
-    } catch (error) {
-      log.error("Guardian: Critical error in monitoring cycle", {
-        error: error instanceof Error ? error.message : String(error),
-      });
     }
-  },
+
+    log.info("Guardian: Monitoring cycle completed", {
+      monitoredAccounts,
+      emergencyActions,
+      totalAccounts: autopilotAccounts.length,
+    });
+
+  } catch (error) {
+    log.error("Guardian: Critical error in monitoring cycle", {
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
 });
