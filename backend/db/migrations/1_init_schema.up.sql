@@ -9,6 +9,8 @@ CREATE TABLE IF NOT EXISTS accounts (
   daily_pnl DECIMAL(18, 2) NOT NULL DEFAULT 0,
   total_pnl DECIMAL(18, 2) NOT NULL DEFAULT 0,
   projectx_account_id INTEGER,
+  topstepx_username TEXT,
+  topstepx_api_key TEXT,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
