@@ -14,10 +14,18 @@ const bedrockAgentAliasId = secret("BedrockAgentAliasId");
  * BedrockAgentClient handles interactions with Amazon Bedrock Agents.
  */
 export class BedrockAgentClient {
-  private agentClient: BedrockAgentRuntimeClient;
-  private runtimeClient: BedrockRuntimeClient;
+  private agentClient: BedrockAgentRuntimeClient | null = null;
+  private runtimeClient: BedrockRuntimeClient | null = null;
 
   constructor() {
+    // Clients initialized lazily
+  }
+
+  private getClients() {
+    if (this.agentClient && this.runtimeClient) {
+      return { agent: this.agentClient, runtime: this.runtimeClient };
+    }
+
     const credentials = {
       accessKeyId: awsAccessKeyId(),
       secretAccessKey: awsSecretAccessKey(),
@@ -33,12 +41,16 @@ export class BedrockAgentClient {
       region,
       credentials,
     });
+
+    return { agent: this.agentClient, runtime: this.runtimeClient };
   }
 
   /**
    * Invokes a Bedrock Agent with a user prompt and session ID.
    */
   async invokeAgent(prompt: string, sessionId: string): Promise<string> {
+    const { agent } = this.getClients();
+    
     const command = new InvokeAgentCommand({
       agentId: bedrockAgentId(),
       agentAliasId: bedrockAgentAliasId(),
@@ -47,7 +59,7 @@ export class BedrockAgentClient {
     });
 
     try {
-      const response = await this.agentClient.send(command);
+      const response = await agent.send(command);
       let completion = "";
 
       if (response.completion) {
@@ -69,6 +81,8 @@ export class BedrockAgentClient {
    * Directly invokes a Bedrock model (fallback or specific logic).
    */
   async invokeModel(prompt: string, modelId: string = "anthropic.claude-3-sonnet-20240229-v1:0"): Promise<string> {
+    const { runtime } = this.getClients();
+
     const body = JSON.stringify({
       anthropic_version: "bedrock-2023-05-31",
       max_tokens: 1000,
@@ -88,7 +102,7 @@ export class BedrockAgentClient {
     });
 
     try {
-      const response = await this.runtimeClient.send(command);
+      const response = await runtime.send(command);
       const result = JSON.parse(new TextDecoder().decode(response.body));
       return result.content[0].text;
     } catch (error) {

@@ -4,7 +4,6 @@ import { secret } from "encore.dev/config";
 import { createClerkClient } from "@clerk/backend";
 
 const clerkSecretKeyProd = secret("ClerkSecretKeyProd");
-const clerkClient = createClerkClient({ secretKey: clerkSecretKeyProd() });
 
 interface AuthParams {
   authorization: Header<"Authorization">;
@@ -25,6 +24,9 @@ export const handler = authHandler<AuthParams, AuthData>(async (params) => {
   }
 
   try {
+    // Initialize clerkClient lazily inside the handler to avoid top-level secret access on startup
+    const clerkClient = createClerkClient({ secretKey: clerkSecretKeyProd() });
+
     const session = await clerkClient.authenticateRequest({
       headerToken: token,
     });
