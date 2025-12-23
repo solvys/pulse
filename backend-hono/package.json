@@ -1,0 +1,35 @@
+{
+  "name": "pulse-api",
+  "version": "1.0.0",
+  "description": "Pulse Trading Platform API - Hono + Neon PostgreSQL",
+  "type": "module",
+  "main": "dist/index.js",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src --ext .ts",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "migrate": "tsx src/db/migrate.ts"
+  },
+  "dependencies": {
+    "@clerk/backend": "^1.27.0",
+    "@hono/node-server": "^1.13.0",
+    "@neondatabase/serverless": "^0.10.4",
+    "hono": "^4.6.0",
+    "pino": "^9.6.0",
+    "pino-pretty": "^11.0.0",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.8.3",
+    "vitest": "^2.0.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
