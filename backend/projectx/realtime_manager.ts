@@ -4,6 +4,7 @@
  */
 
 import log from "encore.dev/log";
+import { ai } from "~encore/clients";
 import { UserHub } from "./realtime_user_hub";
 import { MarketHub } from "./realtime_market_hub";
 import { getAuthToken } from "./projectx_client";
@@ -79,6 +80,16 @@ class RealtimeManager {
 
       // Create message broadcaster for this session
       const broadcast = (message: RealtimeMessage) => {
+        // Send signal to Brain Observer
+        ai.processSignal({
+          userId,
+          type: message.type,
+          data: message.data,
+          timestamp: message.timestamp,
+        }).catch(err => {
+          log.error("Failed to send signal to Brain Observer", { error: err });
+        });
+
         const session = this.sessions.get(sessionKey);
         if (session) {
           session.messageCallbacks.forEach(cb => {

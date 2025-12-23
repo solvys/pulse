@@ -132,10 +132,37 @@ export const sendMessage = api<
       VALUES (${req.threadId}, 'user', ${req.message})
     `;
 
-    // 3. Invoke Bedrock Agent
-    const responseText = await bedrock.invokeAgent(req.message, req.threadId);
+    // 3. Inject System Context
+    const accounts = await db.query`
+      SELECT balance, equity, daily_pnl FROM accounts WHERE user_id = ${auth.userID}
+    `;
+    
+    const openTrades = await db.query`
+      SELECT symbol, side, size, pnl, opened_at FROM trades 
+      WHERE user_id = ${auth.userID} AND closed_at IS NULL
+    `;
 
-    // 4. Store assistant response
+    const recentHistory = await db.query`
+      SELECT symbol, side, size, pnl, closed_at FROM trades 
+      WHERE user_id = ${auth.userID} AND closed_at IS NOT NULL 
+      ORDER BY closed_at DESC LIMIT 5
+    `;
+
+    const systemContext = `
+[SYSTEM CONTEXT]
+Current Time: ${new Date().toISOString()}
+Account Status: ${JSON.stringify(accounts[0] || {})}
+Open Positions: ${JSON.stringify(openTrades)}
+Recent Trades: ${JSON.stringify(recentHistory)}
+[/SYSTEM CONTEXT]
+
+User Message: ${req.message}
+    `;
+
+    // 4. Invoke Bedrock Agent
+    const responseText = await bedrock.invokeAgent(systemContext, req.threadId);
+
+    // 5. Store assistant response
     await db.exec`
       INSERT INTO chat_messages (thread_id, role, content)
       VALUES (${req.threadId}, 'assistant', ${responseText})

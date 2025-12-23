@@ -1,0 +1,336 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "Pulse Trading Autopilot Actions",
+    "version": "1.0.0",
+    "description": "Action groups for Bedrock Agent to execute trading operations through Pulse Autopilot"
+  },
+  "servers": [
+    {
+      "url": "https://pulse-api.com",
+      "description": "Pulse Trading API"
+    }
+  ],
+  "paths": {
+    "/trading/propose/place-order": {
+      "post": {
+        "operationId": "PlaceOrder",
+        "summary": "Propose placing a new trading order",
+        "description": "Creates a proposed order that requires human acknowledgment before execution",
+        "parameters": [
+          {
+            "name": "accountId",
+            "in": "query",
+            "description": "The account ID",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "contractId",
+            "in": "query",
+            "description": "The contract ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "type",
+            "in": "query",
+            "description": "Order type: 1=Limit, 2=Market, 4=Stop, 5=TrailingStop, 6=JoinBid, 7=JoinAsk",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "enum": [1, 2, 4, 5, 6, 7]
+            }
+          },
+          {
+            "name": "side",
+            "in": "query",
+            "description": "Order side: 0=Buy, 1=Sell",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "enum": [0, 1]
+            }
+          },
+          {
+            "name": "size",
+            "in": "query",
+            "description": "Order size",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          {
+            "name": "limitPrice",
+            "in": "query",
+            "description": "Limit price for limit orders",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "stopPrice",
+            "in": "query",
+            "description": "Stop price for stop orders",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "trailPrice",
+            "in": "query",
+            "description": "Trail price for trailing stop orders",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "customTag",
+            "in": "query",
+            "description": "Optional custom tag for the order",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "stopLossTicks",
+            "in": "query",
+            "description": "Stop loss bracket in ticks",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "stopLossType",
+            "in": "query",
+            "description": "Stop loss bracket type: 1=Limit, 2=Market, 4=Stop, 5=TrailingStop",
+            "schema": {
+              "type": "integer",
+              "enum": [1, 2, 4, 5]
+            }
+          },
+          {
+            "name": "takeProfitTicks",
+            "in": "query",
+            "description": "Take profit bracket in ticks",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "takeProfitType",
+            "in": "query",
+            "description": "Take profit bracket type: 1=Limit, 2=Market, 4=Stop, 5=TrailingStop",
+            "schema": {
+              "type": "integer",
+              "enum": [1, 2, 4, 5]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Order proposal created successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "proposalId": {
+                      "type": "string",
+                      "description": "Unique ID of the proposed action"
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": ["draft"],
+                      "description": "Proposal status"
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "Confirmation message"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request parameters or risk limits exceeded"
+          },
+          "403": {
+            "description": "Account access denied or autopilot disabled"
+          }
+        }
+      }
+    },
+    "/trading/propose/modify-order": {
+      "post": {
+        "operationId": "ModifyOrder",
+        "summary": "Propose modifying an existing order",
+        "description": "Creates a proposal to modify an existing open order",
+        "parameters": [
+          {
+            "name": "accountId",
+            "in": "query",
+            "description": "The account ID",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "orderId",
+            "in": "query",
+            "description": "The order ID to modify",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "size",
+            "in": "query",
+            "description": "New order size",
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          {
+            "name": "limitPrice",
+            "in": "query",
+            "description": "New limit price",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "stopPrice",
+            "in": "query",
+            "description": "New stop price",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "trailPrice",
+            "in": "query",
+            "description": "New trail price",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Order modification proposal created successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "proposalId": {
+                      "type": "string",
+                      "description": "Unique ID of the proposed action"
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": ["draft"],
+                      "description": "Proposal status"
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "Confirmation message"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request parameters"
+          },
+          "403": {
+            "description": "Account access denied or autopilot disabled"
+          },
+          "404": {
+            "description": "Order not found"
+          }
+        }
+      }
+    },
+    "/trading/status": {
+      "get": {
+        "operationId": "GetStatus",
+        "summary": "Get current trading status",
+        "description": "Retrieves current open orders and positions for an account",
+        "parameters": [
+          {
+            "name": "accountId",
+            "in": "query",
+            "description": "The account ID",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Trading status retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "openOrders": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": { "type": "integer" },
+                          "contractId": { "type": "string" },
+                          "status": { "type": "integer" },
+                          "type": { "type": "integer" },
+                          "side": { "type": "integer" },
+                          "size": { "type": "integer" },
+                          "limitPrice": { "type": "number" },
+                          "stopPrice": { "type": "number" }
+                        }
+                      }
+                    },
+                    "openPositions": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": { "type": "integer" },
+                          "contractId": { "type": "string" },
+                          "size": { "type": "integer" },
+                          "averagePrice": { "type": "number" }
+                        }
+                      }
+                    },
+                    "tiltRisk": {
+                      "type": "string",
+                      "enum": ["low", "medium", "high"],
+                      "description": "Current tilt risk level"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Account access denied"
+          }
+        }
+      }
+    }
+  }
+}

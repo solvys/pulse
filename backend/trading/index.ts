@@ -11,6 +11,9 @@ import { db } from "../db";
 // Re-export service functions from projectx
 export { executeTestTrade, processTradingSignal } from "../projectx/service";
 
+// Re-export autopilot functions
+export { proposeAction, acknowledgeAction, getProposedActions } from "./autopilot";
+
 /**
  * Record a trade for analytics and PsychAssist tracking
  */
