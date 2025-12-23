@@ -69,7 +69,9 @@ async function checkTiltRisk(userId: string, accountId: number): Promise<{
  * Guardian Cron Job - Runs every minute to monitor tilt risk
  * Automatically liquidates positions when high tilt risk is detected
  */
-export const guardianMonitor = new CronJob("guardian-monitor", "*/1 * * * *", async () => {
+export const guardianMonitor = new CronJob("guardian-monitor", {
+  schedule: "*/1 * * * *",
+  handler: async () => {
     log.info("Guardian: Starting tilt risk monitoring cycle");
 
     try {
@@ -166,4 +168,5 @@ export const guardianMonitor = new CronJob("guardian-monitor", "*/1 * * * *", as
         error: error instanceof Error ? error.message : String(error),
       });
     }
+  },
 });
