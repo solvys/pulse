@@ -9,6 +9,8 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.27.0",
+    "@aws-sdk/client-bedrock-agent-runtime": "^3.957.0",
+    "@aws-sdk/client-bedrock-runtime": "^3.957.0",
     "@clerk/backend": "^1.27.0",
     "@clerk/clerk-sdk-node": "^4.13.23",
     "@langchain/anthropic": "^0.3.0",
