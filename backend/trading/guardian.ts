@@ -163,7 +163,7 @@ export const guardianMonitor = new CronJob("guardian-monitor", {
       totalAccounts: autopilotAccounts.length,
     });
 
-    } catch (error) {
+  } catch (error) {
       log.error("Guardian: Critical error in monitoring cycle", {
         error: error instanceof Error ? error.message : String(error),
       });
