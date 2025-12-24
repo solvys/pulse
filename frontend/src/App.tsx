@@ -1,4 +1,5 @@
-import { Routes, Route, useAuth } from '@clerk/clerk-react'
+import { useAuth } from '@clerk/clerk-react'
+import { Routes, Route } from 'react-router-dom'
 import { AppShell } from '@/components/layout/AppShell';
 import { TheTape } from '@/components/tape/TheTape';
 import { PriceChat } from '@/components/price/PriceChat';
