@@ -1,0 +1,106 @@
+# Pulse — Integrated Trading Environment
+
+> **Pulse** is a comprehensive trading platform that integrates market data, risk management, journaling, and AI-powered insights into a unified interface.
+
+## 🏗️ Project Structure
+
+```
+pulse/
+├── backend-hono/      # Hono backend API (Fly.io deployment)
+├── frontend/          # Next.js frontend (Vercel deployment)
+├── backend/           # Legacy Encore backend (deprecated)
+├── docs/              # Project documentation
+├── knowledge-base/    # Trading knowledge and strategies
+└── scripts/           # Utility scripts
+```
+
+## 🚀 Quick Start
+
+### Prerequisites
+
+- Node.js 20+
+- PostgreSQL (for local development)
+- Fly.io CLI (for backend deployment)
+- Vercel CLI (for frontend deployment)
+
+### Local Development
+
+**Backend:**
+```bash
+cd backend-hono
+npm install
+npm run dev
+```
+
+**Frontend:**
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+See `docs/setup/SETUP-SUMMARY.md` for detailed setup instructions.
+
+## 📚 Documentation
+
+All documentation is organized in the `docs/` directory:
+
+- **Migration Phases:** `docs/phases/` - Complete migration documentation
+- **Deployment:** `docs/deployment/` - Deployment guides
+- **Architecture:** `docs/architecture/` - System design and decisions
+- **Integration:** `docs/integration/` - Third-party integrations
+- **Setup:** `docs/setup/` - Configuration and setup guides
+
+## 🔧 Key Technologies
+
+- **Backend:** Hono, Neon PostgreSQL, Fly.io
+- **Frontend:** Next.js 14, React, TypeScript, Tailwind CSS
+- **Auth:** Clerk
+- **Database:** Neon PostgreSQL
+- **Deployment:** Fly.io (backend), Vercel (frontend)
+
+## 📖 Architecture
+
+See `docs/architecture/ARCHITECTURE.md` for complete system architecture.
+
+## 🔐 Environment Variables
+
+See `secrets.env` for environment variable reference (do not commit secrets).
+
+Required variables:
+- `DATABASE_URL` - Neon PostgreSQL connection string
+- `CLERK_SECRET_KEY` - Clerk authentication secret
+- `NEXT_PUBLIC_API_URL` - Backend API URL
+- `PROJECTX_USERNAME` / `PROJECTX_API_KEY` - TopStepX integration
+
+## 🚢 Deployment
+
+**Backend (Fly.io):**
+```bash
+cd backend-hono
+fly deploy
+```
+
+**Frontend (Vercel):**
+```bash
+cd frontend
+vercel deploy
+```
+
+See `docs/deployment/DEPLOYMENT-GUIDE.md` for detailed instructions.
+
+## 📝 Development Workflow
+
+1. Create feature branch: `git checkout -b v.{MONTH}.{DATE}.{PATCH}`
+2. Make changes following TypeScript strict mode
+3. Test locally
+4. Commit with format: `[v.X.Y.Z] type: description`
+5. Create pull request
+
+## 🗂️ Repository Organization
+
+This is a **monorepo** containing both frontend and backend. See `docs/architecture/ARCHITECTURE-DECISIONS.md` for rationale.
+
+## 📄 License
+
+Proprietary - Solvys Technologies
