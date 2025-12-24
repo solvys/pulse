@@ -40,7 +40,13 @@ ivScoringRoutes.get('/calculate', async (c) => {
     const tickSize = contract?.tick_size || 0.25;
 
     const ivScore = calculateIVScore(vixValue);
-    const impliedPoints = calculateImpliedPoints(vixValue, tickValue, tickSize, symbol);
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const impliedPoints = calculateImpliedPoints(
+      vixValue,
+      tickValue,
+      tickSize,
+      symbol
+    );
 
     return c.json({
       symbol,
@@ -71,8 +77,8 @@ function calculateIVScore(vix: number): number {
 
 function calculateImpliedPoints(
   vix: number,
-  tickValue: number,
-  tickSize: number,
+  _tickValue: number,
+  _tickSize: number,
   symbol: string
 ): { daily: number; session: number } {
   const contractMultipliers: Record<string, number> = {

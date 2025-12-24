@@ -1,8 +1,6 @@
 import { createMiddleware } from 'hono/factory';
-import { createClerkClient } from '@clerk/backend';
+import { verifyToken } from '@clerk/backend';
 import { env } from '../env.js';
-
-const clerk = createClerkClient({ secretKey: env.CLERK_SECRET_KEY });
 
 declare module 'hono' {
   interface ContextVariableMap {
@@ -20,14 +18,22 @@ export const authMiddleware = createMiddleware(async (c, next) => {
   const token = authHeader.replace('Bearer ', '');
 
   try {
-    const { sub: userId } = await clerk.verifyToken(token);
+    const result = await verifyToken(token, {
+      secretKey: env.CLERK_SECRET_KEY,
+    });
 
-    if (!userId) {
+    if (!result || result.errors || !result.payload) {
       return c.json({ error: 'Unauthorized: Invalid token' }, 401);
+    }
+
+    const userId = (result.payload as { sub?: string }).sub;
+    if (!userId) {
+      return c.json({ error: 'Unauthorized: Invalid token payload' }, 401);
     }
 
     c.set('userId', userId);
     await next();
+    return;
   } catch (error) {
     console.error('Auth error:', error);
     return c.json({ error: 'Unauthorized: Token verification failed' }, 401);

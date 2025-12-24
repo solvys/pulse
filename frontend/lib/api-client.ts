@@ -2,9 +2,22 @@
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
 
+/**
+ * Client-side fetch with Clerk token
+ * For use in client components - uses Clerk's client-side getToken
+ */
 async function fetchWithAuth(url: string, options: RequestInit = {}) {
-  // In production, get token from Clerk
-  const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
+  // Dynamically import Clerk client-side getToken
+  let token: string | null = null;
+  
+  if (typeof window !== 'undefined') {
+    try {
+      const { getToken } = await import('@clerk/nextjs');
+      token = await getToken();
+    } catch (error) {
+      console.warn('Failed to get Clerk token:', error);
+    }
+  }
   
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
@@ -21,7 +34,15 @@ async function fetchWithAuth(url: string, options: RequestInit = {}) {
   });
   
   if (!response.ok) {
-    throw new Error(`API error: ${response.statusText}`);
+    const errorText = await response.text();
+    let errorMessage = `API error: ${response.statusText}`;
+    try {
+      const errorJson = JSON.parse(errorText);
+      errorMessage = errorJson.error || errorMessage;
+    } catch {
+      // Use default error message
+    }
+    throw new Error(errorMessage);
   }
   
   return response.json();
@@ -72,7 +93,51 @@ export const econApi = {
 
 // News API
 export const newsApi = {
-  getFeed: async (): Promise<any> => {
-    return fetchWithAuth('/news/feed');
+  getFeed: async (): Promise<{ items: any[] }> => {
+    const data = await fetchWithAuth('/news/feed');
+    // Backend returns 'articles', frontend expects 'items'
+    return {
+      items: (data.articles || []).map((article: any) => ({
+        id: article.id?.toString() || '',
+        time: article.publishedAt || new Date().toISOString(),
+        source: article.source || 'Unknown',
+        headline: article.title || '',
+        sentiment: article.sentiment || 'neutral',
+        ivImpact: article.ivImpact || 0,
+        isBreaking: article.isBreaking || false,
+      })),
+    };
+  },
+};
+
+// Market API
+export const marketApi = {
+  getVIX: async (): Promise<{ value: number; timestamp: string; source: string }> => {
+    return fetchWithAuth('/market/vix');
+  },
+  
+  getData: async (symbol: string): Promise<any> => {
+    return fetchWithAuth(`/market/data/${symbol}`);
+  },
+  
+  getBars: async (symbol: string, unit?: string, barsBack?: number): Promise<any> => {
+    const params = new URLSearchParams();
+    if (unit) params.append('unit', unit);
+    if (barsBack) params.append('barsBack', barsBack.toString());
+    return fetchWithAuth(`/market/bars/${symbol}?${params.toString()}`);
+  },
+};
+
+// IV Scoring API
+export const ivScoringApi = {
+  calculate: async (symbol: string): Promise<{
+    symbol: string;
+    vixValue: number;
+    ivScore: number;
+    impliedPoints: { daily: number; session: number };
+    riskLevel: 'low' | 'medium' | 'high' | 'extreme';
+    timestamp: string;
+  }> => {
+    return fetchWithAuth(`/iv-scoring/calculate?symbol=${symbol}`);
   },
 };
