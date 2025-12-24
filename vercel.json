@@ -1,7 +1,7 @@
 {
-  "installCommand": "cd frontend && npm install",
-  "buildCommand": "cd frontend && npm run build",
-  "outputDirectory": "frontend/dist",
+  "rootDirectory": "frontend",
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist",
   "framework": null,
   "regions": ["iad1"]
 }
