@@ -44,13 +44,15 @@ vercel --cwd .
 
 ### Option 3: Root-Level `vercel.json` (Recommended for Monorepos)
 
-Use a single, root-level `vercel.json` so Vercel builds the **frontend only** even when importing the whole monorepo (✅ **this repo is configured this way**):
+Use a single, root-level `vercel.json` to control the build commands (✅ **this repo is configured this way**).
+
+Important: if your Vercel Project **Root Directory is set to `frontend`**, then commands run inside `frontend/` already — so **do not** `cd frontend` in your commands.
 
 ```json
 {
-  "installCommand": "cd frontend && npm install",
-  "buildCommand": "cd frontend && npm run build",
-  "outputDirectory": "frontend/.next",
+  "installCommand": "npm install",
+  "buildCommand": "npm run build",
+  "outputDirectory": ".next",
   "framework": "nextjs",
   "regions": ["iad1"]
 }
@@ -73,9 +75,9 @@ Use a single, root-level `vercel.json` so Vercel builds the **frontend only** ev
 
 ### Build Settings
 - **Framework:** Next.js (auto-detected)
-- **Build Command:** `cd frontend && npm run build`
-- **Output Directory:** `frontend/.next`
-- **Install Command:** `cd frontend && npm install`
+- **Build Command:** `npm run build`
+- **Output Directory:** `.next`
+- **Install Command:** `npm install`
 
 ### Environment Variables
 Set these in Vercel Dashboard → Settings → Environment Variables:
