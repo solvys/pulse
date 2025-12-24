@@ -1,12 +1,7 @@
 {
   "installCommand": "npm install",
   "buildCommand": "npm run build",
-  "outputDirectory": ".next",
-  "framework": "nextjs",
-  "regions": ["iad1"],
-  "functions": {
-    "frontend/middleware.ts": {
-      "runtime": "nodejs20.x"
-    }
-  }
+  "outputDirectory": "dist",
+  "framework": null,
+  "regions": ["iad1"]
 }

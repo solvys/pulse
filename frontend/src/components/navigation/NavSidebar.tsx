@@ -1,7 +1,7 @@
 'use client';
 
 import { Newspaper, Bot, TrendingUp, BookOpen, Calendar, UserCircle, Settings, LogOut, Pin, X } from 'lucide-react';
-import { useUser } from '@clerk/nextjs';
+import { useUser } from '@clerk/clerk-react';
 import type { NavSection } from '@/types';
 
 interface NavSidebarProps {

@@ -4,7 +4,7 @@ import { VIXTicker } from './VIXTicker';
 import { TopStepXTogglePill } from './TopStepXTogglePill';
 import { LayoutModeSelector } from './LayoutModeSelector';
 import { IVScoreBadge } from './IVScoreBadge';
-import { useUser } from '@clerk/nextjs';
+import { useUser } from '@clerk/clerk-react';
 import { useAppShell } from '@/hooks/useAppShell';
 
 export function HeaderBar() {
