@@ -1,8 +1,8 @@
 {
   "installCommand": "npm install",
   "buildCommand": "npm run build",
-  "outputDirectory": "dist",
-  "framework": null,
+  "outputDirectory": ".next",
+  "framework": "nextjs",
   "regions": ["iad1"],
   "functions": {
     "frontend/middleware.ts": {
