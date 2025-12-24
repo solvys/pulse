@@ -24,3 +24,8 @@
 **/.bun/**
 **/dist/**
 **/.DS_Store
+
+# Environment files with secrets
+secrets.env
+**/.env.local
+**/.env*.local
