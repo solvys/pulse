@@ -1,22 +1,11 @@
 # Vercel Web Analytics Setup Guide
 
-This guide will help you set up and use Vercel Web Analytics on the Pulse frontend project.
+This guide will help you set up and use Vercel Web Analytics on the Pulse frontend project (Vite + React).
 
 ## Prerequisites
 
 - A Vercel account. If you don't have one, you can [sign up for free](https://vercel.com/signup).
 - The Pulse project deployed to Vercel, or ready to be deployed.
-- The Vercel CLI installed. If you don't have it, you can install it using:
-
-```bash
-npm install vercel
-# or
-pnpm add vercel
-# or
-yarn add vercel
-# or
-bun add vercel
-```
 
 ## Setup Steps
 
@@ -41,74 +30,54 @@ npm install @vercel/analytics
 pnpm add @vercel/analytics
 # or
 yarn add @vercel/analytics
-# or
-bun add @vercel/analytics
 ```
 
-### 3. Add Analytics Component to Next.js App Layout
+### 3. Add Analytics Component to React App
 
-Update the root layout to include the Analytics component. The `Analytics` component offers seamless integration with Next.js, including automatic route tracking.
+Update the main entry point to include the Analytics component. For Vite + React projects, use the `react` import.
 
-**File:** `frontend/app/layout.tsx`
+**File:** `frontend/src/main.tsx`
 
 ```tsx
-import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
-import { ClerkProvider } from '@clerk/nextjs';
-import { Analytics } from "@vercel/analytics/next";
-import "./globals.css";
+import React from 'react'
+import ReactDOM from 'react-dom/client'
+import { BrowserRouter } from 'react-router-dom'
+import { ClerkProvider } from '@clerk/clerk-react'
+import { Analytics } from '@vercel/analytics/react'
+import App from './App.tsx'
+import './index.css'
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
+const PUBLISHABLE_KEY = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
-
-export const metadata: Metadata = {
-  title: "Pulse - Integrated Trading Environment",
-  description: "AI-powered trading environment with RiskFlow, Journal, and Econ Calendar",
-};
-
-export default function RootLayout({
-  children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
-  return (
-    <ClerkProvider>
-      <html lang="en">
-        <body
-          className={`${geistSans.variable} ${geistMono.variable} antialiased`}
-        >
-          {children}
-          <Analytics />
-        </body>
-      </html>
-    </ClerkProvider>
-  );
+if (!PUBLISHABLE_KEY) {
+  throw new Error("Missing Publishable Key")
 }
+
+ReactDOM.createRoot(document.getElementById('root')!).render(
+  <React.StrictMode>
+    <ClerkProvider publishableKey={PUBLISHABLE_KEY}>
+      <BrowserRouter>
+        <App />
+        <Analytics />
+      </BrowserRouter>
+    </ClerkProvider>
+  </React.StrictMode>,
+)
 ```
 
 The key changes:
-- Line 5: Import `Analytics` from `@vercel/analytics/next`
-- Line 28: Add `<Analytics />` component at the end of the body
+- Import `Analytics` from `@vercel/analytics/react` (not `/next`)
+- Add `<Analytics />` component inside the React tree
 
 ### 4. Deploy to Vercel
 
-Deploy your app with the updated analytics configuration:
+Deploy your app with the updated analytics configuration. With your Git repository connected, simply push to your main branch and Vercel will automatically deploy.
 
 ```bash
-cd frontend
-vercel deploy
+git add .
+git commit -m "feat: Add Vercel Analytics"
+git push
 ```
-
-Or if you've connected your Git repository (recommended), simply push to your main branch and Vercel will automatically deploy.
-
-> **💡 Tip:** For seamless CI/CD, connect your Git repository to Vercel. This enables automatic deployments on every push to main without terminal commands.
 
 Once deployed, Vercel Web Analytics will start tracking visitors and page views automatically.
 
@@ -167,17 +136,18 @@ function handleClick() {
 }
 ```
 
-See the [Custom Events Documentation](/docs/analytics/custom-events) for more details.
+See the [Custom Events Documentation](https://vercel.com/docs/analytics/custom-events) for more details.
 
-## Filtering and Analysis
+## Environment Variables for Vite
 
-Once you have data, you can:
-- Filter by date range, page, device, browser, and country
-- Create custom dashboards
-- Export reports
-- Set up alerts
+Pulse uses these environment variables (set in Vercel Dashboard → Settings → Environment Variables):
 
-See the [Filtering Documentation](/docs/analytics/filtering) for detailed instructions.
+| Variable | Description | Required |
+|----------|-------------|----------|
+| `VITE_CLERK_PUBLISHABLE_KEY` | Clerk authentication publishable key | Yes |
+| `VITE_API_URL` | Backend API URL (Fly.io) | Yes |
+
+> **Note:** Vite uses the `VITE_` prefix for environment variables (not `NEXT_PUBLIC_`).
 
 ## Privacy and Compliance
 
@@ -187,7 +157,7 @@ Vercel Web Analytics is designed with privacy in mind:
 - First-party data collection (no third-party tracking)
 - No personal data is collected
 
-See [Privacy Policy Documentation](/docs/analytics/privacy-policy) for complete details.
+See [Privacy Policy Documentation](https://vercel.com/docs/analytics/privacy-policy) for complete details.
 
 ## Troubleshooting
 
@@ -203,33 +173,11 @@ See [Privacy Policy Documentation](/docs/analytics/privacy-policy) for complete 
 - **Cause:** Web Analytics might not be enabled on your Vercel project
 - **Solution:** Go to your Vercel dashboard, select the project, and enable Analytics from the Analytics tab
 
-### Performance Issues
-
-If the analytics script affects page load time:
-
-```typescript
-// The script is loaded as deferred, so it shouldn't impact performance
-// If you experience issues, check:
-// 1. Network speed in DevTools
-// 2. Total script size (should be < 50KB)
-// 3. Server response time
-```
-
-## Next Steps
-
-Now that Vercel Web Analytics is set up:
-
-1. **Monitor basic metrics** - Get familiar with visitor trends and top pages
-2. **Set up custom events** - Start tracking user interactions (Pro/Enterprise)
-3. **Analyze performance** - Use performance metrics to optimize Pulse
-4. **Create dashboards** - Build custom views of your most important metrics
-
 ## Additional Resources
 
 - [Vercel Analytics Documentation](https://vercel.com/docs/analytics)
 - [Vercel Analytics Package Reference](https://www.npmjs.com/package/@vercel/analytics)
-- [Web Vitals Documentation](https://web.dev/vitals)
-- [Privacy Documentation](/docs/analytics/privacy-policy)
+- [Vite Environment Variables](https://vitejs.dev/guide/env-and-mode.html)
 
 ## Support
 
