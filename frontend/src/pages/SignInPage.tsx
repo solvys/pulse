@@ -1,7 +1,5 @@
-'use client';
-
-import { SignIn } from '@clerk/nextjs';
-import Link from 'next/link';
+import { SignIn } from '@clerk/clerk-react';
+import { Link } from 'react-router-dom';
 
 export default function SignInPage() {
   return (
@@ -24,7 +22,7 @@ export default function SignInPage() {
 
       {/* Logo/Brand */}
       <div className="relative z-10 mb-8 text-center">
-        <Link href="/" className="inline-flex items-center gap-3 group">
+        <Link to="/" className="inline-flex items-center gap-3 group">
           <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-blue-500/25 group-hover:shadow-blue-500/40 transition-shadow">
             <svg 
               className="w-7 h-7 text-white" 
