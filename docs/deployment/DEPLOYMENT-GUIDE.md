@@ -119,9 +119,26 @@ After deployment, your API will be available at:
 
 Update your frontend's `NEXT_PUBLIC_API_URL` environment variable to point to this URL.
 
+## Frontend Analytics (Vercel Web Analytics)
+
+The frontend is configured with Vercel Web Analytics for monitoring user interactions, page views, and performance metrics.
+
+**Setup:**
+- The `@vercel/analytics` package is installed in `frontend/package.json`
+- The `Analytics` component is integrated in `frontend/app/layout.tsx`
+- Web Analytics must be enabled in the Vercel dashboard
+
+**To enable:**
+1. Go to your Vercel dashboard and select the Pulse project
+2. Click the **Analytics** tab and click **Enable**
+3. Deploy the frontend
+
+See `docs/integration/VERCEL-ANALYTICS.md` for complete setup and usage instructions.
+
 ## Next Steps
 
 1. ✅ Backend deployed to Fly.io
 2. ✅ Update frontend `NEXT_PUBLIC_API_URL` to point to Fly.io backend
 3. ✅ Test API connectivity from frontend
 4. ✅ Verify all routes work correctly
+5. ✅ (Optional) Set up Vercel Web Analytics for monitoring

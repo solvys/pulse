@@ -13,6 +13,7 @@
     "@ai-sdk/react": "^3.0.3",
     "@clerk/nextjs": "^6.36.5",
     "@clerk/types": "^4.101.9",
+    "@vercel/analytics": "^1.4.0",
     "ai": "^6.0.3",
     "lucide-react": "^0.562.0",
     "next": "16.1.1",

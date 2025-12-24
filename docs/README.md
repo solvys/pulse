@@ -20,6 +20,7 @@ Deployment instructions and guides:
 Third-party integrations and setup:
 - `NEON-INTEGRATION.md` - Neon database integration guide
 - `neon-config.md` - Neon configuration and setup
+- `VERCEL-ANALYTICS.md` - Vercel Web Analytics setup and usage guide
 
 ### `/architecture/` - Architecture & Design
 System architecture and design decisions:
