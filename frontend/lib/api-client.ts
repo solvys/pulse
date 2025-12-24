@@ -2,18 +2,30 @@
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
 
+type ClerkBrowser = {
+  session?: {
+    getToken: (options?: { template?: string }) => Promise<string | null>;
+  };
+};
+
 /**
  * Client-side fetch with Clerk token
- * For use in client components - uses Clerk's client-side getToken
+ * For use in client components.
+ *
+ * Clerk token retrieval:
+ * - In the browser, Clerk loads `window.Clerk` (Clerk JS).
+ * - We request a token via `window.Clerk.session.getToken()`.
+ *
+ * We avoid `useAuth().getToken()` here because hooks can't be called from a
+ * plain utility module.
  */
 async function fetchWithAuth(url: string, options: RequestInit = {}) {
-  // Dynamically import Clerk client-side getToken
   let token: string | null = null;
   
   if (typeof window !== 'undefined') {
     try {
-      const { getToken } = await import('@clerk/nextjs');
-      token = await getToken();
+      const clerk = (window as unknown as { Clerk?: ClerkBrowser }).Clerk;
+      token = (await clerk?.session?.getToken()) ?? null;
     } catch (error) {
       console.warn('Failed to get Clerk token:', error);
     }
