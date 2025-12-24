@@ -42,39 +42,27 @@ cd frontend
 vercel --cwd .
 ```
 
-Or configure via `vercel.json` (already exists in `frontend/vercel.json`):
-
-```json
-{
-  "buildCommand": "npm run build",
-  "devCommand": "npm run dev",
-  "installCommand": "npm install",
-  "framework": "nextjs",
-  "regions": ["iad1"]
-}
-```
-
 ### Option 3: Root-Level `vercel.json` (Recommended for Monorepos)
 
-Create a `vercel.json` at the repository root (✅ **This is now configured**):
+Use a single, root-level `vercel.json` so Vercel builds the **frontend only** even when importing the whole monorepo (✅ **this repo is configured this way**):
 
 ```json
 {
-  "buildCommand": "cd frontend && npm install && npm run build",
-  "outputDirectory": "frontend/.next",
   "installCommand": "cd frontend && npm install",
+  "buildCommand": "cd frontend && npm run build",
+  "outputDirectory": "frontend/.next",
   "framework": "nextjs",
   "regions": ["iad1"]
 }
 ```
 
 **This approach:**
-- ✅ Works automatically without dashboard configuration
-- ✅ Explicitly tells Vercel to build from `frontend/` directory
-- ✅ Ensures all commands run in the correct directory
-- ✅ Can be version controlled with your code
+- ✅ Keeps configuration version-controlled in git
+- ✅ Avoids relying on Vercel dashboard “Root Directory” settings
+- ✅ Explicitly runs install/build inside `frontend/`
+- ✅ Works even though the repo root does not have a `package.json`
 
-**Alternative:** You can also set Root Directory in Vercel dashboard to `frontend` (but root `vercel.json` is preferred for monorepos).
+**Note:** If you prefer using the Vercel dashboard Root Directory = `frontend`, you can do that too—just keep `vercel.json` in the effective project root and avoid duplicates.
 
 ## Key Configuration Points
 
@@ -85,9 +73,9 @@ Create a `vercel.json` at the repository root (✅ **This is now configured**):
 
 ### Build Settings
 - **Framework:** Next.js (auto-detected)
-- **Build Command:** `npm run build` (runs in `frontend/`)
-- **Output Directory:** `.next` (Next.js default)
-- **Install Command:** `npm install` (runs in `frontend/`)
+- **Build Command:** `cd frontend && npm run build`
+- **Output Directory:** `frontend/.next`
+- **Install Command:** `cd frontend && npm install`
 
 ### Environment Variables
 Set these in Vercel Dashboard → Settings → Environment Variables:
