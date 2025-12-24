@@ -1,9 +1,0 @@
-# Ignore Go-related files
-go.mod
-go.sum
-*.go
-
-# NOTE:
-# Do not ignore lockfiles or node_modules here.
-# Encore's JS/TS toolchain needs to locate the project dependency root reliably,
-# and ignoring these has caused module-resolution failures (encore.dev/*).
