@@ -1,6 +1,6 @@
 # Pulse — Final Layout & UX Blueprint (Lucide-only, KPI-gradient-only)
 
-> **Purpose**: This is the **final, visually descriptive** reference for the Pulse frontend layout (Next.js). It preserves the 3 layout modes and adds **NavRail + Peek/Pin Sidebar**, plus the new **RiskFlow / Journal / Econ Calendar** requirements.
+> **Purpose**: This is the **final, visually descriptive** reference for the Pulse frontend layout (Vite + React). It preserves the 3 layout modes and adds **NavRail + Peek/Pin Sidebar**, plus the new **RiskFlow / Journal / Econ Calendar** requirements.
 >
 > **Hard rules**:
 > - **No emojis** anywhere.
@@ -248,7 +248,7 @@ COLLAPSED LEFT
 
 ```mermaid
 flowchart LR
-  FE[Next.js Frontend] -->|auth| API[Fly.io API]
+  FE[Vite + React Frontend] -->|auth| API[Fly.io API]
   API --> DB[(Neon)]
   API --> Worker[Playwright Worker]
   Worker --> AI[AI Vision/OCR]

@@ -125,7 +125,7 @@ flowchart LR
 ## Phase 1 Deployment (Vercel)
 
 ### Environment variables (minimum)
-- `NEXT_PUBLIC_API_URL` (Fly API base)
+- `VITE_API_URL` (Fly API base)
 - Clerk publishable/secret keys
 - AI provider key(s) for Vercel AI SDK
 
@@ -289,7 +289,7 @@ We embed TradingView for viewing, then use backend interpretation for fast summa
 
 ### Key environment variables
 - Clerk keys
-- `NEXT_PUBLIC_API_URL` → Fly API base URL
+- `VITE_API_URL` → Fly API base URL
 - AI provider keys (for Price chat streaming in Next.js)
 
 ### Frontend deploy checklist

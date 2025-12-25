@@ -11,10 +11,10 @@ npm install
 
 2. Create `.env.local` file:
 ```env
-# Clerk Authentication
+# Clerk Authentication (Required)
 VITE_CLERK_PUBLISHABLE_KEY=pk_live_...
 
-# Backend API
+# Backend API (Required)
 VITE_API_URL=https://pulse-api-withered-dust-1394.fly.dev
 ```
 
@@ -53,19 +53,57 @@ npm run dev
 
 ## Environment Variables
 
-| Variable | Description |
-|----------|-------------|
-| `VITE_CLERK_PUBLISHABLE_KEY` | Clerk authentication key |
-| `VITE_API_URL` | Backend API URL |
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `VITE_CLERK_PUBLISHABLE_KEY` | ✅ Yes | Clerk authentication key |
+| `VITE_API_URL` | ✅ Yes | Backend API URL (Fly.io deployment) |
 
 ## Deployment
 
-Deploy to Vercel:
+### Vercel Deployment Steps
 
-1. Connect your repository to Vercel
-2. Set Root Directory to `frontend`
-3. Set environment variables in Vercel dashboard
-4. Deploy
+1. **Connect Repository to Vercel**
+   - Go to https://vercel.com/new
+   - Import your `solvys/pulse` repository
+   - Set **Root Directory** to `frontend`
+
+2. **Configure Build Settings**
+   - **Framework Preset:** Vite (auto-detected)
+   - **Root Directory:** `frontend`
+   - **Build Command:** `npm run build` (runs in `frontend/`)
+   - **Output Directory:** `dist`
+   - **Install Command:** `npm install`
+
+3. **Set Environment Variables**
+   In Vercel Dashboard → Project Settings → Environment Variables:
+   - `VITE_CLERK_PUBLISHABLE_KEY` (required) - Get from Clerk Dashboard → API Keys
+   - `VITE_API_URL` (required) - Fly.io backend URL: `https://pulse-api-withered-dust-1394.fly.dev`
+
+4. **Deploy**
+   - Click "Deploy"
+   - Monitor build logs
+   - Visit the deployment URL once complete
+
+### Local Testing Before Deployment
+
+```bash
+# Test production build locally
+cd frontend
+npm run build
+npm run start  # Serves on http://localhost:4173
+
+# Test development server
+npm run dev    # Serves on http://localhost:3000
+```
+
+### Current Status
+
+✅ **Ready for Deployment:** App builds successfully and serves correctly
+✅ **Vite Configuration:** Properly configured for Vercel
+✅ **Environment Variables:** Documented and minimal (only Clerk required)
+✅ **Mock Data:** All backend features use placeholder data
+
+**Note:** The app is now configured for real backend integration with Fly.io. Ensure `VITE_API_URL` points to your deployed backend.
 
 ## Build
 
