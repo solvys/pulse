@@ -61,7 +61,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           const account = await backend.account.get();
           // Always load tier from backend account (persistent across sessions)
           if (account.tier) {
-            setTierState(account.tier);
+            setTierState(account.tier as UserTier);
           } else {
             // Fallback to free if tier is somehow missing
             setTierState('free');
@@ -73,7 +73,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               await backend.projectx.syncProjectXAccounts({ username: '', apiKey: '' }); // This might need proper credentials
               // Set tier from newly created account (defaults to 'free')
               if (newAccount.tier) {
-                setTierState(newAccount.tier);
+                setTierState(newAccount.tier as UserTier);
               } else {
                 setTierState('free');
               }

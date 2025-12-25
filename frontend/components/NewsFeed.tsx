@@ -125,7 +125,7 @@ export default function NewsFeed() {
                 <div className="flex items-start justify-between gap-3 mb-2">
                   <h3 className="text-sm font-medium text-white leading-tight">{item.title}</h3>
                   <div className="flex items-center gap-2">
-                    <IVScoreCard score={item.ivScore || 0} />
+                    <IVScoreCard score={item.ivScore ?? 0} />
                     <span className={`text-[9px] px-2 py-0.5 rounded uppercase tracking-wider whitespace-nowrap ${getImpactColor(item.impact || 'low')}`}>
                       {item.impact || 'low'}
                     </span>

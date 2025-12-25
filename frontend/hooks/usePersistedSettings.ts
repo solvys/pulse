@@ -29,7 +29,7 @@ export function usePersistedSettings() {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
 
       if (settings.riskSettings) {
-        await backend.updateAccountSettings({
+        await backend.account.updateSettings({
           dailyTarget: settings.riskSettings.dailyProfitTarget,
           dailyLossLimit: settings.riskSettings.dailyLossLimit,
         });

@@ -102,8 +102,8 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
       // Save ProjectX credentials if provided
       if (apiKeys.topstepxUsername || apiKeys.topstepxApiKey) {
         await backend.account.updateProjectXCredentials({
-          username: apiKeys.topstepxUsername || undefined,
-          apiKey: apiKeys.topstepxApiKey || undefined,
+          username: apiKeys.topstepxUsername || '',
+          apiKey: apiKeys.topstepxApiKey || '',
         });
       }
 

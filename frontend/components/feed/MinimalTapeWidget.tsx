@@ -17,14 +17,15 @@ export function MinimalTapeWidget() {
         setTotalItems((response.news || []).length);
 
         // Calculate unread count
-        if ((response.news || []).length > 0) {
-          const latestId = typeof response.news[0].id === 'number' ? response.news[0].id : parseInt(response.news[0].id.toString());
+        const newsItems = response.news || [];
+        if (newsItems.length > 0) {
+          const latestId = typeof newsItems[0].id === 'number' ? newsItems[0].id : parseInt(newsItems[0].id.toString());
           if (lastSeenNewsId === null) {
             lastSeenNewsId = latestId;
             setUnreadCount(0);
           } else {
             // Count items newer than last seen
-            const unread = response.items.filter(item => {
+            const unread = newsItems.filter((item: NewsItem) => {
               const itemId = typeof item.id === 'number' ? item.id : parseInt(item.id.toString());
               return itemId > lastSeenNewsId!;
             }).length;

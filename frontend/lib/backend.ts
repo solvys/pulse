@@ -76,28 +76,28 @@ class ApiClient {
   };
 
   readonly projectx = {
-    listAccounts: () => this.request<{ accounts: BrokerAccount[] }>('/projectx/accounts'),
-    syncProjectXAccounts: (data: { username: string; apiKey: string }) => this.request('/projectx/sync', {
+    listAccounts: (): Promise<{ accounts: BrokerAccount[] }> => this.request<{ accounts: BrokerAccount[] }>('/projectx/accounts'),
+    syncProjectXAccounts: (data: { username: string; apiKey: string }): Promise<{ success: boolean; message: string }> => this.request('/projectx/sync', {
       method: 'POST',
       body: JSON.stringify(data),
     }),
-    listOrders: (accountId: number) => this.request(`/projectx/orders?accountId=${accountId}`),
-    placeOrder: (data: any) => this.request('/projectx/order', {
+    listOrders: (accountId: number): Promise<{ orders: Order[] }> => this.request(`/projectx/orders?accountId=${accountId}`),
+    placeOrder: (data: any): Promise<{ orderId: number; status: string; message: string }> => this.request('/projectx/order', {
       method: 'POST',
       body: JSON.stringify(data),
     }),
-    getContracts: (symbol: string) => this.request(`/projectx/contracts/${symbol}`),
-    uplinkProjectX: () => this.request('/projectx/uplink', {
+    getContracts: (symbol: string): Promise<{ contracts: Contract[] }> => this.request(`/projectx/contracts/${symbol}`),
+    uplinkProjectX: (): Promise<{ success: boolean }> => this.request('/projectx/uplink', {
       method: 'POST',
     }),
   };
 
   readonly trading = {
-    recordTrade: (data: any) => this.request('/trading/record', {
+    recordTrade: (data: any): Promise<{ success: boolean; tradeId: number; message: string }> => this.request('/trading/record', {
       method: 'POST',
       body: JSON.stringify(data),
     }),
-    getTrades: (params?: { accountId?: number; limit?: number; offset?: number }) => {
+    getTrades: (params?: { accountId?: number; limit?: number; offset?: number }): Promise<{ trades: Trade[]; total: number }> => {
       const query = new URLSearchParams();
       if (params?.accountId) query.set('accountId', params.accountId.toString());
       if (params?.limit) query.set('limit', params.limit.toString());
@@ -105,56 +105,56 @@ class ApiClient {
 
       return this.request<{ trades: Trade[]; total: number }>(`/trading/history${query.toString() ? '?' + query.toString() : ''}`);
     },
-    listPositions: () => this.request<{ positions: Position[] }>('/trading/positions'),
-    executeSignal: (data: any) => this.request('/trading/execute', {
+    listPositions: (): Promise<{ positions: Position[] }> => this.request<{ positions: Position[] }>('/trading/positions'),
+    executeSignal: (data: any): Promise<{ success: boolean; message: string }> => this.request('/trading/execute', {
       method: 'POST',
       body: JSON.stringify(data),
     }),
-    fireTestTrade: (data: any) => this.request('/trading/test-trade', {
+    fireTestTrade: (data: any): Promise<{ success: boolean; message: string }> => this.request('/trading/test-trade', {
       method: 'POST',
       body: JSON.stringify(data),
     }),
-    getSignals: () => this.request('/trading/signals'),
-    toggleAlgo: (data: any) => this.request('/trading/algo/toggle', {
+    getSignals: (): Promise<{ signals: any[] }> => this.request('/trading/signals'),
+    toggleAlgo: (data: any): Promise<{ success: boolean; message: string }> => this.request('/trading/algo/toggle', {
       method: 'POST',
       body: JSON.stringify(data),
     }),
-    seedPositions: () => this.request('/trading/seed', {
+    seedPositions: (): Promise<{ success: boolean }> => this.request('/trading/seed', {
       method: 'POST',
     }),
   };
 
   readonly ai = {
-    chat: (data: any) => this.request('/ai/chat', {
+    chat: (data: any): Promise<{ message: string; conversationId?: string }> => this.request('/ai/chat', {
       method: 'POST',
       body: JSON.stringify(data),
     }),
-    checkTape: () => this.request('/ai/check-tape', {
+    checkTape: (): Promise<{ message: string; insights: any[] }> => this.request('/ai/check-tape', {
       method: 'POST',
     }),
-    generateDailyRecap: () => this.request('/ai/daily-recap', {
+    generateDailyRecap: (): Promise<{ message: string; recap: string }> => this.request('/ai/daily-recap', {
       method: 'POST',
     }),
-    generateNTNReport: () => this.request('/ai/ntn-report', {
+    generateNTNReport: (): Promise<{ message: string; report: string }> => this.request('/ai/ntn-report', {
       method: 'POST',
     }),
-    listConversations: () => this.request('/ai/conversations'),
-    getConversation: (data: { conversationId: string }) => {
+    listConversations: (): Promise<{ conversations: any[] }> => this.request('/ai/conversations'),
+    getConversation: (data: { conversationId: string }): Promise<{ messages: any[] }> => {
       return this.request(`/ai/conversation?conversationId=${data.conversationId}`);
     },
   };
 
   readonly er = {
-    saveSession: (data: any) => this.request('/er/save-session', {
+    saveSession: (data: any): Promise<{ success: boolean; sessionId: number }> => this.request('/er/save-session', {
       method: 'POST',
       body: JSON.stringify(data),
     }),
-    getERSessions: () => this.request<{ sessions: ERSession[] }>('/er/sessions'),
-    saveSnapshot: (data: any) => this.request('/er/snapshot', {
+    getERSessions: (): Promise<{ sessions: ERSession[] }> => this.request<{ sessions: ERSession[] }>('/er/sessions'),
+    saveSnapshot: (data: any): Promise<{ success: boolean }> => this.request('/er/snapshot', {
       method: 'POST',
       body: JSON.stringify(data),
     }),
-    checkOvertrading: (params?: { windowMinutes?: number; threshold?: number }) => {
+    checkOvertrading: (params?: { windowMinutes?: number; threshold?: number }): Promise<OvertradingStatus> => {
       const query = new URLSearchParams();
       if (params?.windowMinutes) query.set('windowMinutes', params.windowMinutes.toString());
       if (params?.threshold) query.set('threshold', params.threshold.toString());
