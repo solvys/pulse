@@ -49,7 +49,7 @@ async function getClerkToken(): Promise<string | null> {
 
   try {
     // First, try to get Clerk immediately (it might already be loaded)
-    let clerk = (window as unknown as { Clerk?: ClerkBrowser }).Clerk;
+    let clerk: ClerkBrowser | null | undefined = (window as unknown as { Clerk?: ClerkBrowser }).Clerk;
     
     // If Clerk isn't available, wait for it (with a shorter timeout for faster failure)
     if (!clerk || !clerk.session) {
