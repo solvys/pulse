@@ -6,7 +6,7 @@ import { ThreadProvider } from './contexts/ThreadContext';
 import { MainLayout } from './components/layout/MainLayout';
 import { SettingsPanel } from './components/SettingsPanel';
 import { NotificationContainer } from './components/NotificationToast';
-import { dark } from '@clerk/themes';
+// import { dark } from '@clerk/themes'; // Temporarily disabled
 // ERProvider removed - using component-based ER monitoring for stability
 
 function AppInner() {
@@ -21,7 +21,7 @@ function AppInner() {
               <div className="min-h-screen bg-black flex items-center justify-center p-4">
                 <SignIn
                   appearance={{
-                    baseTheme: dark,
+                    baseTheme: undefined,
                     elements: {
                       rootBox: 'mx-auto',
                       card: 'bg-zinc-900 border border-[#FFC038]/20 shadow-[0_0_24px_rgba(255,192,56,0.15)]',

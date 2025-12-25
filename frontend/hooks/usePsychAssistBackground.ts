@@ -64,7 +64,7 @@ export function usePsychAssistBackground() {
         // Silently ignore localStorage errors - app should work without persistence
         console.debug('localStorage not available:', e);
       }
-    }, 0) as number;
+    }, 0) as unknown as number;
 
     return () => clearTimeout(timer);
   }, []);
@@ -85,7 +85,7 @@ export function usePsychAssistBackground() {
       audioContextRef.current = ctx;
       analyserRef.current = analyserNode;
       setIsActive(true);
-      
+
       try {
         if (typeof window !== 'undefined' && window.localStorage) {
           localStorage.setItem('psychassist_active', 'true');
@@ -104,7 +104,7 @@ export function usePsychAssistBackground() {
             sessionDurationSeconds: 0,
           });
           sessionIdRef.current = saveResult.sessionId;
-          
+
           try {
             if (typeof window !== 'undefined' && window.localStorage) {
               localStorage.setItem('psychassist_session_id', saveResult.sessionId.toString());
@@ -190,7 +190,7 @@ export function usePsychAssistBackground() {
         } catch (err) {
           console.error('Failed to save background ER snapshot:', err);
         }
-      }, 5000); // Every 5 seconds
+      }, 5000) as unknown as number; // Every 5 seconds
     } catch (err) {
       console.error('Failed to start background monitoring:', err);
     }
@@ -228,7 +228,7 @@ export function usePsychAssistBackground() {
 
     analyserRef.current = null;
     setIsActive(false);
-    
+
     try {
       if (typeof window !== 'undefined' && window.localStorage) {
         localStorage.setItem('psychassist_active', 'false');
@@ -240,7 +240,7 @@ export function usePsychAssistBackground() {
 
   const updateScore = (newScore: number) => {
     setCurrentScore(newScore);
-    
+
     try {
       if (typeof window !== 'undefined' && window.localStorage) {
         localStorage.setItem('psychassist_current_score', newScore.toString());

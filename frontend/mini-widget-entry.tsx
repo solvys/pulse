@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { createRoot } from 'react-dom/client';
 import { ClerkProvider } from '@clerk/clerk-react';
-import { dark } from '@clerk/themes';
+// import { dark } from '@clerk/themes'; // Temporarily disabled
 import { AuthProvider } from './contexts/AuthContext';
 import { SettingsProvider } from './contexts/SettingsContext';
 import { FloatingWidget } from './components/layout/FloatingWidget';
@@ -89,7 +89,7 @@ function MiniWidgetRoot() {
     <ClerkProvider
       publishableKey={CLERK_PUBLISHABLE_KEY}
       appearance={{
-        baseTheme: dark,
+        baseTheme: undefined,
         variables: {
           colorPrimary: '#FFC038',
         },

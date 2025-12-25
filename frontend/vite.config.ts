@@ -1,9 +1,9 @@
 import { defineConfig } from 'vite'
-import tailwindcss from '@tailwindcss/vite'
+// import tailwindcss from '@tailwindcss/vite' // Temporarily disabled
 import react from '@vitejs/plugin-react'
 
 export default defineConfig({
-  plugins: [tailwindcss(), react()],
+  plugins: [react()],
   mode: "development",
   build: {
     minify: false,

@@ -423,7 +423,7 @@ export function ERProvider({ children }: ERProviderProps) {
         persistScore(clampedScore);
         return clampedScore;
       });
-    }, 1000) as number;
+    }, 1000) as unknown as number;
 
     return () => {
       if (scoreIntervalRef.current) {
@@ -478,7 +478,7 @@ export function ERProvider({ children }: ERProviderProps) {
       } catch (err) {
         console.error('Failed to save ER snapshot:', err);
       }
-    }, 5000) as number;
+    }, 5000) as unknown as number;
 
     return () => {
       if (snapshotIntervalRef.current) {
@@ -514,7 +514,7 @@ export function ERProvider({ children }: ERProviderProps) {
     // Check immediately
     checkOvertrading();
 
-    overtradingIntervalRef.current = setInterval(checkOvertrading, 30000) as number;
+    overtradingIntervalRef.current = setInterval(checkOvertrading, 30000) as unknown as number;
 
     return () => {
       if (overtradingIntervalRef.current) {

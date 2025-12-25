@@ -37,7 +37,8 @@ export default function PositionsList() {
       
       <div className="space-y-2">
         {positions.map((position) => {
-          const isProfit = position.pnl >= 0;
+          const pnl = position.pnl ?? 0;
+          const isProfit = pnl >= 0;
           
           return (
             <div
@@ -65,7 +66,7 @@ export default function PositionsList() {
                 <span className="text-[9px] text-zinc-600">P&L</span>
                 <div className="text-right">
                   <div className={`text-xs font-mono font-bold ${isProfit ? "text-[#00FF85]" : "text-[#FF4040]"}`}>
-                    {isProfit ? "+" : ""}{(position.pnl ?? 0).toFixed(2)}
+                    {isProfit ? "+" : ""}{pnl.toFixed(2)}
                   </div>
                   <div className={`text-[8px] ${isProfit ? "text-[#00FF85]/70" : "text-[#FF4040]/70"}`}>
                     {isProfit ? "+" : ""}{(position.pnlPercentage ?? 0).toFixed(2)}%

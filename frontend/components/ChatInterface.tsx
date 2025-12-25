@@ -3,7 +3,7 @@ import { ArrowRight, Paperclip, Image, FileText, Link2, AlertTriangle, TrendingU
 import { useBackend } from "../lib/backend";
 import { healingBowlPlayer } from "../utils/healingBowlSounds";
 import { useSettings } from "../contexts/SettingsContext";
-import ReactMarkdown from "react-markdown";
+// import ReactMarkdown from "react-markdown"; // Temporarily disabled
 
 interface Message {
   id: string;
@@ -637,19 +637,20 @@ export default function ChatInterface() {
               >
                 {message.role === "assistant" ? (
                   <div className="text-sm text-zinc-300 mb-2 prose prose-invert prose-sm max-w-none">
-                    <ReactMarkdown
+                    {/* <ReactMarkdown
                       components={{
-                        p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
-                        strong: ({ children }) => <strong className="font-semibold text-zinc-200">{children}</strong>,
-                        em: ({ children }) => <em className="italic">{children}</em>,
-                        u: ({ children }) => <u className="underline">{children}</u>,
-                        ul: ({ children }) => <ul className="list-disc list-inside mb-2 space-y-1">{children}</ul>,
-                        ol: ({ children }) => <ol className="list-decimal list-inside mb-2 space-y-1">{children}</ol>,
-                        li: ({ children }) => <li className="text-zinc-300">{children}</li>,
+                        p: ({ children }: any) => <p className="mb-2 last:mb-0">{children}</p>,
+                        strong: ({ children }: any) => <strong className="font-semibold text-zinc-200">{children}</strong>,
+                        em: ({ children }: any) => <em className="italic">{children}</em>,
+                        u: ({ children }: any) => <u className="underline">{children}</u>,
+                        ul: ({ children }: any) => <ul className="list-disc list-inside mb-2 space-y-1">{children}</ul>,
+                        ol: ({ children }: any) => <ol className="list-decimal list-inside mb-2 space-y-1">{children}</ol>,
+                        li: ({ children }: any) => <li className="text-zinc-300">{children}</li>,
                       }}
                     >
                       {message.content}
-                    </ReactMarkdown>
+                    </ReactMarkdown> */}
+                    <div className="whitespace-pre-wrap">{message.content}</div>
                   </div>
                 ) : (
                   <p className="text-sm text-zinc-300 mb-2 whitespace-pre-wrap">{message.content}</p>
