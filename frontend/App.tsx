@@ -6,11 +6,14 @@ import { ThreadProvider } from './contexts/ThreadContext';
 import { MainLayout } from './components/layout/MainLayout';
 import { SettingsPanel } from './components/SettingsPanel';
 import { NotificationContainer } from './components/NotificationToast';
+import { ErrorBoundary } from './components/ErrorBoundary';
 // import { dark } from '@clerk/themes'; // Temporarily disabled
 // ERProvider removed - using component-based ER monitoring for stability
 
 function AppInner() {
   const [showSettings, setShowSettings] = useState(false);
+
+  console.log('[Pulse] AppInner rendering...');
 
   return (
     <AuthProvider>
@@ -90,12 +93,33 @@ function AppInner() {
 }
 
 export default function App() {
-  // Production Clerk publishable key
-  const clerkKey = 'pk_live_Y2xlcmsuc29sdnlzLmlvJA';
+  // Get Clerk publishable key from environment or use production key as fallback
+  const clerkKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY || 'pk_live_Y2xlcmsuc29sdnlzLmlvJA';
+  const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8080';
+
+  // Log configuration for debugging
+  console.log('[Pulse] App initializing...', {
+    hasClerkKey: !!clerkKey,
+    apiUrl,
+    env: import.meta.env.MODE,
+  });
+
+  if (!clerkKey) {
+    return (
+      <div className="min-h-screen bg-black flex items-center justify-center text-red-500">
+        <div className="text-center">
+          <h1 className="text-xl font-bold mb-2">Configuration Error</h1>
+          <p>Missing Clerk publishable key. Please set VITE_CLERK_PUBLISHABLE_KEY environment variable.</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <ClerkProvider publishableKey={clerkKey}>
-      <AppInner />
-    </ClerkProvider>
+    <ErrorBoundary>
+      <ClerkProvider publishableKey={clerkKey}>
+        <AppInner />
+      </ClerkProvider>
+    </ErrorBoundary>
   );
 }

@@ -67,10 +67,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             setTierState('free');
           }
         } catch (error: any) {
+          console.error('Failed to get account:', error);
+          
+          // Only try to create account if it's a 404/not found error
           if (error?.message?.includes('not found') || error?.status === 404) {
             try {
               const newAccount = await backend.account.create({ initialBalance: 10000 });
-              await backend.projectx.syncProjectXAccounts({ username: '', apiKey: '' }); // This might need proper credentials
               // Set tier from newly created account (defaults to 'free')
               if (newAccount.tier) {
                 setTierState(newAccount.tier as UserTier);
@@ -82,8 +84,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               setTierState('free');
             }
           } else {
-            console.error('Failed to get account:', error);
-            // Don't reset tier on error - keep current state
+            // For other errors (network, auth, etc.), just set to free tier
+            // Don't crash the app - allow user to continue
+            setTierState('free');
           }
         }
       } else {
@@ -94,7 +97,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     // Always initialize when auth state changes
-    initializeUser();
+    initializeUser().catch((err) => {
+      console.error('Failed to initialize user:', err);
+      setIsLoading(false);
+      setTierState('free');
+    });
   }, [isSignedIn, clerkUserId, backend]);
 
   return (
