@@ -23,16 +23,16 @@ export default function NewsFeed() {
   const loadNews = async () => {
     try {
       const data = await backend.news.list({ limit: 20 });
-      setNews(data.items);
+      setNews(data.news);
     } catch (error: any) {
       console.error('Failed to load news:', error);
       if (error.code === "not_found" || error.code === "unauthenticated") {
         try {
-          await backend.news.seed();
+          await backend.news.sync();
           const newData = await backend.news.list({ limit: 20 });
-          setNews(newData.items);
+          setNews(newData.news);
         } catch (seedError) {
-          console.error('Failed to seed news:', seedError);
+          console.error('Failed to sync news:', seedError);
         }
       }
     }

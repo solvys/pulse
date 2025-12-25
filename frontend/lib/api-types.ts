@@ -7,7 +7,11 @@ export interface Account {
   balance: number;
   equity: number;
   dailyPnl: number;
+  marginUsed: number;
   algoEnabled: boolean;
+  tradingEnabled?: boolean;
+  autoTrade?: boolean;
+  riskManagement?: any;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -49,8 +53,11 @@ export interface NewsItem {
   source: string;
   url?: string;
   publishedAt: Date;
-  sentiment?: 'positive' | 'negative' | 'neutral';
+  sentiment?: 'positive' | 'negative' | 'neutral' | 'bullish' | 'bearish';
   symbols?: string[];
+  ivScore?: number;
+  impact?: 'high' | 'medium' | 'low';
+  category?: string;
 }
 
 export interface SystemEvent {
@@ -130,4 +137,27 @@ export interface Order {
   avgFillPrice?: number;
   createdAt: Date;
   updatedAt: Date;
+}
+
+export interface OvertradingStatus {
+  isOvertrading: boolean;
+  tradesInWindow: number;
+  windowMinutes: number;
+  threshold: number;
+  recentTrades: Array<{
+    symbol: string;
+    openedAt: Date;
+    side: string;
+  }>;
+  warning?: string;
+}
+
+export interface NewsNotification {
+  id: number;
+  title: string;
+  message: string;
+  ivScore?: number;
+  type: string;
+  read: boolean;
+  createdAt: Date;
 }

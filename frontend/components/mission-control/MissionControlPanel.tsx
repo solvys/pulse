@@ -35,7 +35,7 @@ export function MissionControlPanel({
   useEffect(() => {
     const fetchAccount = async () => {
       try {
-        const account = await backend.getAccount();
+        const account = await backend.account.get();
         setDailyPnl(account.dailyPnl || 0);
         setAlgoEnabled(account.algoEnabled || false);
       } catch (err) {

@@ -43,6 +43,142 @@ class ApiClient {
     return response.json();
   }
 
+  // Namespaced services to match component expectations
+  readonly account = {
+    get: () => this.request<Account>('/account'),
+    create: (data: { initialBalance: number }) => this.request<Account>('/account', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+    updateSettings: (data: any) => this.request('/account/settings', {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }),
+    updateTier: (data: { tier: string }) => this.request('/account/tier', {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }),
+  };
+
+  readonly projectx = {
+    listAccounts: () => this.request<{ accounts: BrokerAccount[] }>('/projectx/accounts'),
+    syncProjectXAccounts: (data: { username: string; apiKey: string }) => this.request('/projectx/sync', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+    listOrders: (accountId: number) => this.request(`/projectx/orders?accountId=${accountId}`),
+    placeOrder: (data: any) => this.request('/projectx/order', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+    getContracts: (symbol: string) => this.request(`/projectx/contracts/${symbol}`),
+  };
+
+  readonly trading = {
+    recordTrade: (data: any) => this.request('/trading/record', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+    getTrades: (params?: { accountId?: number; limit?: number; offset?: number }) => {
+      const query = new URLSearchParams();
+      if (params?.accountId) query.set('accountId', params.accountId.toString());
+      if (params?.limit) query.set('limit', params.limit.toString());
+      if (params?.offset) query.set('offset', params.offset.toString());
+
+      return this.request<{ trades: Trade[]; total: number }>(`/trading/history${query.toString() ? '?' + query.toString() : ''}`);
+    },
+    listPositions: () => this.request<{ positions: Position[] }>('/trading/positions'),
+    executeSignal: (data: any) => this.request('/trading/execute', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+    fireTestTrade: (data: any) => this.request('/trading/test-trade', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+    getSignals: () => this.request('/trading/signals'),
+    toggleAlgo: (data: any) => this.request('/trading/algo/toggle', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  };
+
+  readonly ai = {
+    chat: (data: any) => this.request('/ai/chat', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+    checkTape: () => this.request('/ai/check-tape', {
+      method: 'POST',
+    }),
+    generateDailyRecap: () => this.request('/ai/daily-recap', {
+      method: 'POST',
+    }),
+    listConversations: () => this.request('/ai/conversations'),
+    getConversation: (data: { conversationId: string }) => {
+      return this.request(`/ai/conversation?conversationId=${data.conversationId}`);
+    },
+  };
+
+  readonly er = {
+    saveSession: (data: any) => this.request('/er/save-session', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+    getERSessions: () => this.request<{ sessions: ERSession[] }>('/er/sessions'),
+    saveSnapshot: (data: any) => this.request('/er/snapshot', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+    checkOvertrading: (params?: { windowMinutes?: number; threshold?: number }) => {
+      const query = new URLSearchParams();
+      if (params?.windowMinutes) query.set('windowMinutes', params.windowMinutes.toString());
+      if (params?.threshold) query.set('threshold', params.threshold.toString());
+
+      return this.request<OvertradingStatus>(`/er/overtrading${query.toString() ? '?' + query.toString() : ''}`);
+    },
+  };
+
+  readonly news = {
+    list: (params?: { limit?: number }) => {
+      const query = params?.limit ? `?limit=${params.limit}` : '';
+      return this.request<{ news: NewsItem[] }>(`/news${query}`);
+    },
+    sync: () => this.request('/news/sync', {
+      method: 'POST',
+    }),
+  };
+
+  readonly notifications = {
+    getPreferences: () => this.request('/notifications/preferences'),
+    list: () => this.request<{ notifications: Notification[] }>('/notifications'),
+    markRead: (notificationId: number) => this.request(`/notifications/${notificationId}/read`, {
+      method: 'POST',
+    }),
+    send: (data: any) => this.request('/notifications/send', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+    updatePreferences: (data: any) => this.request('/notifications/preferences', {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+  };
+
+  readonly events = {
+    create: (data: any) => this.request('/events', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+    list: (params?: { limit?: number }) => {
+      const query = params?.limit ? `?limit=${params.limit}` : '';
+      return this.request<{ events: SystemEvent[] }>(`/events${query}`);
+    },
+    seed: () => this.request('/events/seed', {
+      method: 'POST',
+    }),
+  };
+
   // Account endpoints
   async getAccount() {
     return this.request('/account');

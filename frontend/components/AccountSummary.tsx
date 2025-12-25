@@ -14,7 +14,7 @@ export default function AccountSummary() {
 
   const loadAccount = async () => {
     try {
-      const data = await backend.getAccount();
+      const data = await backend.account.get();
       setAccount(data);
     } catch (error) {
       console.error('Failed to load account:', error);
