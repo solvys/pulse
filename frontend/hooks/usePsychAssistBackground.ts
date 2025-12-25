@@ -22,7 +22,7 @@ export function usePsychAssistBackground() {
   const [isActive, setIsActive] = useState(false);
   const [currentScore, setCurrentScore] = useState(0);
   const sessionIdRef = useRef<number | null>(null);
-  const snapshotIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const snapshotIntervalRef = useRef<number | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
   const mediaStreamRef = useRef<MediaStream | null>(null);

@@ -29,7 +29,7 @@ export function FloatingWidget({ vix, ivScore, layoutOption = 'movable', onClose
   const [notifications, setNotifications] = useState<NewsNotification[]>([]);
   const [isHoveringNotifications, setIsHoveringNotifications] = useState(false);
   const seenNewsIds = useRef<Set<string>>(new Set());
-  const notificationTimeouts = useRef<Map<string, NodeJS.Timeout>>(new Map());
+  const notificationTimeouts = useRef<Map<string, number>>(new Map());
 
   // Listen for ER score updates
   useEffect(() => {

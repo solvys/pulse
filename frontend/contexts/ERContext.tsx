@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useRef, useCallback, useEffect } from 'react';
 import { useBackend } from '../lib/backend';
+import type { OvertradingStatus } from '../lib/api-types';
 
 export type ERState = 'stable' | 'neutral' | 'tilt';
 
@@ -11,11 +12,7 @@ interface ERSnapshot {
   keywords?: string[];
 }
 
-interface OvertradingStatus {
-  isOvertrading: boolean;
-  tradesInWindow: number;
-  warning?: string;
-}
+// OvertradingStatus is imported from api-types
 
 interface ERContextValue {
   // State
@@ -88,9 +85,9 @@ export function ERProvider({ children }: ERProviderProps) {
   const snapshotsRef = useRef<ERSnapshot[]>([]);
   
   // Intervals
-  const scoreIntervalRef = useRef<NodeJS.Timeout | null>(null);
-  const snapshotIntervalRef = useRef<NodeJS.Timeout | null>(null);
-  const overtradingIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const scoreIntervalRef = useRef<number | null>(null);
+  const snapshotIntervalRef = useRef<number | null>(null);
+  const overtradingIntervalRef = useRef<number | null>(null);
   
   // Regression tracking
   const regressionStartScoreRef = useRef<number>(0);
