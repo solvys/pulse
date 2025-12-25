@@ -1,5 +1,5 @@
 import { useEffect, useCallback } from 'react';
-import backend from '~backend/client';
+import { useBackend } from '../lib/backend';
 
 const STORAGE_KEY = 'pulse_settings';
 
@@ -13,6 +13,8 @@ interface PersistedSettings {
 }
 
 export function usePersistedSettings() {
+  const backend = useBackend();
+
   const loadSettings = useCallback((): PersistedSettings => {
     try {
       const stored = localStorage.getItem(STORAGE_KEY);
@@ -27,7 +29,7 @@ export function usePersistedSettings() {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
 
       if (settings.riskSettings) {
-        await backend.account.updateSettings({
+        await backend.updateAccountSettings({
           dailyTarget: settings.riskSettings.dailyProfitTarget,
           dailyLossLimit: settings.riskSettings.dailyLossLimit,
         });
@@ -35,7 +37,7 @@ export function usePersistedSettings() {
     } catch (error) {
       console.error('Failed to save settings:', error);
     }
-  }, []);
+  }, [backend]);
 
   return { loadSettings, saveSettings };
 }

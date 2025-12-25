@@ -33,15 +33,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   });
   const [isLoading, setIsLoading] = useState(true);
 
-  // Wrapper to persist tier changes to backend
+    // Wrapper to persist tier changes to backend
   const setTier = (newTier: UserTier) => {
     setTierState(newTier);
     // Persist to backend asynchronously (fire-and-forget for immediate UI update)
     if (isSignedIn && clerkUserId) {
-      backend.account.updateTier({ tier: newTier }).catch((error) => {
+      backend.updateAccountTier({ tier: newTier }).catch((error) => {
         console.error('Failed to update tier:', error);
         // Revert on error
-        backend.account.get()
+        backend.getAccount()
           .then((account) => {
             if (account.tier) {
               setTierState(account.tier);
@@ -58,7 +58,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     async function initializeUser() {
       if (isSignedIn && clerkUserId) {
         try {
-          const account = await backend.account.get();
+          const account = await backend.getAccount();
           // Always load tier from backend account (persistent across sessions)
           if (account.tier) {
             setTierState(account.tier);
@@ -67,10 +67,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             setTierState('free');
           }
         } catch (error: any) {
-          if (error?.message?.includes('not found') || error?.code === 'not_found') {
+          if (error?.message?.includes('not found') || error?.status === 404) {
             try {
-              const newAccount = await backend.account.create({ initialBalance: 10000 });
-              await backend.projectx.syncProjectXAccounts();
+              const newAccount = await backend.createAccount({ initialBalance: 10000 });
+              await backend.syncProjectX({ username: '', apiKey: '' }); // This might need proper credentials
               // Set tier from newly created account (defaults to 'free')
               if (newAccount.tier) {
                 setTierState(newAccount.tier);

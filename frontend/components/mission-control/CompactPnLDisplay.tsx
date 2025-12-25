@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useBackend } from '../../lib/backend';
-import type { BrokerAccount } from '~backend/projectx/list_accounts';
+import type { BrokerAccount } from '../../lib/api-types';
 
 interface CompactPnLDisplayProps {
   showAccount?: boolean;

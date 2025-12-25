@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useBackend } from "../lib/backend";
-import type { NewsItem } from "~backend/news/list";
+import type { NewsItem } from "../lib/api-types";
 import { TrendingUp, AlertTriangle, Info } from "lucide-react";
 import { Button } from "./ui/Button";
 import { IVScoreCard } from "./IVScoreCard";

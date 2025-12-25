@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useBackend } from "../lib/backend";
-import type { Position } from "~backend/trading/list_positions";
+import type { Position } from "../lib/api-types";
 import { TrendingUp, TrendingDown } from "lucide-react";
 
 export default function PositionsList() {
@@ -15,8 +15,8 @@ export default function PositionsList() {
 
   const loadPositions = async () => {
     try {
-      const data = await backend.trading.listPositions();
-      setPositions(data.positions);
+      const data = await backend.listPositions();
+      setPositions(data.positions || []);
     } catch (error) {
       console.error('Failed to load positions:', error);
     }

@@ -35,9 +35,9 @@ export function MissionControlPanel({
   useEffect(() => {
     const fetchAccount = async () => {
       try {
-        const account = await backend.account.get();
-        setDailyPnl(account.dailyPnl);
-        setAlgoEnabled(account.algoEnabled);
+        const account = await backend.getAccount();
+        setDailyPnl(account.dailyPnl || 0);
+        setAlgoEnabled(account.algoEnabled || false);
       } catch (err) {
         console.error('Failed to fetch account:', err);
       }

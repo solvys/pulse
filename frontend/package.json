@@ -7,7 +7,6 @@
     "@clerk/clerk-react": "^5.35.2",
     "@clerk/themes": "^2.2.26",
     "@tailwindcss/vite": "^4.1.11",
-    "encore.dev": "^1.51.6",
     "lucide-react": "^0.484.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
@@ -27,5 +26,11 @@
   },
   "optionalDependencies": {
     "rollup": "^4.44.1"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit"
   }
 }

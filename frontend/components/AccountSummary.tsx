@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useBackend } from "../lib/backend";
-import type { Account } from "~backend/account/get";
+import type { Account } from "../lib/api-types";
 
 export default function AccountSummary() {
   const backend = useBackend();
@@ -14,7 +14,7 @@ export default function AccountSummary() {
 
   const loadAccount = async () => {
     try {
-      const data = await backend.account.get();
+      const data = await backend.getAccount();
       setAccount(data);
     } catch (error) {
       console.error('Failed to load account:', error);

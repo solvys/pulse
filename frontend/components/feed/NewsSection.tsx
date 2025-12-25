@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Bell, BellOff } from 'lucide-react';
 import { useBackend } from '../../lib/backend';
-import type { NewsItem } from '~backend/news/list';
+import type { NewsItem } from '../../lib/api-types';
 import { Button } from '../ui/Button';
 
 export function NewsSection() {

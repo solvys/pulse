@@ -127,4 +127,41 @@ tradingRoutes.get('/history', async (c) => {
   });
 });
 
+// GET /trading/positions - Get active positions
+tradingRoutes.get('/positions', async (c) => {
+  const userId = c.get('userId');
+
+  try {
+    // Get open positions (trades without closed_at)
+    const positions = await sql`
+      SELECT
+        id,
+        account_id as "accountId",
+        contract_id as "contractId",
+        symbol,
+        side,
+        size,
+        entry_price as "entryPrice",
+        pnl,
+        opened_at as "openedAt"
+      FROM trades
+      WHERE user_id = ${userId} AND closed_at IS NULL
+      ORDER BY opened_at DESC
+    `;
+
+    // Calculate pnlPercentage for each position if pnl exists
+    const positionsWithPercentage = positions.map(pos => ({
+      ...pos,
+      pnlPercentage: pos.pnl ? (pos.pnl / (pos.entryPrice * pos.size)) * 100 : 0,
+    }));
+
+    return c.json({
+      positions: positionsWithPercentage,
+    });
+  } catch (error) {
+    console.error('Failed to get positions:', error);
+    return c.json({ error: 'Failed to get positions' }, 500);
+  }
+});
+
 export { tradingRoutes };

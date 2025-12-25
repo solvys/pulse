@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useBackend } from "../lib/backend";
-import type { SystemEvent } from "~backend/events/list";
+import type { SystemEvent } from "../lib/api-types";
 import { AlertCircle, CheckCircle, Info, XCircle, FileText, Trash2 } from "lucide-react";
 import { NTNReportModal } from "./NTNReportModal";
 

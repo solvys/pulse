@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { FeedItem as FeedItemType, IVIndicator } from '../../types/feed';
 import { useBackend } from '../../lib/backend';
-import type { NewsItem } from '~backend/news/list';
+import type { NewsItem } from '../../lib/api-types';
 import { FeedItem } from './FeedItem';
 import { MoveLeft, MoveRight, GripVertical, X, ChevronLeft, ChevronRight } from 'lucide-react';
 import { PanelPosition } from '../layout/DraggablePanel';

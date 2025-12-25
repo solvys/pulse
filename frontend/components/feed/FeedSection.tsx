@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { FileText, Trash2 } from 'lucide-react';
 import { FeedItem as FeedItemType, IVIndicator } from '../../types/feed';
 import { useBackend } from '../../lib/backend';
-import type { NewsItem } from '~backend/news/list';
+import type { NewsItem } from '../../lib/api-types';
 import { FeedItem } from './FeedItem';
 import { NTNReportModal } from '../NTNReportModal';
 
