@@ -87,7 +87,7 @@ class ApiClient {
       body: JSON.stringify(data),
     }),
     getContracts: (symbol: string): Promise<{ contracts: Contract[] }> => this.request(`/projectx/contracts/${symbol}`),
-    uplinkProjectX: (): Promise<{ success: boolean }> => this.request('/projectx/uplink', {
+    uplinkProjectX: (): Promise<{ success: boolean; message: string }> => this.request('/projectx/uplink', {
       method: 'POST',
     }),
   };

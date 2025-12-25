@@ -299,8 +299,8 @@ export default function ChatInterface() {
       setConversationId(response.conversationId);
 
       // Show tilt warning if detected
-      if (response.tiltWarning?.detected) {
-        setTiltWarning(response.tiltWarning);
+      if ((response as any).tiltWarning?.detected) {
+        setTiltWarning((response as any).tiltWarning);
 
         // Play healing bowl sound
         healingBowlPlayer.play();

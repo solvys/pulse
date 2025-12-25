@@ -119,7 +119,7 @@ export default function NewsFeed() {
             className="bg-[#0a0a00] border border-zinc-900 rounded-lg p-4 hover:border-zinc-800 transition-colors"
           >
             <div className="flex items-start gap-3">
-              {getImpactIcon(item.impact)}
+              {getImpactIcon(item.impact || 'low')}
               
               <div className="flex-1 min-w-0">
                 <div className="flex items-start justify-between gap-3 mb-2">

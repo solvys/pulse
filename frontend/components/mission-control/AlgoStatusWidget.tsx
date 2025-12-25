@@ -29,7 +29,11 @@ export function AlgoStatusWidget() {
   const handleToggleAlgo = async () => {
     try {
       const result = await backend.trading.toggleAlgo({ enabled: !algoEnabled });
-      setAlgoEnabled(result.algoEnabled);
+      if (result.success) {
+        // Refresh account data to get updated algo status
+        const account = await backend.account.get();
+        setAlgoEnabled(account.algoEnabled);
+      }
     } catch (err) {
       console.error('Failed to toggle algo:', err);
     }
