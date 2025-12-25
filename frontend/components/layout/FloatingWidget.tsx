@@ -73,7 +73,7 @@ export function FloatingWidget({ vix, ivScore, layoutOption = 'movable', onClose
                 if (!isHoveringNotifications) {
                   const timeout = setTimeout(() => {
                     dismissNotification(item.notificationId);
-                  }, 8000);
+                  }, 8000) as number;
                   notificationTimeouts.current.set(item.notificationId, timeout);
                 }
               });
@@ -125,7 +125,7 @@ export function FloatingWidget({ vix, ivScore, layoutOption = 'movable', onClose
     notifications.forEach(item => {
       const timeout = setTimeout(() => {
         dismissNotification(item.notificationId);
-      }, 5000);
+      }, 5000) as number;
       notificationTimeouts.current.set(item.notificationId, timeout);
     });
   };

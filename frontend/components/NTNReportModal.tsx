@@ -56,7 +56,7 @@ export function NTNReportModal({ onClose }: NTNReportModalProps) {
       try {
         // Use the dedicated NTN report endpoint (with persistence)
         const response = await backend.ai.generateNTNReport();
-        setReport(response.content);
+        setReport(response.content || response.message);
         // Note: Report is now persisted to database automatically
       } catch (err) {
         console.error("Failed to fetch NTN report:", err);

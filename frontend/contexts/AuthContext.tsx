@@ -44,7 +44,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         backend.account.get()
           .then((account) => {
             if (account.tier) {
-              setTierState(account.tier);
+              setTierState(account.tier as UserTier);
             }
           })
           .catch((getError) => {

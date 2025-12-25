@@ -64,8 +64,8 @@ export function usePsychAssistBackground() {
         // Silently ignore localStorage errors - app should work without persistence
         console.debug('localStorage not available:', e);
       }
-    }, 0);
-    
+    }, 0) as number;
+
     return () => clearTimeout(timer);
   }, []);
 

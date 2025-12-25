@@ -11,6 +11,34 @@ import type {
   Notification
 } from "./api-types";
 
+// Define Order and Contract types locally since they're not in api-types yet
+interface Order {
+  id: number;
+  accountId: number;
+  contractId?: string;
+  symbol: string;
+  side: string;
+  orderType: string;
+  size: number;
+  limitPrice?: number;
+  stopPrice?: number;
+  status: string;
+  filledSize: number;
+  avgFillPrice?: number;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+interface Contract {
+  id: number;
+  name: string;
+  symbol: string;
+  description: string;
+  tickSize: number;
+  tickValue: number;
+  active: boolean;
+}
+
 // Get API URL from environment
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
