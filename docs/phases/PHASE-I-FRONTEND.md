@@ -1,6 +1,6 @@
 # Phase 1 — Translation (Frontend) + Frontend Deployment (Vercel)
 
-> **Objective**: Translate the Pulse frontend to **Next.js 14 App Router**, preserve layout/UX, implement new sections (Risk Flow / Journal / Econ Calendar), and deploy to **Vercel**.
+> **Objective**: Translate the Pulse frontend to **Vite + React 19**, preserve layout/UX, implement new sections (Risk Flow / Journal / Econ Calendar), and deploy to **Vercel**.
 >
 > **Source of truth for layout**: [`pulse/PULSE-LAYOUT-PLAN.md`](pulse/PULSE-LAYOUT-PLAN.md)
 >
@@ -59,7 +59,7 @@ Frontend UX only in Phase 1:
 ```mermaid
 flowchart LR
   subgraph Vercel [Vercel]
-    Next[Next.js App Router]
+    Vite[Vite + React]
     Clerk[Clerk Auth]
     AIChat["/api/chat (Vercel AI SDK)"]
   end
@@ -68,9 +68,9 @@ flowchart LR
     API[Hono API]
   end
 
-  Next --> Clerk
-  Next --> AIChat
-  Next --> API
+  Vite --> Clerk
+  Vite --> AIChat
+  Vite --> API
 ```
 
 ---
@@ -125,7 +125,7 @@ flowchart LR
 ## Phase 1 Deployment (Vercel)
 
 ### Environment variables (minimum)
-- `NEXT_PUBLIC_API_URL` (Fly API base)
+- `VITE_API_URL` (Fly API base)
 - Clerk publishable/secret keys
 - AI provider key(s) for Vercel AI SDK
 
@@ -138,7 +138,7 @@ flowchart LR
 
 # Phase 1 — Translation (Frontend) + Frontend Deployment (Vercel)
 
-> **Objective**: Translate Pulse UI to **Next.js 14 (App Router)** and deploy to **Vercel** while preserving layout architecture and adding the finalized sections: **The Tape, Price, Risk Flow, Journal, Econ Calendar**.
+> **Objective**: Translate Pulse UI to **Vite + React 19** and deploy to **Vercel** while preserving layout architecture and adding the finalized sections: **The Tape, Price, Risk Flow, Journal, Econ Calendar**.
 >
 > **Non-negotiable UI rules**:
 > - **No emojis**. Lucide icons only.
@@ -289,8 +289,8 @@ We embed TradingView for viewing, then use backend interpretation for fast summa
 
 ### Key environment variables
 - Clerk keys
-- `NEXT_PUBLIC_API_URL` → Fly API base URL
-- AI provider keys (for Price chat streaming in Next.js)
+- `VITE_API_URL` → Fly API base URL
+- AI provider keys (for Price chat streaming in Vite + React)
 
 ### Frontend deploy checklist
 - App Router strict TS

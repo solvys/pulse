@@ -28,14 +28,14 @@ You are continuing Phase 3 of the Pulse migration project. Phase 1 (frontend mig
 
 4. **Project Structure**
    - Backend: `/pulse/backend-hono/`
-   - Frontend: `/pulse/frontend/` (Next.js 14 App Router)
+   - Frontend: `/pulse/frontend/` (Vite + React 19)
    - Both in same monorepo
 
 ### 🔄 In Progress / Next Steps
 
 1. **Frontend API Client**
    - Create/update API client utility to connect frontend to backend
-   - Configure `NEXT_PUBLIC_API_URL` environment variable
+   - Configure `VITE_API_URL` environment variable
    - Ensure all API calls use the Fly.io backend URL
 
 2. **API Endpoint Verification**
@@ -67,7 +67,7 @@ https://pulse-api-withered-dust-1394.fly.dev
 
 ### Required Frontend Environment Variable
 ```env
-NEXT_PUBLIC_API_URL=https://pulse-api-withered-dust-1394.fly.dev
+VITE_API_URL=https://pulse-api-withered-dust-1394.fly.dev
 ```
 
 ### Backend Routes Available
@@ -112,7 +112,7 @@ The backend validates tokens using `@clerk/backend` `verifyToken` function.
 **Location:** `/pulse/frontend/lib/api-client.ts` (or similar)
 
 Create a centralized API client that:
-- Uses `NEXT_PUBLIC_API_URL` from environment
+- Uses `VITE_API_URL` from environment
 - Handles Clerk token injection (client-side via `useAuth`, server-side via middleware)
 - Provides typed methods for all backend routes
 - Handles errors consistently
@@ -124,7 +124,7 @@ Create a centralized API client that:
 
 Set:
 ```env
-NEXT_PUBLIC_API_URL=https://pulse-api-withered-dust-1394.fly.dev
+VITE_API_URL=https://pulse-api-withered-dust-1394.fly.dev
 ```
 
 ### 3. Update Frontend Components
@@ -172,7 +172,7 @@ git add .
 git commit -m "[v.2.23.4] feat: Connect frontend to Fly.io backend
 
 - Add API client utility for backend communication
-- Configure NEXT_PUBLIC_API_URL environment variable
+- Configure VITE_API_URL environment variable
 - Update all frontend components to use new API client
 - Verify CORS configuration and authentication flow
 - Test all API endpoints end-to-end"
@@ -227,7 +227,7 @@ git push origin v.2.23.4
 cd pulse/frontend
 
 # Check current API configuration
-grep -r "NEXT_PUBLIC_API_URL" .env* || echo "Not set"
+grep -r "VITE_API_URL" .env* || echo "Not set"
 
 # Check for existing API client
 find . -name "*api*client*" -o -name "*api*.ts" -o -name "*api*.tsx"

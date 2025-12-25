@@ -117,7 +117,7 @@ curl https://pulse-api.fly.dev/health
 After deployment, your API will be available at:
 - `https://pulse-api.fly.dev` (or your custom domain if configured)
 
-Update your frontend's `NEXT_PUBLIC_API_URL` environment variable to point to this URL.
+Update your frontend's `VITE_API_URL` environment variable to point to this URL.
 
 ## Frontend Analytics (Vercel Web Analytics)
 
@@ -138,7 +138,7 @@ See `docs/integration/VERCEL-ANALYTICS.md` for complete setup and usage instruct
 ## Next Steps
 
 1. ✅ Backend deployed to Fly.io
-2. ✅ Update frontend `NEXT_PUBLIC_API_URL` to point to Fly.io backend
+2. ✅ Update frontend `VITE_API_URL` to point to Fly.io backend
 3. ✅ Test API connectivity from frontend
 4. ✅ Verify all routes work correctly
 5. ✅ (Optional) Set up Vercel Web Analytics for monitoring

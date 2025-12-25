@@ -49,7 +49,7 @@ If we decide to split in the future:
 
 2. **Create `pulse-frontend` repository**
    - Copy `frontend/` contents
-   - Update `NEXT_PUBLIC_API_URL` if needed
+   - Update `VITE_API_URL` if needed
    - Connect Vercel to new repo
 
 3. **Create `pulse-docs` repository (optional)**

@@ -1,4 +1,5 @@
 // API client for backend integration
+// Now restored with real Fly.io backend integration
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080';
 
@@ -21,7 +22,7 @@ type ClerkBrowser = {
  */
 async function fetchWithAuth(url: string, options: RequestInit = {}) {
   let token: string | null = null;
-  
+
   if (typeof window !== 'undefined') {
     try {
       const clerk = (window as unknown as { Clerk?: ClerkBrowser }).Clerk;
@@ -30,21 +31,21 @@ async function fetchWithAuth(url: string, options: RequestInit = {}) {
       console.warn('Failed to get Clerk token:', error);
     }
   }
-  
+
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     ...(options.headers as Record<string, string> || {}),
   };
-  
+
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
   }
-  
+
   const response = await fetch(`${API_URL}${url}`, {
     ...options,
     headers: headers as HeadersInit,
   });
-  
+
   if (!response.ok) {
     const errorText = await response.text();
     let errorMessage = `API error: ${response.statusText}`;
@@ -56,7 +57,7 @@ async function fetchWithAuth(url: string, options: RequestInit = {}) {
     }
     throw new Error(errorMessage);
   }
-  
+
   return response.json();
 }
 
@@ -68,11 +69,11 @@ export const journalApi = {
     if (endDate) params.append('endDate', endDate);
     return fetchWithAuth(`/journal/stats?${params.toString()}`);
   },
-  
+
   getCalendar: async (month: string): Promise<{ days: any[] }> => {
     return fetchWithAuth(`/journal/calendar?month=${month}`);
   },
-  
+
   getDateDetail: async (date: string): Promise<any> => {
     return fetchWithAuth(`/journal/date/${date}`);
   },
@@ -83,7 +84,7 @@ export const erApi = {
   getByDate: async (date: string): Promise<any> => {
     return fetchWithAuth(`/er/date/${date}`);
   },
-  
+
   getBlindspots: async (date: string): Promise<any> => {
     return fetchWithAuth(`/er/blindspots/${date}`);
   },
@@ -94,7 +95,7 @@ export const econApi = {
   getDay: async (date: string): Promise<any> => {
     return fetchWithAuth(`/econ/day/${date}`);
   },
-  
+
   interpret: async (date: string, timezone: string, region: string): Promise<any> => {
     return fetchWithAuth('/econ/interpret', {
       method: 'POST',
@@ -127,11 +128,11 @@ export const marketApi = {
   getVIX: async (): Promise<{ value: number; timestamp: string; source: string }> => {
     return fetchWithAuth('/market/vix');
   },
-  
+
   getData: async (symbol: string): Promise<any> => {
     return fetchWithAuth(`/market/data/${symbol}`);
   },
-  
+
   getBars: async (symbol: string, unit?: string, barsBack?: number): Promise<any> => {
     const params = new URLSearchParams();
     if (unit) params.append('unit', unit);

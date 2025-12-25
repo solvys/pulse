@@ -7,7 +7,7 @@
 ```
 pulse/
 ├── backend-hono/      # Hono backend API (Fly.io deployment)
-├── frontend/          # Next.js frontend (Vercel deployment)
+├── frontend/          # Vite + React frontend (Vercel deployment)
 ├── backend/           # Legacy Encore backend (deprecated)
 ├── docs/              # Project documentation
 ├── knowledge-base/    # Trading knowledge and strategies
@@ -54,7 +54,7 @@ All documentation is organized in the `docs/` directory:
 ## 🔧 Key Technologies
 
 - **Backend:** Hono, Neon PostgreSQL, Fly.io
-- **Frontend:** Next.js 14, React, TypeScript, Tailwind CSS
+- **Frontend:** Vite + React 19, TypeScript, Tailwind CSS
 - **Auth:** Clerk
 - **Database:** Neon PostgreSQL
 - **Deployment:** Fly.io (backend), Vercel (frontend)
@@ -70,7 +70,7 @@ See `secrets.env` for environment variable reference (do not commit secrets).
 Required variables:
 - `DATABASE_URL` - Neon PostgreSQL connection string
 - `CLERK_SECRET_KEY` - Clerk authentication secret
-- `NEXT_PUBLIC_API_URL` - Backend API URL
+- `VITE_API_URL` - Backend API URL
 - `PROJECTX_USERNAME` / `PROJECTX_API_KEY` - TopStepX integration
 
 ## 🚢 Deployment

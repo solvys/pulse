@@ -8,7 +8,7 @@
 
 ## Commits to Push
 1. `0038420` - [v2.24.4] chore: Clean up duplicate iCloud files and finalize frontend structure
-2. `09c71e1` - [v2.24.3] feat: Replace Next.js frontend with Pulse-v4 TypeScript/Vite frontend
+2. `09c71e1` - [v2.24.3] feat: Replace Next.js frontend with Pulse-v4 Vite + React frontend
 3. `201c55b` - [v2.24.2] fix: Redirect authenticated users from sign-in/sign-up pages
 
 ## Manual Push Command

@@ -30,8 +30,8 @@ https://vercel.com/docs/projects/overview/root-directory
 
 4. **Environment Variables**
    - Set in Vercel dashboard → Settings → Environment Variables:
-     - `NEXT_PUBLIC_API_URL=https://pulse-api-withered-dust-1394.fly.dev`
-     - `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_live_...`
+     - `VITE_API_URL=https://pulse-api-withered-dust-1394.fly.dev`
+     - `VITE_CLERK_PUBLISHABLE_KEY=pk_live_...`
      - `CLERK_SECRET_KEY=sk_live_...`
      - Any other required variables
 
@@ -52,8 +52,11 @@ Important: if your Vercel Project **Root Directory is set to `frontend`**, then 
 {
   "installCommand": "npm install",
   "buildCommand": "npm run build",
-  "outputDirectory": ".next",
-  "framework": "nextjs",
+  "outputDirectory": "dist",
+  "framework": "vite",
+  "rewrites": [
+    { "source": "/(.*)", "destination": "/index.html" }
+  ],
   "regions": ["iad1"]
 }
 ```
@@ -83,8 +86,8 @@ Important: if your Vercel Project **Root Directory is set to `frontend`**, then 
 Set these in Vercel Dashboard → Settings → Environment Variables:
 
 ```bash
-NEXT_PUBLIC_API_URL=https://pulse-api-withered-dust-1394.fly.dev
-NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_live_YOUR_KEY
+VITE_API_URL=https://pulse-api-withered-dust-1394.fly.dev
+VITE_CLERK_PUBLISHABLE_KEY=pk_live_YOUR_KEY
 CLERK_SECRET_KEY=sk_live_YOUR_KEY
 ```
 
@@ -93,7 +96,7 @@ CLERK_SECRET_KEY=sk_live_YOUR_KEY
 After deployment:
 1. Check build logs to ensure commands run in `frontend/` directory
 2. Verify environment variables are accessible
-3. Test API calls to backend (should use `NEXT_PUBLIC_API_URL`)
+3. Test API calls to backend (should use `VITE_API_URL`)
 
 ## Troubleshooting
 

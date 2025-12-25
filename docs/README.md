@@ -6,7 +6,7 @@ This directory contains all project documentation organized by category.
 
 ### `/phases/` - Migration Phases
 Complete documentation for each migration phase:
-- `PHASE-I-FRONTEND.md` - Frontend migration to Next.js/Vercel
+- `PHASE-I-FRONTEND.md` - Frontend migration to Vite/Vercel
 - `PHASE-II-BACKEND.md` - Backend migration from Encore to Hono/Neon
 - `PHASE-III-BACKEND-DEPLOY.md` - Backend deployment to Fly.io
 - `PHASE-III-HANDOFF.md` - Frontend integration handoff
