@@ -37,7 +37,7 @@ class ApiClient {
     if (this.getAuthToken) {
       const token = await this.getAuthToken();
       if (token) {
-        headers['Authorization'] = `Bearer ${token}`;
+        (headers as Record<string, string>)['Authorization'] = `Bearer ${token}`;
       }
     }
 

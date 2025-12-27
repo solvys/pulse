@@ -22,17 +22,19 @@ export function ThreadHistory() {
       setLoading(true);
       try {
         const response = await backend.ai.listConversations();
+        const conversations = Array.isArray(response) ? response : [];
         const enrichedThreads = await Promise.all(
-          (response.conversations || []).map(async (conv) => {
+          conversations.map(async (conv: any) => {
             // Try to get ER status and P&L for this session
             let erStatus: "Stable" | "Tilt" | "Neutral" | undefined;
             let pnl: number | undefined;
             
             try {
               const erSessions = await backend.er.getERSessions();
+              const sessions = Array.isArray(erSessions) ? erSessions : [];
               const convDay = new Date(conv.updatedAt).toDateString();
-              const sessionForDay = erSessions.sessions.find(
-                (s) => new Date(s.sessionStart).toDateString() === convDay
+              const sessionForDay = sessions.find(
+                (s: any) => new Date(s.sessionStart).toDateString() === convDay
               );
               
               if (sessionForDay) {

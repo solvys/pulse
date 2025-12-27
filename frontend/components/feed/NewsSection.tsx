@@ -93,7 +93,7 @@ export function NewsSection() {
                       item.impact === 'medium' ? 'bg-yellow-500/20 text-yellow-400' :
                         'bg-blue-500/20 text-blue-400'
                       }`}>
-                      {item.impact.toUpperCase()}
+                      {(item.impact || 'low').toUpperCase()}
                     </span>
                     <span className="text-xs text-gray-500">{item.category}</span>
                   </div>
@@ -103,7 +103,7 @@ export function NewsSection() {
                   )}
                   <div className="flex items-center gap-3 mt-2">
                     <span className="text-xs text-gray-500">
-                      {new Date(item.publishedAt).toLocaleString()}
+                      {typeof item.publishedAt === "string" ? new Date(item.publishedAt).toLocaleString() : item.publishedAt.toLocaleString()}
                     </span>
                     {item.url && (
                       <a

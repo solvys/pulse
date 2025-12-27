@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useBackend } from '../../lib/backend';
-import type { NewsItem } from '~backend/news/list';
+import type { NewsItem } from '../../types/api';
 
 // Track last seen news item ID to count unread items (per session)
 let lastSeenNewsId: number | null = null;

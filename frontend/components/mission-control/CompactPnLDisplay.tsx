@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useBackend } from '../../lib/backend';
-import type { BrokerAccount } from '~backend/projectx/list_accounts';
+import type { ProjectXAccount } from '../../../types/api';
+type BrokerAccount = ProjectXAccount & { provider?: string; isPaper?: boolean };
 
 interface CompactPnLDisplayProps {
   showAccount?: boolean;

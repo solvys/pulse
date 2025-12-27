@@ -16,7 +16,7 @@ export function AlgoStatusWidget() {
     const fetchAccount = async () => {
       try {
         const account = await backend.account.get();
-        setAlgoEnabled(account.algoEnabled);
+        setAlgoEnabled(account.algoEnabled ?? false);
       } catch (err) {
         console.error('Failed to fetch account:', err);
       }
@@ -29,7 +29,7 @@ export function AlgoStatusWidget() {
   const handleToggleAlgo = async () => {
     try {
       const result = await backend.trading.toggleAlgo({ enabled: !algoEnabled });
-      setAlgoEnabled(result.algoEnabled);
+      setAlgoEnabled(result.algoEnabled ?? !algoEnabled);
     } catch (err) {
       console.error('Failed to toggle algo:', err);
     }

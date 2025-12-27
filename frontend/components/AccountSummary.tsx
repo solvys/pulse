@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useBackend } from "../lib/backend";
-import type { Account } from "~backend/account/get";
+import type { Account } from "../types/api";
 
 export default function AccountSummary() {
   const backend = useBackend();
@@ -34,8 +34,8 @@ export default function AccountSummary() {
     );
   }
 
-  const pnlPercentage = (account.dailyPnl / account.balance) * 100;
-  const isPositive = account.dailyPnl >= 0;
+  const pnlPercentage = ((account.dailyPnl ?? 0) / account.balance) * 100;
+  const isPositive = (account.dailyPnl ?? 0) >= 0;
   
   const barWidth = Math.min(Math.abs(pnlPercentage) * 2, 100);
   
@@ -51,12 +51,12 @@ export default function AccountSummary() {
         
         <div className="flex justify-between items-baseline">
           <span className="text-[10px] text-zinc-500">Equity</span>
-          <span className="text-sm font-mono text-white">${account.equity.toLocaleString()}</span>
+          <span className="text-sm font-mono text-white">${(account.equity ?? account.balance).toLocaleString()}</span>
         </div>
         
         <div className="flex justify-between items-baseline">
           <span className="text-[10px] text-zinc-500">Margin Used</span>
-          <span className="text-sm font-mono text-zinc-400">${account.marginUsed.toLocaleString()}</span>
+          <span className="text-sm font-mono text-zinc-400">${(account.marginUsed ?? 0).toLocaleString()}</span>
         </div>
       </div>
       
@@ -65,7 +65,7 @@ export default function AccountSummary() {
           <span className="text-[10px] text-zinc-500">Daily P&L</span>
           <div className="text-right">
             <div className={`text-sm font-mono font-bold ${isPositive ? "text-[#00FF85]" : "text-[#FF4040]"}`}>
-              {isPositive ? "+" : ""}{account.dailyPnl.toFixed(2)}
+              {isPositive ? "+" : ""}{(account.dailyPnl ?? 0).toFixed(2)}
             </div>
             <div className={`text-[9px] ${isPositive ? "text-[#00FF85]/70" : "text-[#FF4040]/70"}`}>
               {isPositive ? "+" : ""}{pnlPercentage.toFixed(2)}%

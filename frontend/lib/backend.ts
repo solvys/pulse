@@ -38,5 +38,5 @@ export const useBackend = BYPASS_AUTH ? useBackendWithoutAuth : useBackendWithCl
 export default baseBackendClient;
 
 // Re-export types and services
-export { ApiClient } from "./apiClient";
+export { default as ApiClient } from "./apiClient";
 export * from "./services";

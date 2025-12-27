@@ -37,7 +37,7 @@ export function MissionControlPanel({
       try {
         const account = await backend.account.get();
         setDailyPnl(account.dailyPnl);
-        setAlgoEnabled(account.algoEnabled);
+        setAlgoEnabled(account.algoEnabled ?? false);
       } catch (err) {
         console.error('Failed to fetch account:', err);
       }

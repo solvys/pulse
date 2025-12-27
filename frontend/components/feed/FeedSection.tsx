@@ -58,7 +58,7 @@ function convertNewsToFeedItem(newsItem: NewsItem): FeedItemType | null {
 
   // Determine classification based on category
   let classification: 'Cyclical' | 'Countercyclical' | 'Neutral' = 'Neutral';
-  const category = newsItem.category.toLowerCase();
+  const category = newsItem.category || ''.toLowerCase();
   if (category.includes('fed') || category.includes('economic') || category.includes('political') || category.includes('geopolitical')) {
     classification = 'Countercyclical';
   } else if (category.includes('earning') || category.includes('corporate') || category.includes('technical')) {
@@ -73,7 +73,7 @@ function convertNewsToFeedItem(newsItem: NewsItem): FeedItemType | null {
 
   return {
     id: newsItem.id.toString(),
-    time: newsItem.publishedAt,
+    time: typeof newsItem.publishedAt === 'string' ? new Date(newsItem.publishedAt) : newsItem.publishedAt,
     text: title, // Use interpreted title (already processed by Logic Matrix)
     source: newsItem.source,
     type: 'news',

@@ -22,7 +22,7 @@ export function AutopilotStatusLight({ compact = false }: AutopilotStatusLightPr
     const fetchAccount = async () => {
       try {
         const account = await backend.account.get();
-        setAlgoEnabled(account.algoEnabled);
+        setAlgoEnabled(account.algoEnabled ?? false);
       } catch (err) {
         console.error('Failed to fetch account:', err);
       }

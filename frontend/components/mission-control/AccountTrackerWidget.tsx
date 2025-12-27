@@ -2,7 +2,8 @@ import { useSettings } from '../../contexts/SettingsContext';
 import { useState, useEffect } from 'react';
 import { useBackend } from '../../lib/backend';
 import { TestTradeButton } from './TestTradeButton';
-import type { BrokerAccount } from '~backend/projectx/list_accounts';
+import type { ProjectXAccount } from '../../../types/api';
+type BrokerAccount = ProjectXAccount & { provider?: string; isPaper?: boolean };
 import { Radio } from 'lucide-react';
 
 interface AccountTrackerWidgetProps {
@@ -29,7 +30,7 @@ export function AccountTrackerWidget({ currentPnL: propPnL }: AccountTrackerWidg
     const fetchProjectXAccounts = async () => {
       try {
         const result = await backend.projectx.listAccounts();
-        setProjectxAccounts(result.accounts);
+        setProjectxAccounts(result.accounts as BrokerAccount[]);
         if (result.accounts.length > 0 && !selectedAccount) {
           setSelectedAccount(result.accounts[0].accountId);
         }
@@ -70,7 +71,7 @@ export function AccountTrackerWidget({ currentPnL: propPnL }: AccountTrackerWidg
         setUplinkMessage(result.message);
         
         const accountsResult = await backend.projectx.listAccounts();
-        setProjectxAccounts(accountsResult.accounts);
+        setProjectxAccounts(accountsResult.accounts as BrokerAccount[]);
         if (accountsResult.accounts.length > 0 && !selectedAccount) {
           setSelectedAccount(accountsResult.accounts[0].accountId);
         }

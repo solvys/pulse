@@ -21,15 +21,6 @@
     "paths": {
       "@/*": [
         "./*"
-      ],
-      "~backend/*": [
-        "../backend/*"
-      ],
-      "~backend/client": [
-        "./client.ts"
-      ],
-      "~encore/*": [
-        "../backend/encore.gen/*"
       ]
     }
   },
@@ -38,6 +29,8 @@
     "**/*.tsx"
   ],
   "exclude": [
-    "node_modules"
+    "node_modules",
+    "../backend",
+    "../backend-hono"
   ]
 }

@@ -217,7 +217,7 @@ export function TopStepXBrowser({ onClose }: TopStepXBrowserProps) {
           src={url}
           className="w-full h-full"
           style={{ display: 'flex' }}
-          allowpopups="true"
+          allowpopups={true}
           partition="persist:topstepx"
         />
         

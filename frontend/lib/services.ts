@@ -19,6 +19,12 @@ export interface Account {
   tradingEnabled?: boolean;
   autoTrade?: boolean;
   riskManagement?: boolean;
+  algoEnabled?: boolean;
+  topstepxUsername?: string;
+  topstepxApiKey?: string;
+  selectedSymbol?: string;
+  contractsPerTrade?: number;
+  projectxUsername?: string;
 }
 
 export interface NewsItem {
@@ -53,13 +59,21 @@ export interface NTNReport {
 }
 
 export interface Position {
-  id: string;
-  symbol: string;
-  quantity: number;
-  entryPrice: number;
-  currentPrice: number;
-  pnl: number;
-  side: 'long' | 'short';
+  id: string | number;
+  accountId?: number;
+  contractId?: string;
+  symbol?: string;
+  quantity?: number;
+  size?: number;
+  entryPrice?: number;
+  exitPrice?: number;
+  currentPrice?: number;
+  pnl?: number;
+  pnlPercentage?: number;
+  side: string;
+  openedAt: Date | string;
+  closedAt?: Date | string | null;
+  status?: string;
 }
 
 export interface PositionsResponse {
@@ -70,6 +84,8 @@ export interface ProjectXAccount {
   accountId: string;
   accountName: string;
   balance?: number;
+  provider?: string;
+  isPaper?: boolean;
 }
 
 export interface ProjectXAccountsResponse {
@@ -97,6 +113,7 @@ export class AccountService {
       tradingEnabled: false,
       autoTrade: false,
       riskManagement: false,
+      algoEnabled: false, // Backend doesn't return this
     };
   }
 
@@ -116,6 +133,13 @@ export class AccountService {
     // Stub - backend doesn't have this endpoint
     console.warn('Account tier update endpoint not available in Hono backend');
     return this.get();
+  }
+
+  async updateProjectXCredentials(data: { username?: string; apiKey?: string }): Promise<void> {
+    // Use projectx sync endpoint
+    if (data.username && data.apiKey) {
+      await this.client.post('/projectx/sync', data);
+    }
   }
 }
 
@@ -170,6 +194,28 @@ export class AIService {
     };
   }
 
+  async listConversations(): Promise<any[]> {
+    return this.client.get<{ conversations: any[] }>('/ai/conversations').then(r => r.conversations || []);
+  }
+
+  async getConversation(data: { conversationId: string }): Promise<any> {
+    // Stub - backend doesn't have this endpoint yet
+    console.warn('AI get conversation endpoint not available in Hono backend');
+    return { messages: [] };
+  }
+
+  async checkTape(): Promise<{ message: string; insights: any[] }> {
+    // Stub - backend doesn't have this endpoint yet
+    console.warn('AI check tape endpoint not available in Hono backend');
+    return { message: 'Check tape not yet implemented', insights: [] };
+  }
+
+  async generateDailyRecap(): Promise<{ message: string; recap: string }> {
+    // Stub - backend doesn't have this endpoint yet
+    console.warn('AI daily recap endpoint not available in Hono backend');
+    return { message: 'Daily recap not yet implemented', recap: '' };
+  }
+
   async generateNTNReport(): Promise<NTNReport> {
     // Stub - backend doesn't have this endpoint yet
     console.warn('NTN report endpoint not available in Hono backend');
@@ -193,10 +239,14 @@ export class TradingService {
         id: pos.id?.toString() || '',
         symbol: pos.symbol || '',
         quantity: pos.size || 0,
+        size: pos.size || 0,
         entryPrice: pos.entryPrice || 0,
         currentPrice: pos.entryPrice || 0, // Backend doesn't return current price
         pnl: pos.pnl || 0,
-        side: pos.side === 'buy' || pos.side === 'long' ? 'long' : 'short',
+        pnlPercentage: pos.pnlPercentage || 0,
+        side: pos.side || '',
+        openedAt: pos.openedAt || new Date().toISOString(),
+        status: 'open',
       })),
     };
   }
@@ -204,6 +254,18 @@ export class TradingService {
   async seedPositions(): Promise<void> {
     // Stub - backend doesn't have this endpoint
     console.warn('Position seed endpoint not available in Hono backend');
+  }
+
+  async toggleAlgo(data: any): Promise<{ success: boolean; message: string; algoEnabled?: boolean }> {
+    // Stub - backend doesn't have this endpoint
+    console.warn('Toggle algo endpoint not available in Hono backend');
+    return { success: false, message: 'Not implemented', algoEnabled: false };
+  }
+
+  async fireTestTrade(data: any): Promise<{ success: boolean; message: string }> {
+    // Stub - backend doesn't have this endpoint
+    console.warn('Test trade endpoint not available in Hono backend');
+    return { success: false, message: 'Not implemented' };
   }
 }
 
@@ -219,6 +281,8 @@ export class ProjectXService {
         accountId: acc.accountId?.toString() || acc.id?.toString() || '',
         accountName: acc.accountName || '',
         balance: acc.balance,
+        provider: acc.provider || 'projectx',
+        isPaper: acc.isPaper || false,
       })),
     };
   }
@@ -263,10 +327,27 @@ export class ERService {
     return [];
   }
 
+  async getERSessions(): Promise<any[]> {
+    // Alias for getSessions
+    return this.getSessions();
+  }
+
   async saveSession(data: any): Promise<any> {
     // Stub - backend doesn't have this endpoint
     console.warn('ER session save endpoint not available in Hono backend');
     return {};
+  }
+
+  async saveSnapshot(data: any): Promise<any> {
+    // Stub - backend doesn't have this endpoint
+    console.warn('ER snapshot save endpoint not available in Hono backend');
+    return {};
+  }
+
+  async checkOvertrading(params?: { windowMinutes?: number; threshold?: number }): Promise<any> {
+    // Stub - backend doesn't have this endpoint
+    console.warn('ER overtrading check endpoint not available in Hono backend');
+    return { isOvertrading: false, tradesInWindow: 0 };
   }
 }
 
@@ -278,6 +359,11 @@ export class EventsService {
     // Stub - backend doesn't have this endpoint
     console.warn('Events endpoint not available in Hono backend');
     return [];
+  }
+
+  async seed(): Promise<void> {
+    // Stub - backend doesn't have this endpoint
+    console.warn('Events seed endpoint not available in Hono backend');
   }
 }
 
