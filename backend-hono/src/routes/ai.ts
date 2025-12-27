@@ -279,7 +279,7 @@ aiRoutes.delete('/conversations/:id', async (c) => {
 const chatRequestSchema = z.object({
   message: z.string().min(1),
   conversationId: z.string().optional(),
-  model: z.enum(['grok-4', 'claude-opus-4']).optional(),
+  model: z.enum(['grok-4', 'claude-opus-4', 'claude-sonnet-4.5']).optional(),
 });
 
 aiRoutes.post('/chat', async (c) => {
@@ -344,21 +344,41 @@ aiRoutes.post('/chat', async (c) => {
       ? [`Active blind spots: ${activeBlindSpots.map(bs => bs.name).join(', ')}`]
       : [];
 
-    // Generate AI response (non-streaming for now, can be enhanced later)
+    // Generate AI response with 3-tier fallback: Opus -> Grok -> Sonnet 4.5
     let fullResponse = '';
+    const fallbackModels: Array<'claude-opus-4' | 'grok-4' | 'claude-sonnet-4.5'> = 
+      model === 'claude-opus-4' 
+        ? ['claude-opus-4', 'grok-4', 'claude-sonnet-4.5']
+        : model === 'grok-4'
+        ? ['grok-4', 'claude-opus-4', 'claude-sonnet-4.5']
+        : model === 'claude-sonnet-4.5'
+        ? ['claude-sonnet-4.5', 'claude-opus-4', 'grok-4']
+        : ['claude-opus-4', 'grok-4', 'claude-sonnet-4.5']; // Default fallback chain
 
-    try {
-      for await (const chunk of streamAIResponse(
-        message,
-        conversationHistory.slice(0, -1), // Exclude the current message
-        model,
-        blindSpotContext
-      )) {
-        fullResponse += chunk;
+    let lastError: Error | null = null;
+    for (const fallbackModel of fallbackModels) {
+      try {
+        for await (const chunk of streamAIResponse(
+          message,
+          conversationHistory.slice(0, -1), // Exclude the current message
+          fallbackModel,
+          blindSpotContext
+        )) {
+          fullResponse += chunk;
+        }
+        // Success - break out of fallback loop
+        break;
+      } catch (error) {
+        console.error(`AI response error with ${fallbackModel}:`, error);
+        lastError = error instanceof Error ? error : new Error(String(error));
+        // Continue to next fallback model
+        fullResponse = ''; // Reset response for next attempt
       }
-    } catch (error) {
-      console.error('AI response error:', error);
-      // Fallback response
+    }
+
+    // If all models failed, use fallback message
+    if (!fullResponse && lastError) {
+      console.error('All AI models failed, using fallback message');
       fullResponse = "I'm having trouble processing that right now. Please try again.";
     }
 

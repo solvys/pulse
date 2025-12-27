@@ -65,7 +65,7 @@ export interface ConversationsResponse {
 export interface ChatRequest {
   message: string;
   conversationId?: string;
-  model?: 'grok-4' | 'claude-opus-4';
+  model?: 'grok-4' | 'claude-opus-4' | 'claude-sonnet-4.5';
 }
 
 export interface ChatResponse {
