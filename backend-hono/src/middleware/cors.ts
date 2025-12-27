@@ -16,8 +16,8 @@ export const corsMiddleware = cors({
     return origins[0];
   },
   credentials: true,
-  allowHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin'],
+  allowHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin', 'X-Session-ID'],
   allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
-  exposeHeaders: ['Content-Length', 'Content-Type', 'X-Request-Id'],
+  exposeHeaders: ['Content-Length', 'Content-Type', 'X-Request-Id', 'X-Conversation-Id'],
   maxAge: 86400, // Cache preflight requests for 24 hours
 });

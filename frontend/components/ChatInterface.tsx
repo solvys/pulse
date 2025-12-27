@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { ArrowRight, Paperclip, Image, FileText, Link2, AlertTriangle, TrendingUp, History, X, Pin, Archive, Edit2, MoreVertical } from "lucide-react";
 import { useChat } from "@ai-sdk/react";
+import { DefaultChatTransport } from "ai";
 import { useAuth } from "@clerk/clerk-react";
 import { useBackend } from "../lib/backend";
 import { healingBowlPlayer } from "../utils/healingBowlSounds";
@@ -96,11 +97,16 @@ export default function ChatInterface() {
   const [input, setInput] = useState("");
 
   // Custom fetch function for useChat with auth
-  const fetchWithAuth = useCallback(async (url: string, options: RequestInit = {}) => {
+  const fetchWithAuth = useCallback(async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
     const token = await getToken();
+    const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+    
+    // If URL is relative, prepend API_BASE_URL
+    const fullUrl = url.startsWith('http') ? url : `${API_BASE_URL}${url}`;
+    
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
-      ...(options.headers as Record<string, string> || {}),
+      ...(init?.headers as Record<string, string> || {}),
     };
     
     if (token) {
@@ -108,19 +114,23 @@ export default function ChatInterface() {
     }
 
     // Add conversationId to body if available
-    if (options.body && conversationId) {
+    let body = init?.body;
+    if (body && conversationId) {
       try {
-        const body = JSON.parse(options.body as string);
-        body.conversationId = conversationId;
-        options.body = JSON.stringify(body);
+        const bodyObj = typeof body === 'string' ? JSON.parse(body) : body;
+        if (typeof bodyObj === 'object' && bodyObj !== null) {
+          bodyObj.conversationId = conversationId;
+          body = JSON.stringify(bodyObj);
+        }
       } catch (e) {
         // Ignore parse errors
       }
     }
 
-    const response = await fetch(`${API_BASE_URL}${url}`, {
-      ...options,
+    const response = await fetch(fullUrl, {
+      ...init,
       headers: headers as HeadersInit,
+      body,
     });
 
     // Extract conversationId from response headers
@@ -135,17 +145,38 @@ export default function ChatInterface() {
   // Track loading state manually
   const [isStreaming, setIsStreaming] = useState(false);
 
-  // Use useChat hook for streaming chat (v3 API)
+  // Use useChat hook for streaming chat (v3 API with DefaultChatTransport)
   const {
     messages: useChatMessages,
     sendMessage,
     status,
     setMessages: setUseChatMessages,
   } = useChat({
-    transport: {
-      url: `${API_BASE_URL}/ai/chat`,
+    transport: new DefaultChatTransport({
+      api: `${API_BASE_URL}/ai/chat`,
       fetch: fetchWithAuth,
-    } as any, // Type assertion needed for custom fetch
+      prepareSendMessagesRequest: ({ messages, id }) => {
+        // Convert useChat messages format to our backend format
+        const lastMessage = messages[messages.length - 1];
+        const textContent = lastMessage.parts
+          ?.filter((part: any) => part.type === 'text')
+          .map((part: any) => part.text)
+          .join('') || '';
+        
+        return {
+          body: {
+            messages: messages.map((msg) => ({
+              role: msg.role,
+              content: msg.parts
+                ?.filter((part: any) => part.type === 'text')
+                .map((part: any) => part.text)
+                .join('') || '',
+            })),
+            conversationId: conversationId || id,
+          },
+        };
+      },
+    }),
     onFinish: (message) => {
       setIsStreaming(false);
       // Handle any post-processing after message is complete
