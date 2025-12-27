@@ -54,14 +54,16 @@ app.notFound((c) => {
 });
 
 const port = parseInt(env.PORT, 10);
+const host = '0.0.0.0'; // Bind to all interfaces for Fly.io
 
-logger.info({ port, env: env.NODE_ENV }, 'Starting Pulse API server');
+logger.info({ port, host, env: env.NODE_ENV }, 'Starting Pulse API server');
 
 serve({
   fetch: app.fetch,
   port,
+  hostname: host,
 });
 
-logger.info({ port }, `Server running at http://localhost:${port}`);
+logger.info({ port, host }, `Server running at http://${host}:${port}`);
 
 export default app;
