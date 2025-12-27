@@ -13,14 +13,17 @@ app.use('*', corsMiddleware);
 app.use('*', loggerMiddleware);
 
 app.get('/health', async (c) => {
+  // Health check should always return 200 for Fly.io routing
+  // Database connectivity is checked but doesn't fail the health check
   const dbHealthy = await checkDatabase();
   return c.json(
     {
-      status: dbHealthy ? 'healthy' : 'unhealthy',
+      status: 'healthy',
+      database: dbHealthy ? 'connected' : 'disconnected',
       timestamp: new Date().toISOString(),
       version: process.env.npm_package_version || '1.0.0',
     },
-    dbHealthy ? 200 : 503
+    200 // Always return 200 so proxy can route traffic
   );
 });
 
