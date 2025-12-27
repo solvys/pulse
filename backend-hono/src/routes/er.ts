@@ -1,4 +1,5 @@
 import { Hono } from 'hono';
+import { z } from 'zod';
 import { sql } from '../db/index.js';
 
 const erRoutes = new Hono();
@@ -135,6 +136,72 @@ erRoutes.get('/blindspots/:date', async (c) => {
         : `Significant blindspots detected: ${issues.join(', ')}`;
 
   return c.json({ score, summary });
+});
+
+// POST /er/sessions - Save ER monitoring session
+const saveSessionSchema = z.object({
+  finalScore: z.number().min(0).max(10),
+  timeInTiltSeconds: z.number().int().min(0).default(0),
+  infractionCount: z.number().int().min(0).default(0),
+  sessionDurationSeconds: z.number().int().min(0),
+  maxTiltScore: z.number().min(0).max(10).optional(),
+  maxTiltTime: z.number().int().min(0).optional(),
+  sessionId: z.string().optional(),
+});
+
+erRoutes.post('/sessions', async (c) => {
+  const userId = c.get('userId');
+  const body = await c.req.json();
+  const result = saveSessionSchema.safeParse(body);
+
+  if (!result.success) {
+    return c.json({ error: 'Invalid request body', details: result.error.flatten() }, 400);
+  }
+
+  const {
+    finalScore,
+    timeInTiltSeconds,
+    infractionCount,
+    sessionDurationSeconds,
+    maxTiltScore,
+    maxTiltTime,
+    sessionId,
+  } = result.data;
+
+  try {
+    const [session] = await sql`
+      INSERT INTO er_sessions (
+        user_id,
+        session_id,
+        final_score,
+        time_in_tilt_seconds,
+        infraction_count,
+        session_duration_seconds,
+        max_tilt_score,
+        max_tilt_time
+      )
+      VALUES (
+        ${userId},
+        ${sessionId || null},
+        ${finalScore},
+        ${timeInTiltSeconds},
+        ${infractionCount},
+        ${sessionDurationSeconds},
+        ${maxTiltScore ?? null},
+        ${maxTiltTime ?? null}
+      )
+      RETURNING id, created_at
+    `;
+
+    return c.json({
+      id: session.id,
+      sessionId: session.session_id,
+      createdAt: session.created_at,
+    });
+  } catch (error) {
+    console.error('Failed to save ER session:', error);
+    return c.json({ error: 'Failed to save ER session' }, 500);
+  }
 });
 
 export { erRoutes };

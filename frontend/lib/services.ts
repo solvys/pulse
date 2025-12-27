@@ -350,9 +350,7 @@ export class ERService {
   }
 
   async saveSession(data: any): Promise<any> {
-    // Stub - backend doesn't have this endpoint
-    console.warn('ER session save endpoint not available in Hono backend');
-    return {};
+    return this.client.post('/er/sessions', data);
   }
 
   async saveSnapshot(data: any): Promise<any> {
