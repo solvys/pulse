@@ -28,7 +28,7 @@ export function CompactPnLDisplay({ showAccount = true }: CompactPnLDisplayProps
           const result = await backend.projectx.listAccounts();
           if (result.accounts.length > 0) {
             // Use the first account or the one marked as active
-            setSelectedAccount(result.accounts[0] as BrokerAccount);
+            setSelectedAccount(result.accounts[0]);
           }
         }
       } catch (err) {
