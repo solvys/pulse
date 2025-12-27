@@ -9,6 +9,8 @@ import { econRoutes } from './econ.js';
 import { accountRoutes } from './account.js';
 import { notificationsRoutes } from './notifications.js';
 import { aiRoutes } from './ai.js';
+import { autopilotRoutes } from './autopilot.js';
+import { autopilotTestRoutes } from './autopilot-test.js';
 
 export function registerRoutes(app: Hono) {
   app.route('/account', accountRoutes);
@@ -21,4 +23,10 @@ export function registerRoutes(app: Hono) {
   app.route('/econ', econRoutes);
   app.route('/notifications', notificationsRoutes);
   app.route('/ai', aiRoutes);
+  app.route('/autopilot', autopilotRoutes);
+  
+  // Test routes (only available when AUTOPILOT_TEST_MODE=true)
+  if (process.env.AUTOPILOT_TEST_MODE === 'true') {
+    app.route('/autopilot/test', autopilotTestRoutes);
+  }
 }
