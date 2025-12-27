@@ -111,7 +111,7 @@ export default function ChatInterface() {
     healingBowlPlayer.setSound(alertConfig.healingBowlSound);
   }, [alertConfig.healingBowlSound]);
 
-  // Animate thinking text - slower with 4-5 seconds between words
+  // Animate thinking text - 2-3 seconds between words for faster feedback
   useEffect(() => {
     if (!isLoading) return;
 
@@ -119,7 +119,7 @@ export default function ChatInterface() {
     const interval = setInterval(() => {
       setThinkingText(THINKING_TERMS[currentIndex]);
       currentIndex = (currentIndex + 1) % THINKING_TERMS.length;
-    }, 4500); // 4.5 seconds between words
+    }, 2500); // 2.5 seconds between words
 
     return () => clearInterval(interval);
   }, [isLoading]);
