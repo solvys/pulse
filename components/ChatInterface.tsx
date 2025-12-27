@@ -1,9 +1,13 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { ArrowRight, Paperclip, Image, FileText, Link2, AlertTriangle, TrendingUp, History, X, Pin, Archive, Edit2, MoreVertical } from "lucide-react";
+import { useChat } from "@ai-sdk/react";
+import { useAuth } from "@clerk/clerk-react";
 import { useBackend } from "../lib/backend";
 import { healingBowlPlayer } from "../utils/healingBowlSounds";
 import { useSettings } from "../contexts/SettingsContext";
 import ReactMarkdown from "react-markdown";
+
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080';
 
 interface Message {
   id: string;
@@ -14,7 +18,7 @@ interface Message {
 
 interface TiltWarning {
   detected: boolean;
-  score: number;
+  score?: number;
   message?: string;
 }
 
@@ -74,12 +78,10 @@ interface ConversationSession {
 export default function ChatInterface() {
   const backend = useBackend();
   const { alertConfig } = useSettings();
-  const [messages, setMessages] = useState<Message[]>([]);
+  const { getToken } = useAuth();
   const [showSuggestions, setShowSuggestions] = useState(true);
-  const [input, setInput] = useState("");
   const [showAttachMenu, setShowAttachMenu] = useState(false);
   const [conversationId, setConversationId] = useState<string | undefined>();
-  const [isLoading, setIsLoading] = useState(false);
   const [thinkingText, setThinkingText] = useState("");
   const [tiltWarning, setTiltWarning] = useState<TiltWarning | undefined>();
   const [showHistory, setShowHistory] = useState(false);
@@ -89,6 +91,71 @@ export default function ChatInterface() {
   const [renameValue, setRenameValue] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // Custom fetch function for useChat with auth
+  const fetchWithAuth = useCallback(async (url: string, options: RequestInit = {}) => {
+    const token = await getToken();
+    const headers: HeadersInit = {
+      'Content-Type': 'application/json',
+      ...(options.headers as HeadersInit || {}),
+    };
+    
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+
+    // Add conversationId to body if available
+    if (options.body && conversationId) {
+      try {
+        const body = JSON.parse(options.body as string);
+        body.conversationId = conversationId;
+        options.body = JSON.stringify(body);
+      } catch (e) {
+        // Ignore parse errors
+      }
+    }
+
+    const response = await fetch(`${API_BASE_URL}${url}`, {
+      ...options,
+      headers,
+    });
+
+    // Extract conversationId from response headers
+    const convId = response.headers.get('X-Conversation-Id');
+    if (convId) {
+      setConversationId(convId);
+    }
+
+    return response;
+  }, [getToken, conversationId]);
+
+  // Use useChat hook for streaming chat
+  const {
+    messages: useChatMessages,
+    input,
+    handleInputChange,
+    handleSubmit,
+    isLoading,
+    setMessages: setUseChatMessages,
+  } = useChat({
+    api: '/ai/chat',
+    fetch: fetchWithAuth,
+    onFinish: (message) => {
+      // Handle any post-processing after message is complete
+      console.log('Message finished:', message);
+    },
+    onError: (error) => {
+      console.error('Chat error:', error);
+    },
+  });
+
+  // Convert useChat messages to our Message format for display
+  const messages: Message[] = useChatMessages.map((msg) => ({
+    id: msg.id,
+    role: msg.role,
+    content: msg.content,
+    timestamp: new Date(), // useChat doesn't provide timestamps
+  }));
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -105,21 +172,32 @@ export default function ChatInterface() {
       textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 200)}px`;
     }
   }, [input]);
+  
+  // Sync input with textarea value for useChat
+  useEffect(() => {
+    if (textareaRef.current) {
+      textareaRef.current.value = input;
+    }
+  }, [input]);
 
   // Sync healing bowl player with user's selected sound
   useEffect(() => {
     healingBowlPlayer.setSound(alertConfig.healingBowlSound);
   }, [alertConfig.healingBowlSound]);
 
-  // Animate thinking text - slower with 4-5 seconds between words
+  // Animate thinking text - 2-3 seconds between words for faster feedback
   useEffect(() => {
-    if (!isLoading) return;
+    if (!isLoading) {
+      setThinkingText("");
+      return;
+    }
 
     let currentIndex = 0;
+    setThinkingText(THINKING_TERMS[0]);
     const interval = setInterval(() => {
-      setThinkingText(THINKING_TERMS[currentIndex]);
       currentIndex = (currentIndex + 1) % THINKING_TERMS.length;
-    }, 4500); // 4.5 seconds between words
+      setThinkingText(THINKING_TERMS[currentIndex]);
+    }, 2500); // 2.5 seconds between words
 
     return () => clearInterval(interval);
   }, [isLoading]);
@@ -138,8 +216,9 @@ export default function ChatInterface() {
     try {
       const response = await backend.ai.listConversations();
       // Enrich with ER status and P&L data
+      const conversations = Array.isArray(response) ? response : [];
       const enrichedConversations = await Promise.all(
-        (response.conversations || []).map(async (conv) => {
+        conversations.map(async (conv: any) => {
           const now = new Date();
           const convDate = new Date(conv.updatedAt);
           const hoursSinceUpdate = (now.getTime() - convDate.getTime()) / (1000 * 60 * 60);
@@ -153,8 +232,9 @@ export default function ChatInterface() {
             // Get ER sessions for the day of this conversation
             const erSessions = await backend.er.getERSessions();
             const convDay = new Date(conv.updatedAt).toDateString();
-            const sessionForDay = erSessions.sessions.find(
-              (s) => new Date(s.sessionStart).toDateString() === convDay
+            const sessions = Array.isArray(erSessions) ? erSessions : [];
+            const sessionForDay = sessions.find(
+              (s: any) => new Date(s.sessionStart).toDateString() === convDay
             );
             
             if (sessionForDay) {
@@ -228,24 +308,20 @@ export default function ChatInterface() {
       // Still load it for viewing
     }
     
-    setIsLoading(true);
     setShowHistory(false);
     try {
       const response = await backend.ai.getConversation({ conversationId: convId });
-      // Convert backend messages to frontend format
-      const loadedMessages: Message[] = (response.messages || []).map((msg: any, idx: number) => ({
+      // Convert backend messages to useChat format
+      const loadedMessages = (response.messages || []).map((msg: any, idx: number) => ({
         id: `${convId}-${idx}`,
         role: msg.role as "user" | "assistant",
         content: msg.content,
-        timestamp: new Date(), // We don't have timestamps in the stored messages
       }));
-      setMessages(loadedMessages);
+      setUseChatMessages(loadedMessages);
       setConversationId(convId);
       setShowSuggestions(false);
     } catch (error) {
       console.error("Failed to load conversation:", error);
-    } finally {
-      setIsLoading(false);
     }
   };
 
@@ -269,115 +345,68 @@ export default function ChatInterface() {
 
     // Hide suggestions when user sends a message
     setShowSuggestions(false);
-
-    const userMessage: Message = {
-      id: Date.now().toString(),
-      role: "user",
-      content: messageText,
-      timestamp: new Date(),
-    };
-
-    setMessages((prev) => [...prev, userMessage]);
-    setInput("");
-    setIsLoading(true);
     setThinkingText(THINKING_TERMS[0]);
 
-    try {
-      const response = await backend.ai.chat({
-        message: messageText,
-        conversationId,
-      });
-
-      const assistantMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        role: "assistant",
-        content: response.message,
-        timestamp: new Date(),
-      };
-
-      setMessages((prev) => [...prev, assistantMessage]);
-      setConversationId(response.conversationId);
-
-      // Show tilt warning if detected
-      if (response.tiltWarning?.detected) {
-        setTiltWarning(response.tiltWarning);
-
-        // Play healing bowl sound
-        healingBowlPlayer.play();
-
-        setTimeout(() => setTiltWarning(undefined), 10000); // Clear after 10s
+    // If custom message, add it to useChat messages and submit
+    if (customMessage) {
+      // Add custom message to useChat and trigger submit
+      const event = new Event('submit', { bubbles: true, cancelable: true });
+      const form = textareaRef.current?.closest('form');
+      if (form) {
+        // Set input value and submit
+        handleInputChange({ target: { value: customMessage } } as any);
+        setTimeout(() => {
+          handleSubmit(event as any);
+        }, 0);
       }
-    } catch (error) {
-      console.error("Chat error:", error);
-      const errorMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        role: "assistant",
-        content: "Sorry, I'm having trouble connecting right now. Try again in a moment.",
-        timestamp: new Date(),
-      };
-      setMessages((prev) => [...prev, errorMessage]);
-    } finally {
-      setIsLoading(false);
-      setThinkingText("");
+    } else {
+      // Use normal handleSubmit from useChat
+      handleSubmit(new Event('submit', { bubbles: true, cancelable: true }) as any);
     }
   };
 
   const handleCheckTape = async () => {
     setShowSuggestions(false);
-    setIsLoading(true);
-    setThinkingText(THINKING_TERMS[0]);
     
     // Add user message to show what was requested
-    const userMessage: Message = {
+    const userMessage = {
       id: Date.now().toString(),
-      role: "user",
+      role: "user" as const,
       content: "Check the Tape",
-      timestamp: new Date(),
     };
-    setMessages((prev) => [...prev, userMessage]);
+    setUseChatMessages((prev) => [...prev, userMessage]);
     
     try {
       const response = await backend.ai.checkTape();
-      const tapeMessage: Message = {
+      const tapeMessage = {
         id: (Date.now() + 1).toString(),
-        role: "assistant",
+        role: "assistant" as const,
         content: response.message,
-        timestamp: new Date(),
       };
-      setMessages((prev) => [...prev, tapeMessage]);
+      setUseChatMessages((prev) => [...prev, tapeMessage]);
     } catch (error) {
       console.error("Check tape error:", error);
-      const errorMessage: Message = {
+      const errorMessage = {
         id: (Date.now() + 1).toString(),
-        role: "assistant",
+        role: "assistant" as const,
         content: "Sorry, I'm having trouble checking the tape right now. Please try again in a moment.",
-        timestamp: new Date(),
       };
-      setMessages((prev) => [...prev, errorMessage]);
-    } finally {
-      setIsLoading(false);
-      setThinkingText("");
+      setUseChatMessages((prev) => [...prev, errorMessage]);
     }
   };
 
   const handleDailyRecap = async () => {
     setShowSuggestions(false);
-    setIsLoading(true);
-    setThinkingText(THINKING_TERMS[0]);
     try {
       const response = await backend.ai.generateDailyRecap();
-      const recapMessage: Message = {
+      const recapMessage = {
         id: Date.now().toString(),
-        role: "assistant",
+        role: "assistant" as const,
         content: response.message,
-        timestamp: new Date(),
       };
-      setMessages((prev) => [...prev, recapMessage]);
+      setUseChatMessages((prev) => [...prev, recapMessage]);
     } catch (error) {
       console.error("Daily recap error:", error);
-    } finally {
-      setIsLoading(false);
-      setThinkingText("");
     }
   };
 
@@ -404,7 +433,7 @@ export default function ChatInterface() {
             </button>
             <button
               onClick={() => {
-                setMessages([]);
+                setUseChatMessages([]);
                 setConversationId(undefined);
                 setShowSuggestions(true);
               }}
@@ -434,7 +463,7 @@ export default function ChatInterface() {
           <AlertTriangle className="w-5 h-5 text-orange-500" />
           <div className="flex-1">
             <p className="text-sm font-medium text-orange-500">
-              Emotional Tilt Detected (Score: {(tiltWarning.score * 100).toFixed(0)}%)
+              Emotional Tilt Detected (Score: {((tiltWarning.score ?? 0) * 100).toFixed(0)}%)
             </p>
             <p className="text-xs text-orange-400/80">{tiltWarning.message}</p>
           </div>
@@ -724,7 +753,7 @@ export default function ChatInterface() {
             ref={textareaRef}
             value={input}
             onChange={(e) => {
-              setInput(e.target.value);
+              handleInputChange(e);
               // Auto-resize textarea - grows on new lines
               const target = e.target as HTMLTextAreaElement;
               target.style.height = "auto";
@@ -733,7 +762,7 @@ export default function ChatInterface() {
             onKeyDown={(e) => {
               if (e.key === "Enter" && !e.shiftKey && !isLoading) {
                 e.preventDefault();
-                handleSend();
+                handleSubmit(e as any);
               }
             }}
             placeholder="Analyze your performance, the news, or the markets…."
@@ -744,10 +773,13 @@ export default function ChatInterface() {
 
           {/* Send button - round with arrow, aligned to bottom */}
           <button
-            onClick={handleSend}
+            onClick={(e) => {
+              e.preventDefault();
+              handleSubmit(e as any);
+            }}
             disabled={!input.trim() || isLoading}
             className="flex items-center justify-center w-[42px] h-[42px] flex-shrink-0 rounded-full bg-[#FFC038] hover:bg-[#FFD060] disabled:bg-zinc-900 disabled:text-zinc-700 disabled:border disabled:border-zinc-800 transition-all self-end"
-            type="button"
+            type="submit"
           >
             <ArrowRight className="w-5 h-5" />
           </button>

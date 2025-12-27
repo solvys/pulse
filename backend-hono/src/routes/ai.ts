@@ -19,6 +19,7 @@ import {
 } from '../services/threat-service.js';
 import {
   streamAIResponse,
+  createStreamingChatResponse,
   generateQuickPulseAnalysis,
   analyzeImage,
   generateAIResponse,
@@ -276,10 +277,17 @@ aiRoutes.delete('/conversations/:id', async (c) => {
 });
 
 // POST /ai/chat - Send message, get streaming AI response
+// Supports both useChat format (messages array) and legacy format (message string)
 const chatRequestSchema = z.object({
-  message: z.string().min(1),
+  messages: z.array(z.object({
+    role: z.enum(['user', 'assistant', 'system']),
+    content: z.string(),
+  })).optional(),
+  message: z.string().min(1).optional(), // Legacy format
   conversationId: z.string().optional(),
   model: z.enum(['grok-4', 'claude-opus-4', 'claude-sonnet-4.5']).optional(),
+}).refine((data) => data.messages || data.message, {
+  message: "Either 'messages' or 'message' must be provided",
 });
 
 aiRoutes.post('/chat', async (c) => {
@@ -291,10 +299,36 @@ aiRoutes.post('/chat', async (c) => {
     return c.json({ error: 'Invalid request body', details: result.error.flatten() }, 400);
   }
 
-  const { message, conversationId, model = 'grok-4' } = result.data;
+  const { messages: useChatMessages, message: legacyMessage, conversationId, model = 'grok-4' } = result.data;
 
   try {
     let convId: number;
+    let userMessage: string;
+    let conversationHistory: Array<{ role: 'user' | 'assistant'; content: string }> = [];
+
+    // Handle useChat format (messages array) or legacy format (single message)
+    if (useChatMessages && useChatMessages.length > 0) {
+      // useChat format: extract the last user message and use all messages as history
+      const lastMessage = useChatMessages[useChatMessages.length - 1];
+      if (lastMessage.role !== 'user') {
+        return c.json({ error: 'Last message must be from user' }, 400);
+      }
+      userMessage = lastMessage.content;
+      
+      // Convert useChat messages to conversation history (exclude system and last user message)
+      conversationHistory = useChatMessages
+        .slice(0, -1)
+        .filter(msg => msg.role !== 'system')
+        .map(msg => ({
+          role: msg.role as 'user' | 'assistant',
+          content: msg.content,
+        }));
+    } else if (legacyMessage) {
+      // Legacy format: single message string
+      userMessage = legacyMessage;
+    } else {
+      return c.json({ error: 'No message provided' }, 400);
+    }
 
     // Get or create conversation
     if (conversationId) {
@@ -309,6 +343,21 @@ aiRoutes.post('/chat', async (c) => {
       }
 
       convId = existing.id;
+      
+      // If using legacy format, load conversation history from DB
+      if (legacyMessage && conversationHistory.length === 0) {
+        const historyMessages = await sql`
+          SELECT role, content
+          FROM ai_messages
+          WHERE conversation_id = ${convId}
+          ORDER BY created_at ASC
+          LIMIT 20
+        `;
+        conversationHistory = historyMessages.map((msg: any) => ({
+          role: msg.role as 'user' | 'assistant',
+          content: msg.content,
+        }));
+      }
     } else {
       const [newConv] = await sql`
         INSERT INTO ai_conversations (user_id)
@@ -318,25 +367,13 @@ aiRoutes.post('/chat', async (c) => {
       convId = newConv.id;
     }
 
-    // Store user message
-    await sql`
-      INSERT INTO ai_messages (conversation_id, role, content)
-      VALUES (${convId}, 'user', ${message})
-    `;
-
-    // Get conversation history for context
-    const historyMessages = await sql`
-      SELECT role, content
-      FROM ai_messages
-      WHERE conversation_id = ${convId}
-      ORDER BY created_at ASC
-      LIMIT 20
-    `;
-
-    const conversationHistory = historyMessages.map((msg: any) => ({
-      role: msg.role as 'user' | 'assistant',
-      content: msg.content,
-    }));
+    // Store user message (only if not already in conversation history from useChat)
+    if (legacyMessage || !useChatMessages) {
+      await sql`
+        INSERT INTO ai_messages (conversation_id, role, content)
+        VALUES (${convId}, 'user', ${userMessage})
+      `;
+    }
 
     // Get blind spots for context
     const activeBlindSpots = await getActiveBlindSpots(userId);
@@ -344,63 +381,42 @@ aiRoutes.post('/chat', async (c) => {
       ? [`Active blind spots: ${activeBlindSpots.map(bs => bs.name).join(', ')}`]
       : [];
 
-    // Generate AI response with 3-tier fallback: Opus -> Grok -> Sonnet 4.5
-    let fullResponse = '';
-    const fallbackModels: Array<'claude-opus-4' | 'grok-4' | 'claude-sonnet-4.5'> = 
-      model === 'claude-opus-4' 
-        ? ['claude-opus-4', 'grok-4', 'claude-sonnet-4.5']
-        : model === 'grok-4'
-        ? ['grok-4', 'claude-opus-4', 'claude-sonnet-4.5']
-        : model === 'claude-sonnet-4.5'
-        ? ['claude-sonnet-4.5', 'claude-opus-4', 'grok-4']
-        : ['claude-opus-4', 'grok-4', 'claude-sonnet-4.5']; // Default fallback chain
+    // Create streaming response with fallback support
+    const streamingResponse = await createStreamingChatResponse(
+      userMessage,
+      conversationHistory, // Already excludes current message if from useChat format
+      model,
+      blindSpotContext,
+      // onFinish callback to store the assistant message
+      async (fullResponse: string) => {
+        try {
+          // Store assistant message
+          await sql`
+            INSERT INTO ai_messages (conversation_id, role, content)
+            VALUES (${convId}, 'assistant', ${fullResponse})
+          `;
 
-    let lastError: Error | null = null;
-    for (const fallbackModel of fallbackModels) {
-      try {
-        for await (const chunk of streamAIResponse(
-          message,
-          conversationHistory.slice(0, -1), // Exclude the current message
-          fallbackModel,
-          blindSpotContext
-        )) {
-          fullResponse += chunk;
+          // Update conversation updated_at
+          await sql`
+            UPDATE ai_conversations
+            SET updated_at = NOW()
+            WHERE id = ${convId}
+          `;
+        } catch (error) {
+          console.error('Error storing assistant message:', error);
         }
-        // Success - break out of fallback loop
-        break;
-      } catch (error) {
-        console.error(`AI response error with ${fallbackModel}:`, error);
-        lastError = error instanceof Error ? error : new Error(String(error));
-        // Continue to next fallback model
-        fullResponse = ''; // Reset response for next attempt
       }
-    }
+    );
 
-    // If all models failed, use fallback message
-    if (!fullResponse && lastError) {
-      console.error('All AI models failed, using fallback message');
-      fullResponse = "I'm having trouble processing that right now. Please try again.";
-    }
-
-    // Store assistant message
-    await sql`
-      INSERT INTO ai_messages (conversation_id, role, content)
-      VALUES (${convId}, 'assistant', ${fullResponse})
-    `;
-
-    // Update conversation updated_at
-    await sql`
-      UPDATE ai_conversations
-      SET updated_at = NOW()
-      WHERE id = ${convId}
-    `;
-
-    // Return response matching frontend API contract
-    return c.json({
-      message: fullResponse,
-      conversationId: convId.toString(),
-      messageId: Date.now().toString(),
-      references: activeBlindSpots.length > 0 ? activeBlindSpots.map(bs => bs.name) : undefined,
+    // Return streaming response with additional headers
+    return new Response(streamingResponse.body, {
+      status: streamingResponse.status,
+      statusText: streamingResponse.statusText,
+      headers: {
+        ...Object.fromEntries(streamingResponse.headers.entries()),
+        'X-Conversation-Id': convId.toString(),
+        'X-References': activeBlindSpots.length > 0 ? activeBlindSpots.map(bs => bs.name).join(',') : '',
+      },
     });
   } catch (error) {
     console.error('Chat error:', error);

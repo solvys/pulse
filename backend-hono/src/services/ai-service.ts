@@ -156,6 +156,80 @@ export async function* streamAIResponse(
 }
 
 /**
+ * Create streaming chat response with fallback support
+ * Returns a Response object that can be used with useChat hook
+ */
+export async function createStreamingChatResponse(
+  prompt: string,
+  conversationHistory: Array<{ role: 'user' | 'assistant'; content: string }>,
+  modelName: string = 'grok-4',
+  context?: string[],
+  onFinish?: (text: string) => Promise<void>
+): Promise<Response> {
+  const fallbackModels: Array<'claude-opus-4' | 'grok-4' | 'claude-sonnet-4.5'> = 
+    modelName === 'claude-opus-4' 
+      ? ['claude-opus-4', 'grok-4', 'claude-sonnet-4.5']
+      : modelName === 'grok-4'
+      ? ['grok-4', 'claude-opus-4', 'claude-sonnet-4.5']
+      : modelName === 'claude-sonnet-4.5'
+      ? ['claude-sonnet-4.5', 'claude-opus-4', 'grok-4']
+      : ['claude-opus-4', 'grok-4', 'claude-sonnet-4.5']; // Default fallback chain
+
+  const systemPrompt = context
+    ? `Context: ${context.join('\n')}\n\nYou are a trading assistant helping with analysis and coaching. Reference blind spots when relevant in E-VALS conversations.`
+    : 'You are a trading assistant helping with analysis and coaching. Reference blind spots when relevant in E-VALS conversations.';
+
+  const messages = [
+    { role: 'system' as const, content: systemPrompt },
+    ...conversationHistory,
+    { role: 'user' as const, content: prompt },
+  ];
+
+  // Try models in fallback order
+  let lastError: Error | null = null;
+  for (const fallbackModel of fallbackModels) {
+    try {
+      const model = getModel(fallbackModel);
+      
+      const result = await streamText({
+        model: model as any,
+        messages,
+        temperature: 0.7,
+        maxTokens: 2000,
+        onFinish: async ({ text }) => {
+          if (onFinish) {
+            await onFinish(text);
+          }
+        },
+      });
+
+      // Return streaming response
+      return result.toDataStreamResponse();
+    } catch (error) {
+      console.error(`AI streaming error with ${fallbackModel}:`, error);
+      lastError = error instanceof Error ? error : new Error(String(error));
+      // Continue to next fallback model
+    }
+  }
+
+  // If all models failed, return error response
+  if (lastError) {
+    console.error('All AI models failed');
+    // Return a streaming response with error message
+    const errorResult = await streamText({
+      model: getModel('grok-4') as any, // Use default model for error message
+      messages: [{ role: 'user' as const, content: "I'm having trouble processing that right now. Please try again." }],
+      temperature: 0.7,
+      maxTokens: 50,
+    });
+    return errorResult.toDataStreamResponse();
+  }
+
+  // This should never be reached, but TypeScript needs it
+  throw new Error('Failed to create streaming response');
+}
+
+/**
  * Analyze image (for Quick Pulse screenshot analysis)
  */
 export async function analyzeImage(
