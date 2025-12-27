@@ -14,6 +14,7 @@ import type { ChatRequest, ChatResponse } from '../types/ai.js';
 const GROK_4_MODEL = 'grok-4';
 const GROK_VISION_MODEL = 'grok-2-1212';
 const CLAUDE_OPUS_4_5_MODEL = 'claude-opus-4-20250514';
+const CLAUDE_SONNET_4_5_MODEL = 'claude-3-5-sonnet-20241022';
 
 // Initialize Vercel AI Gateway if API key is provided
 let gateway: ReturnType<typeof createGateway> | null = null;
@@ -35,6 +36,11 @@ function getModel(modelName: string = 'grok-4') {
       case 'claude-opus-4-20250514':
         // Vercel AI Gateway format: provider/model-name
         return gateway(`anthropic/${CLAUDE_OPUS_4_5_MODEL}`);
+      case 'claude-sonnet-4.5':
+      case 'claude-sonnet-4-5':
+      case 'claude-3-5-sonnet-20241022':
+        // Vercel AI Gateway format: provider/model-name
+        return gateway(`anthropic/${CLAUDE_SONNET_4_5_MODEL}`);
       case 'grok-4':
       default:
         // Vercel AI Gateway format: provider/model-name
@@ -50,6 +56,13 @@ function getModel(modelName: string = 'grok-4') {
         throw new Error('ANTHROPIC_API_KEY not configured. Either set VERCEL_AI_GATEWAY_API_KEY or ANTHROPIC_API_KEY');
       }
       return anthropic(CLAUDE_OPUS_4_5_MODEL);
+    case 'claude-sonnet-4.5':
+    case 'claude-sonnet-4-5':
+    case 'claude-3-5-sonnet-20241022':
+      if (!env.ANTHROPIC_API_KEY) {
+        throw new Error('ANTHROPIC_API_KEY not configured. Either set VERCEL_AI_GATEWAY_API_KEY or ANTHROPIC_API_KEY');
+      }
+      return anthropic(CLAUDE_SONNET_4_5_MODEL);
     case 'grok-4':
     default:
       if (!env.XAI_API_KEY) {
