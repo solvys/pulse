@@ -452,7 +452,7 @@ autopilotTestRoutes.post('/run-full-test', async (c) => {
     });
 
     if (!proposeRes.ok) {
-      const error = await proposeRes.json();
+      const error = await proposeRes.json() as { error?: string };
       return c.json({
         success: false,
         step: 'propose',
@@ -460,7 +460,7 @@ autopilotTestRoutes.post('/run-full-test', async (c) => {
       }, 400);
     }
 
-    const proposeData = await proposeRes.json();
+    const proposeData = await proposeRes.json() as { proposalId: string };
     const proposalId = proposeData.proposalId;
 
     // Step 2: Approve proposal
@@ -474,7 +474,7 @@ autopilotTestRoutes.post('/run-full-test', async (c) => {
     });
 
     if (!approveRes.ok) {
-      const error = await approveRes.json();
+      const error = await approveRes.json() as { error?: string };
       return c.json({
         success: false,
         step: 'approve',
@@ -494,7 +494,7 @@ autopilotTestRoutes.post('/run-full-test', async (c) => {
     });
 
     if (!executeRes.ok) {
-      const error = await executeRes.json();
+      const error = await executeRes.json() as { error?: string };
       return c.json({
         success: false,
         step: 'execute',
@@ -503,7 +503,7 @@ autopilotTestRoutes.post('/run-full-test', async (c) => {
       }, 400);
     }
 
-    const executeData = await executeRes.json();
+    const executeData = await executeRes.json() as { orderId?: string; executionId?: string };
 
     return c.json({
       success: true,

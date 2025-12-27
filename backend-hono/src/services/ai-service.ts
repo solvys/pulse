@@ -125,12 +125,13 @@ export async function* streamAIResponse(
       { role: 'user' as const, content: prompt },
     ];
 
-    const { textStream } = streamText({
+    const streamResult = await streamText({
       model: model as any, // Type assertion for compatibility between gateway and direct provider models
       messages,
       temperature: 0.7,
       maxTokens: 2000,
     });
+    const { textStream } = streamResult;
 
     for await (const chunk of textStream) {
       yield chunk;

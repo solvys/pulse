@@ -9,6 +9,12 @@ declare module 'hono' {
 }
 
 export const authMiddleware = createMiddleware(async (c, next) => {
+  // Skip auth for OPTIONS requests (CORS preflight)
+  if (c.req.method === 'OPTIONS') {
+    await next();
+    return;
+  }
+
   const authHeader = c.req.header('Authorization');
 
   if (!authHeader || !authHeader.startsWith('Bearer ')) {

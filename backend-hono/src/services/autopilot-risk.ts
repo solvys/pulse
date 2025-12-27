@@ -182,13 +182,13 @@ export async function checkThreatHistory(userId: string): Promise<ThreatCheckRes
     console.warn('Using stub endpoint for threat-history');
     const result = { threats: [] };
 
-    const criticalThreats = result.threats.filter((t: any) => t.severity === 'critical');
-    const highThreats = result.threats.filter((t: any) => t.severity === 'high');
+    const criticalThreats = result.threats.filter((t: any) => t.severity === 'critical') as Array<{ type: string; severity: 'low' | 'medium' | 'high' | 'critical' }>;
+    const highThreats = result.threats.filter((t: any) => t.severity === 'high') as Array<{ type: string; severity: 'low' | 'medium' | 'high' | 'critical' }>;
 
     if (criticalThreats.length > 0) {
       return {
         blocked: true,
-        reason: `Critical threat detected: ${criticalThreats[0].type}`,
+        reason: `Critical threat detected: ${criticalThreats[0]?.type || 'unknown'}`,
         threats: criticalThreats,
       };
     }
@@ -240,15 +240,15 @@ export async function checkBlindSpots(userId: string): Promise<BlindSpotCheckRes
 
     const guardRailedActive = result.blindSpots.filter(
       (bs: any) => bs.isGuardRailed === true && bs.isActive === true
-    );
+    ) as Array<{ name: string; category: string; isGuardRailed: boolean }>;
     const riskCategoryActive = result.blindSpots.filter(
       (bs: any) => bs.category === 'risk' && bs.isActive === true && bs.isGuardRailed === false
-    );
+    ) as Array<{ name: string; category: string; isGuardRailed: boolean }>;
 
     if (guardRailedActive.length > 0) {
       return {
         blocked: true,
-        reason: `Guard-railed blind spot active: ${guardRailedActive[0].name}`,
+        reason: `Guard-railed blind spot active: ${guardRailedActive[0]?.name || 'unknown'}`,
         blindSpots: guardRailedActive,
       };
     }
@@ -256,7 +256,7 @@ export async function checkBlindSpots(userId: string): Promise<BlindSpotCheckRes
     if (riskCategoryActive.length > 0) {
       return {
         blocked: true,
-        reason: `Risk category blind spot active: ${riskCategoryActive[0].name}`,
+        reason: `Risk category blind spot active: ${riskCategoryActive[0]?.name || 'unknown'}`,
         blindSpots: riskCategoryActive,
       };
     }
