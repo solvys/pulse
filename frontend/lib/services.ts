@@ -186,12 +186,29 @@ export class AIService {
   constructor(private client: ApiClient) {}
 
   async chat(data: { message: string; conversationId?: string }): Promise<ChatResponse> {
-    // Stub - backend doesn't have this endpoint yet
-    console.warn('AI chat endpoint not available in Hono backend');
-    return {
-      message: 'AI chat is not yet implemented in the Hono backend. Please check back later.',
-      conversationId: data.conversationId || '',
-    };
+    // #region agent log
+    fetch('http://127.0.0.1:7243/ingest/bfd14014-339c-48d5-b13a-bb701c96c886',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'services.ts:188',message:'AI chat request',data:{message:data.message.substring(0,50),hasConversationId:!!data.conversationId},timestamp:Date.now(),sessionId:'debug-session',runId:'pre-fix',hypothesisId:'A'})}).catch(()=>{});
+    // #endregion
+    
+    try {
+      const response = await this.client.post<ChatResponse>('/ai/chat', {
+        message: data.message,
+        conversationId: data.conversationId,
+      });
+      
+      // #region agent log
+      fetch('http://127.0.0.1:7243/ingest/bfd14014-339c-48d5-b13a-bb701c96c886',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'services.ts:197',message:'AI chat response received',data:{conversationId:response.conversationId,messageLength:response.message?.length||0},timestamp:Date.now(),sessionId:'debug-session',runId:'pre-fix',hypothesisId:'A'})}).catch(()=>{});
+      // #endregion
+      
+      return response;
+    } catch (error: any) {
+      // #region agent log
+      fetch('http://127.0.0.1:7243/ingest/bfd14014-339c-48d5-b13a-bb701c96c886',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'services.ts:202',message:'AI chat error',data:{code:error?.code,message:error?.message},timestamp:Date.now(),sessionId:'debug-session',runId:'pre-fix',hypothesisId:'A'})}).catch(()=>{});
+      // #endregion
+      
+      console.error('AI chat error:', error);
+      throw error;
+    }
   }
 
   async listConversations(): Promise<any[]> {

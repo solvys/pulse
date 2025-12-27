@@ -28,6 +28,10 @@ class ApiClient {
   ): Promise<T> {
     const url = `${this.baseUrl}${endpoint}`;
     
+    // #region agent log
+    fetch('http://127.0.0.1:7243/ingest/bfd14014-339c-48d5-b13a-bb701c96c886',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'apiClient.ts:29',message:'API request starting',data:{url,endpoint,method:options.method||'GET'},timestamp:Date.now(),sessionId:'debug-session',runId:'pre-fix',hypothesisId:'B'})}).catch(()=>{});
+    // #endregion
+    
     const headers: HeadersInit = {
       'Content-Type': 'application/json',
       ...options.headers,
@@ -46,6 +50,10 @@ class ApiClient {
         ...options,
         headers,
       });
+      
+      // #region agent log
+      fetch('http://127.0.0.1:7243/ingest/bfd14014-339c-48d5-b13a-bb701c96c886',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'apiClient.ts:50',message:'API response received',data:{status:response.status,statusText:response.statusText,ok:response.ok,url},timestamp:Date.now(),sessionId:'debug-session',runId:'pre-fix',hypothesisId:'B'})}).catch(()=>{});
+      // #endregion
 
       if (!response.ok) {
         const errorText = await response.text();
@@ -80,6 +88,10 @@ class ApiClient {
 
       return await response.json();
     } catch (error) {
+      // #region agent log
+      fetch('http://127.0.0.1:7243/ingest/bfd14014-339c-48d5-b13a-bb701c96c886',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'apiClient.ts:82',message:'API request error',data:{errorType:error?.constructor?.name,message:error instanceof Error ? error.message : String(error),hasCode:error && typeof error === 'object' && 'code' in error},timestamp:Date.now(),sessionId:'debug-session',runId:'pre-fix',hypothesisId:'B'})}).catch(()=>{});
+      // #endregion
+      
       if (error && typeof error === 'object' && 'code' in error) {
         throw error;
       }
