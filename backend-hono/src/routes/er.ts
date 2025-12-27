@@ -139,12 +139,31 @@ erRoutes.get('/blindspots/:date', async (c) => {
 });
 
 // POST /er/sessions - Save ER monitoring session
+// Validates scores (0-10, 1 decimal place) and durations
 const saveSessionSchema = z.object({
-  finalScore: z.number().min(0).max(10),
+  finalScore: z
+    .number()
+    .min(0)
+    .max(10)
+    .refine((val) => {
+      // Round to 1 decimal place and check it matches
+      const rounded = Math.round(val * 10) / 10;
+      return Math.abs(val - rounded) < 0.01;
+    }, { message: 'finalScore must have at most 1 decimal place' })
+    .transform((val) => Math.round(val * 10) / 10), // Round to 1 decimal
   timeInTiltSeconds: z.number().int().min(0).default(0),
   infractionCount: z.number().int().min(0).default(0),
   sessionDurationSeconds: z.number().int().min(0),
-  maxTiltScore: z.number().min(0).max(10).optional(),
+  maxTiltScore: z
+    .number()
+    .min(0)
+    .max(10)
+    .refine((val) => {
+      const rounded = Math.round(val * 10) / 10;
+      return Math.abs(val - rounded) < 0.01;
+    }, { message: 'maxTiltScore must have at most 1 decimal place' })
+    .transform((val) => Math.round(val * 10) / 10)
+    .optional(),
   maxTiltTime: z.number().int().min(0).optional(),
   sessionId: z.string().optional(),
 });
