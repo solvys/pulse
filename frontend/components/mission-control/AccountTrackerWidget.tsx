@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import { useBackend } from '../../lib/backend';
 import { TestTradeButton } from './TestTradeButton';
 import type { ProjectXAccount } from '../../../types/api';
-type BrokerAccount = ProjectXAccount;
+type BrokerAccount = ProjectXAccount & { provider?: string; isPaper?: boolean };
 import { Radio } from 'lucide-react';
 
 interface AccountTrackerWidgetProps {
