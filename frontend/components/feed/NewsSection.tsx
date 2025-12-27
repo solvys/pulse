@@ -103,7 +103,7 @@ export function NewsSection() {
                   )}
                   <div className="flex items-center gap-3 mt-2">
                     <span className="text-xs text-gray-500">
-                      {new Date(item.publishedAt).toLocaleString()}
+                      {typeof item.publishedAt === "string" ? new Date(item.publishedAt) : item.publishedAt.toLocaleString()}
                     </span>
                     {item.url && (
                       <a

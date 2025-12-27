@@ -102,9 +102,10 @@ export function NotificationContainer() {
         
         if (!isMounted) return;
 
-        const newNotifications = result.notifications
-          .filter(item => new Date(item.createdAt) > lastChecked && !item.read)
-          .map(item => ({
+        const notifications = Array.isArray(result) ? result : [];
+        const newNotifications = notifications
+          .filter((item: any) => new Date(item.createdAt) > lastChecked && !item.read)
+          .map((item: any) => ({
             id: item.id.toString(),
             type: item.type as any,
             severity: item.severity as any,

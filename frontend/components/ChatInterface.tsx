@@ -14,7 +14,7 @@ interface Message {
 
 interface TiltWarning {
   detected: boolean;
-  score: number;
+  score?: number;
   message?: string;
 }
 
@@ -138,8 +138,9 @@ export default function ChatInterface() {
     try {
       const response = await backend.ai.listConversations();
       // Enrich with ER status and P&L data
+      const conversations = Array.isArray(response) ? response : [];
       const enrichedConversations = await Promise.all(
-        (response.conversations || []).map(async (conv) => {
+        conversations.map(async (conv: any) => {
           const now = new Date();
           const convDate = new Date(conv.updatedAt);
           const hoursSinceUpdate = (now.getTime() - convDate.getTime()) / (1000 * 60 * 60);
@@ -153,8 +154,9 @@ export default function ChatInterface() {
             // Get ER sessions for the day of this conversation
             const erSessions = await backend.er.getERSessions();
             const convDay = new Date(conv.updatedAt).toDateString();
-            const sessionForDay = erSessions.sessions.find(
-              (s) => new Date(s.sessionStart).toDateString() === convDay
+            const sessions = Array.isArray(erSessions) ? erSessions : [];
+            const sessionForDay = sessions.find(
+              (s: any) => new Date(s.sessionStart).toDateString() === convDay
             );
             
             if (sessionForDay) {
@@ -300,7 +302,10 @@ export default function ChatInterface() {
 
       // Show tilt warning if detected
       if (response.tiltWarning?.detected) {
-        setTiltWarning(response.tiltWarning);
+        setTiltWarning({
+          detected: response.tiltWarning.detected,
+          message: response.tiltWarning.message,
+        });
 
         // Play healing bowl sound
         healingBowlPlayer.play();
@@ -434,7 +439,7 @@ export default function ChatInterface() {
           <AlertTriangle className="w-5 h-5 text-orange-500" />
           <div className="flex-1">
             <p className="text-sm font-medium text-orange-500">
-              Emotional Tilt Detected (Score: {(tiltWarning.score * 100).toFixed(0)}%)
+              Emotional Tilt Detected (Score: {((tiltWarning.score ?? 0) * 100).toFixed(0)}%)
             </p>
             <p className="text-xs text-orange-400/80">{tiltWarning.message}</p>
           </div>

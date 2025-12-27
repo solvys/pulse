@@ -1,6 +1,15 @@
 import { useEffect, useState } from "react";
 import { useBackend } from "../lib/backend";
-import type { SystemEvent } from "~backend/events/list";
+// SystemEvent type - matches backend structure
+interface SystemEvent {
+  id: number;
+  eventType: string;
+  severity: 'info' | 'warning' | 'error' | 'success';
+  title: string;
+  message: string;
+  metadata?: any;
+  createdAt: Date | string;
+}
 import { AlertCircle, CheckCircle, Info, XCircle, FileText, Trash2 } from "lucide-react";
 import { NTNReportModal } from "./NTNReportModal";
 
@@ -19,15 +28,15 @@ export default function SystemFeed() {
 
   const loadEvents = async () => {
     try {
-      const data = await backend.events.list({ limit: 50 });
-      setEvents(data.events);
+      const data = await backend.events.list();
+      setEvents(Array.isArray(data) ? data : []);
     } catch (error: any) {
       console.error('Failed to load events:', error);
       if (error.code === "not_found" || error.code === "unauthenticated") {
         try {
           await backend.events.seed();
-          const data = await backend.events.list({ limit: 50 });
-          setEvents(data.events);
+          const data = await backend.events.list();
+          setEvents(Array.isArray(data) ? data : []);
         } catch (seedError) {
           console.error('Failed to seed events:', seedError);
         }
@@ -68,7 +77,7 @@ export default function SystemFeed() {
     }
   };
 
-  const formatTime = (date: Date) => {
+  const formatTime = (date: Date | string) => {
     const d = new Date(date);
     return d.toLocaleTimeString("en-US", {
       hour: "2-digit",

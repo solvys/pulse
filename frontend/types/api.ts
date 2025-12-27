@@ -15,9 +15,11 @@ export interface NewsItem {
   publishedAt: Date | string;
   sentiment?: 'positive' | 'negative' | 'neutral' | 'bullish' | 'bearish';
   ivImpact?: number;
+  ivScore?: number;
   impact?: 'high' | 'medium' | 'low';
   symbols?: string[];
   isBreaking?: boolean;
+  category?: string;
 }
 
 export interface Account {
@@ -40,6 +42,7 @@ export interface Account {
   provider?: string;
   isPaper?: boolean;
   lastSyncedAt?: Date | string | null;
+  algoEnabled?: boolean;
 }
 
 export interface Position {

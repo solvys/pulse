@@ -5,7 +5,7 @@ import { CompactERMonitor } from '../mission-control/CompactERMonitor';
 import { AutopilotStatusLight } from '../mission-control/AutopilotStatusLight';
 import { CompactPnLDisplay } from '../mission-control/CompactPnLDisplay';
 import { useBackend } from '../../lib/backend';
-import type { NewsItem } from '~backend/news/list';
+import type { NewsItem } from '../../types/api';
 import { X, Trash2 } from 'lucide-react';
 
 type LayoutOption = 'movable' | 'tickers-only' | 'combined';

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { FeedItem as FeedItemType, IVIndicator } from '../../types/feed';
 import { useBackend } from '../../lib/backend';
-import type { NewsItem } from '~backend/news/list';
+import type { NewsItem } from '../../types/api';
 import { FeedItem } from './FeedItem';
 import { MoveLeft, MoveRight, GripVertical, X, ChevronLeft, ChevronRight } from 'lucide-react';
 import { PanelPosition } from '../layout/DraggablePanel';
@@ -51,7 +51,7 @@ function convertNewsToFeedItem(newsItem: NewsItem): FeedItemType | null {
   }
 
   let classification: 'Cyclical' | 'Countercyclical' | 'Neutral' = 'Neutral';
-  const category = newsItem.category.toLowerCase();
+  const category = newsItem.category || ''.toLowerCase();
   if (category.includes('fed') || category.includes('economic') || category.includes('political') || category.includes('geopolitical')) {
     classification = 'Countercyclical';
   } else if (category.includes('earning') || category.includes('corporate') || category.includes('technical')) {
@@ -66,7 +66,7 @@ function convertNewsToFeedItem(newsItem: NewsItem): FeedItemType | null {
 
   return {
     id: newsItem.id.toString(),
-    time: newsItem.publishedAt,
+    time: typeof newsItem.publishedAt === 'string' ? new Date(newsItem.publishedAt) : newsItem.publishedAt,
     text: title,
     source: newsItem.source,
     type: 'news',

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useBackend } from "../lib/backend";
-import type { NewsItem } from "~backend/news/list";
+import type { NewsItem } from "../types/api";
 import { TrendingUp, AlertTriangle, Info } from "lucide-react";
 import { Button } from "./ui/Button";
 import { IVScoreCard } from "./IVScoreCard";
@@ -60,8 +60,8 @@ export default function NewsFeed() {
     }
   };
   
-  const formatDate = (date: Date) => {
-    const d = new Date(date);
+  const formatDate = (date: Date | string) => {
+    const d = typeof date === 'string' ? new Date(date) : date;
     const now = new Date();
     const diffMs = now.getTime() - d.getTime();
     const diffMins = Math.floor(diffMs / 60000);
@@ -137,7 +137,7 @@ export default function NewsFeed() {
                 )}
                 
                 <div className="flex items-center gap-3 text-[9px] text-zinc-600">
-                  <span className="text-[#FFC038]/60">{item.category}</span>
+                  <span className="text-[#FFC038]/60">{item.category || ''}</span>
                   <span>•</span>
                   <span>{formatDate(item.publishedAt)}</span>
                 </div>

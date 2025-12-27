@@ -1,8 +1,8 @@
 import { X, ChevronRight } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useBackend } from "../lib/backend";
-import type { Account } from "~backend/account/get";
-import type { Position } from "~backend/trading/list_positions";
+import type { Account } from "../types/api";
+import type { Position } from "../types/api";
 import Toggle from "./Toggle";
 import AccountSummary from "./AccountSummary";
 import PositionsList from "./PositionsList";
