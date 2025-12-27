@@ -92,12 +92,15 @@ export default function ChatInterface() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
+  // Local input state for textarea
+  const [input, setInput] = useState("");
+
   // Custom fetch function for useChat with auth
   const fetchWithAuth = useCallback(async (url: string, options: RequestInit = {}) => {
     const token = await getToken();
-    const headers: HeadersInit = {
+    const headers: Record<string, string> = {
       'Content-Type': 'application/json',
-      ...(options.headers as HeadersInit || {}),
+      ...(options.headers as Record<string, string> || {}),
     };
     
     if (token) {
@@ -117,7 +120,7 @@ export default function ChatInterface() {
 
     const response = await fetch(`${API_BASE_URL}${url}`, {
       ...options,
-      headers,
+      headers: headers as HeadersInit,
     });
 
     // Extract conversationId from response headers
@@ -129,33 +132,50 @@ export default function ChatInterface() {
     return response;
   }, [getToken, conversationId]);
 
-  // Use useChat hook for streaming chat
+  // Track loading state manually
+  const [isStreaming, setIsStreaming] = useState(false);
+
+  // Use useChat hook for streaming chat (v3 API)
   const {
     messages: useChatMessages,
-    input,
-    handleInputChange,
-    handleSubmit,
-    isLoading,
+    sendMessage,
+    status,
     setMessages: setUseChatMessages,
   } = useChat({
-    api: '/ai/chat',
-    fetch: fetchWithAuth,
+    transport: {
+      url: `${API_BASE_URL}/ai/chat`,
+      fetch: fetchWithAuth,
+    } as any, // Type assertion needed for custom fetch
     onFinish: (message) => {
+      setIsStreaming(false);
       // Handle any post-processing after message is complete
       console.log('Message finished:', message);
     },
     onError: (error) => {
+      setIsStreaming(false);
       console.error('Chat error:', error);
     },
   });
 
+  const isLoading = isStreaming || status === 'streaming' || status === 'submitted';
+
   // Convert useChat messages to our Message format for display
-  const messages: Message[] = useChatMessages.map((msg) => ({
-    id: msg.id,
-    role: msg.role,
-    content: msg.content,
-    timestamp: new Date(), // useChat doesn't provide timestamps
-  }));
+  const messages: Message[] = useChatMessages
+    .filter((msg) => msg.role !== 'system') // Filter out system messages
+    .map((msg) => {
+      // Extract text content from parts array
+      const textParts = msg.parts
+        ?.filter((part: any) => part.type === 'text')
+        .map((part: any) => part.text)
+        .join('') || '';
+      
+      return {
+        id: msg.id,
+        role: msg.role === 'user' ? 'user' : 'assistant',
+        content: textParts,
+        timestamp: new Date(),
+      };
+    });
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -346,68 +366,25 @@ export default function ChatInterface() {
     // Hide suggestions when user sends a message
     setShowSuggestions(false);
     setThinkingText(THINKING_TERMS[0]);
+    setIsStreaming(true);
 
-    // If custom message, add it to useChat messages and submit
-    if (customMessage) {
-      // Add custom message to useChat and trigger submit
-      const event = new Event('submit', { bubbles: true, cancelable: true });
-      const form = textareaRef.current?.closest('form');
-      if (form) {
-        // Set input value and submit
-        handleInputChange({ target: { value: customMessage } } as any);
-        setTimeout(() => {
-          handleSubmit(event as any);
-        }, 0);
-      }
-    } else {
-      // Use normal handleSubmit from useChat
-      handleSubmit(new Event('submit', { bubbles: true, cancelable: true }) as any);
+    // Send message using useChat's sendMessage
+    sendMessage({ text: messageText });
+    
+    // Clear input if not a custom message
+    if (!customMessage) {
+      setInput("");
     }
   };
 
   const handleCheckTape = async () => {
     setShowSuggestions(false);
-    
-    // Add user message to show what was requested
-    const userMessage = {
-      id: Date.now().toString(),
-      role: "user" as const,
-      content: "Check the Tape",
-    };
-    setUseChatMessages((prev) => [...prev, userMessage]);
-    
-    try {
-      const response = await backend.ai.checkTape();
-      const tapeMessage = {
-        id: (Date.now() + 1).toString(),
-        role: "assistant" as const,
-        content: response.message,
-      };
-      setUseChatMessages((prev) => [...prev, tapeMessage]);
-    } catch (error) {
-      console.error("Check tape error:", error);
-      const errorMessage = {
-        id: (Date.now() + 1).toString(),
-        role: "assistant" as const,
-        content: "Sorry, I'm having trouble checking the tape right now. Please try again in a moment.",
-      };
-      setUseChatMessages((prev) => [...prev, errorMessage]);
-    }
+    sendMessage({ text: "Check the Tape" });
   };
 
   const handleDailyRecap = async () => {
     setShowSuggestions(false);
-    try {
-      const response = await backend.ai.generateDailyRecap();
-      const recapMessage = {
-        id: Date.now().toString(),
-        role: "assistant" as const,
-        content: response.message,
-      };
-      setUseChatMessages((prev) => [...prev, recapMessage]);
-    } catch (error) {
-      console.error("Daily recap error:", error);
-    }
+    sendMessage({ text: "Generate daily recap" });
   };
 
   const formatTime = (date: Date) => {
@@ -753,7 +730,7 @@ export default function ChatInterface() {
             ref={textareaRef}
             value={input}
             onChange={(e) => {
-              handleInputChange(e);
+              setInput(e.target.value);
               // Auto-resize textarea - grows on new lines
               const target = e.target as HTMLTextAreaElement;
               target.style.height = "auto";
@@ -762,7 +739,7 @@ export default function ChatInterface() {
             onKeyDown={(e) => {
               if (e.key === "Enter" && !e.shiftKey && !isLoading) {
                 e.preventDefault();
-                handleSubmit(e as any);
+                handleSend();
               }
             }}
             placeholder="Analyze your performance, the news, or the markets…."
@@ -775,11 +752,11 @@ export default function ChatInterface() {
           <button
             onClick={(e) => {
               e.preventDefault();
-              handleSubmit(e as any);
+              handleSend();
             }}
             disabled={!input.trim() || isLoading}
             className="flex items-center justify-center w-[42px] h-[42px] flex-shrink-0 rounded-full bg-[#FFC038] hover:bg-[#FFD060] disabled:bg-zinc-900 disabled:text-zinc-700 disabled:border disabled:border-zinc-800 transition-all self-end"
-            type="submit"
+            type="button"
           >
             <ArrowRight className="w-5 h-5" />
           </button>
