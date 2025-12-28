@@ -88,17 +88,17 @@ export const authMiddleware = createMiddleware(async (c, next) => {
 
     console.log(`[AUTH] Verifying token for ${c.req.path}, CLERK_SECRET_KEY prefix: ${env.CLERK_SECRET_KEY?.substring(0, 15)}...`);
 
-    const result = await verifyToken(token, {
+    // In @clerk/backend v1.x, verifyToken returns the JWT claims directly
+    const payload = await verifyToken(token, {
       secretKey: env.CLERK_SECRET_KEY,
     });
 
     console.log(`[AUTH] verifyToken result:`, {
-      hasPayload: !!result?.payload,
-      hasErrors: !!(result as any)?.errors,
-      errorDetails: (result as any)?.errors || null
+      hasPayload: !!payload,
+      sub: (payload as any)?.sub,
     });
 
-    if (!result || result.errors || !result.payload) {
+    if (!payload || !payload.sub) {
       // #region agent log - hypothesis C
       fetch('http://127.0.0.1:7244/ingest/fbebf980-5e49-4327-9406-872372234680', {
         method: 'POST',
@@ -106,7 +106,7 @@ export const authMiddleware = createMiddleware(async (c, next) => {
         body: JSON.stringify({
           location: 'auth.ts:invalid-token',
           message: 'Token verification failed',
-          data: { hasResult: !!result, hasErrors: !!(result && result.errors), method: c.req.method, path: c.req.path },
+          data: { hasPayload: !!payload, method: c.req.method, path: c.req.path },
           timestamp: Date.now(),
           sessionId: 'debug-session',
           runId: 'initial',
@@ -117,7 +117,7 @@ export const authMiddleware = createMiddleware(async (c, next) => {
       return c.json({ error: 'Unauthorized: Invalid token' }, 401);
     }
 
-    const userId = (result.payload as { sub?: string }).sub;
+    const userId = payload.sub;
     if (!userId) {
       // #region agent log - hypothesis C
       fetch('http://127.0.0.1:7244/ingest/fbebf980-5e49-4327-9406-872372234680', {
