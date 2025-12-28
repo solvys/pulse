@@ -9,6 +9,7 @@ import { econRoutes } from './econ.js';
 import { accountRoutes } from './account.js';
 import { notificationsRoutes } from './notifications.js';
 import { eventsRoutes } from './events.js';
+import { ivScoringRoutes } from './iv-scoring.js';
 import { aiRoutes } from './ai/index.js';
 import { autopilotRoutes } from './autopilot/index.js';
 import { autopilotTestRoutes } from './autopilot-test.js';
@@ -26,6 +27,7 @@ export function registerRoutes(app: Hono, includePublicRoutes = true) {
   app.route('/api/econ', econRoutes);
   app.route('/api/notifications', notificationsRoutes);
   app.route('/api/events', eventsRoutes);
+  app.route('/api/iv-scoring', ivScoringRoutes);
   app.route('/api/ai', aiRoutes);
   app.route('/api/autopilot', autopilotRoutes);
 
