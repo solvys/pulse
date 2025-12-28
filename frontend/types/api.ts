@@ -42,7 +42,7 @@ export interface PolymarketUpdate {
   timestamp: string;
 }
 
-export interface NewsItem {
+export interface RiskFlowItem {
   id: string | number;
   title: string;
   content?: string;
@@ -62,6 +62,9 @@ export interface NewsItem {
   authorHandle?: string;
   polymarketUpdate?: PolymarketUpdate;
 }
+
+// Alias for backward compatibility
+export type NewsItem = RiskFlowItem;
 
 export interface Account {
   id: string | number | null;

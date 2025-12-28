@@ -2,16 +2,18 @@ import { useState, useEffect } from 'react';
 import { FileText, Trash2 } from 'lucide-react';
 import { FeedItem as FeedItemType, IVIndicator } from '../../types/feed';
 import { useBackend } from '../../lib/backend';
-import type { NewsItem } from '../../types/api';
+import type { RiskFlowItem } from '../../types/api';
 import { FeedItem } from './FeedItem';
 import { NTNReportModal } from '../NTNReportModal';
+import { useSettings } from '../../contexts/SettingsContext';
+import { generateInitialFeed, generateMockFeedItem } from '../../utils/mockDataGenerator';
 
-// Convert NewsItem to FeedItem format
+// Convert RiskFlowItem to FeedItem format
 // Filters out raw/unprocessed data and ensures only interpreted messages are shown
-function convertNewsToFeedItem(newsItem: NewsItem): FeedItemType | null {
+function convertRiskFlowToFeedItem(riskflowItem: RiskFlowItem): FeedItemType | null {
   // Filter out items that look like raw system logs or unprocessed data
-  const title = newsItem.title || '';
-  const content = newsItem.content || '';
+  const title = riskflowItem.title || '';
+  const content = riskflowItem.content || '';
   
   // Skip items that look like raw API responses or system logs
   const rawDataPatterns = [
@@ -31,18 +33,18 @@ function convertNewsToFeedItem(newsItem: NewsItem): FeedItemType | null {
   }
   
   // Ensure ivScore is always a valid number first
-  const ivScoreValue = typeof newsItem.ivScore === 'number' ? newsItem.ivScore : 
-                       newsItem.ivScore != null ? Number(newsItem.ivScore) : 0;
+  const ivScoreValue = typeof riskflowItem.ivScore === 'number' ? riskflowItem.ivScore : 
+                       riskflowItem.ivScore != null ? Number(riskflowItem.ivScore) : 0;
   const safeIvScore = isNaN(ivScoreValue) ? 0 : ivScoreValue;
 
   // Determine IV type based on sentiment from Logic Matrix (database)
   // Use sentiment from database if available, otherwise fall back to keyword analysis
   let ivType: 'Bullish' | 'Bearish' | 'Neutral' = 'Neutral';
   
-  if (newsItem.sentiment) {
+  if (riskflowItem.sentiment) {
     // Use sentiment from Logic Matrix interpretation
-    if (newsItem.sentiment === 'bullish') ivType = 'Bullish';
-    else if (newsItem.sentiment === 'bearish') ivType = 'Bearish';
+    if (riskflowItem.sentiment === 'bullish') ivType = 'Bullish';
+    else if (riskflowItem.sentiment === 'bearish') ivType = 'Bearish';
   } else if (safeIvScore >= 6) {
     // Fallback: High volatility - check title for sentiment keywords
     const titleLower = title.toLowerCase();
@@ -58,7 +60,7 @@ function convertNewsToFeedItem(newsItem: NewsItem): FeedItemType | null {
 
   // Determine classification based on category
   let classification: 'Cyclical' | 'Countercyclical' | 'Neutral' = 'Neutral';
-  const category = newsItem.category || ''.toLowerCase();
+  const category = riskflowItem.category || ''.toLowerCase();
   if (category.includes('fed') || category.includes('economic') || category.includes('political') || category.includes('geopolitical')) {
     classification = 'Countercyclical';
   } else if (category.includes('earning') || category.includes('corporate') || category.includes('technical')) {
@@ -72,10 +74,10 @@ function convertNewsToFeedItem(newsItem: NewsItem): FeedItemType | null {
   };
 
   return {
-    id: newsItem.id.toString(),
-    time: typeof newsItem.publishedAt === 'string' ? new Date(newsItem.publishedAt) : newsItem.publishedAt,
+    id: riskflowItem.id.toString(),
+    time: typeof riskflowItem.publishedAt === 'string' ? new Date(riskflowItem.publishedAt) : riskflowItem.publishedAt,
     text: title, // Use interpreted title (already processed by Logic Matrix)
-    source: newsItem.source,
+    source: riskflowItem.source,
     type: 'news',
     iv: iv,
   };
@@ -83,6 +85,7 @@ function convertNewsToFeedItem(newsItem: NewsItem): FeedItemType | null {
 
 export function FeedSection() {
   const backend = useBackend();
+  const { mockDataEnabled } = useSettings();
   const [feedItems, setFeedItems] = useState<FeedItemType[]>([]);
   const [showNTNModal, setShowNTNModal] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -90,17 +93,27 @@ export function FeedSection() {
   useEffect(() => {
     const initializeNews = async () => {
       try {
-        // Fetch news items from the database (pre-fetched by cron job)
-        // The cron job runs every 5 minutes to fetch and classify events,
-        // so we don't need to trigger API calls here - just load from DB
-        const response = await backend.news.list({ limit: 50 });
-        // Filter out null items (raw/unprocessed data)
-        const convertedItems = response.items
-          .map(convertNewsToFeedItem)
-          .filter((item): item is FeedItemType => item !== null);
-        setFeedItems(convertedItems);
+        if (mockDataEnabled) {
+          // Use mock data when enabled
+          const mockItems = generateInitialFeed(20);
+          setFeedItems(mockItems);
+        } else {
+          // Fetch RiskFlow items from the database (pre-fetched by cron job)
+          // The cron job runs every 5 minutes to fetch and classify events,
+          // so we don't need to trigger API calls here - just load from DB
+          const response = await backend.riskflow.list({ limit: 50 });
+          // Filter out null items (raw/unprocessed data)
+          const convertedItems = response.items
+            .map((item: RiskFlowItem) => convertRiskFlowToFeedItem(item))
+            .filter((item): item is FeedItemType => item !== null);
+          setFeedItems(convertedItems);
+        }
       } catch (err) {
-        console.error('Failed to fetch news for The Tape:', err);
+        console.error('Failed to fetch RiskFlow for The Tape:', err);
+        // Fallback to mock data on error if enabled
+        if (mockDataEnabled) {
+          setFeedItems(generateInitialFeed(20));
+        }
       } finally {
         setLoading(false);
       }
@@ -108,25 +121,31 @@ export function FeedSection() {
 
     const fetchNews = async () => {
       try {
-        const response = await backend.news.list({ limit: 50 });
-        // Filter out null items (raw/unprocessed data)
-        const convertedItems = response.items
-          .map(convertNewsToFeedItem)
-          .filter((item): item is FeedItemType => item !== null);
-        setFeedItems(convertedItems);
+        if (mockDataEnabled) {
+          // Add new mock item periodically
+          const newItem = generateMockFeedItem();
+          setFeedItems(prev => [newItem, ...prev].slice(0, 50));
+        } else {
+          const response = await backend.riskflow.list({ limit: 50 });
+          // Filter out null items (raw/unprocessed data)
+          const convertedItems = response.items
+            .map((item: RiskFlowItem) => convertRiskFlowToFeedItem(item))
+            .filter((item): item is FeedItemType => item !== null);
+          setFeedItems(convertedItems);
+        }
       } catch (err) {
-        console.error('Failed to fetch news for The Tape:', err);
+        console.error('Failed to fetch RiskFlow for The Tape:', err);
       }
     };
 
-    // Initialize on mount (load from database)
+    // Initialize on mount (load from database or mock data)
     initializeNews();
 
     // Then fetch every 30 seconds (just refresh the list, don't sync every time)
     const interval = setInterval(fetchNews, 30000);
 
     return () => clearInterval(interval);
-  }, [backend]);
+  }, [backend, mockDataEnabled]);
 
   const handleClear = () => {
     if (confirm("Clear all tape items?")) {
@@ -173,7 +192,7 @@ export function FeedSection() {
               </div>
             ) : feedItems.length === 0 ? (
               <div className="text-center text-gray-500 py-12">
-                <p>No news items available</p>
+                <p>No RiskFlow items available</p>
                 <p className="text-xs mt-2">Waiting for RiskFlow updates...</p>
               </div>
             ) : (

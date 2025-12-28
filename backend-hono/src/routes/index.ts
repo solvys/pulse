@@ -2,7 +2,7 @@ import { Hono } from 'hono';
 import { projectxRoutes } from './projectx.js';
 import { tradingRoutes } from './trading.js';
 import { marketRoutes } from './market.js';
-import { newsRoutes } from './news.js';
+import { riskflowRoutes } from './riskflow.js';
 import { journalRoutes } from './journal.js';
 import { erRoutes } from './er.js';
 import { econRoutes } from './econ.js';
@@ -22,7 +22,7 @@ export function registerRoutes(app: Hono, includePublicRoutes = true) {
   if (includePublicRoutes) {
     app.route('/api/market', marketRoutes);
   }
-  app.route('/api/news', newsRoutes);
+  app.route('/api/riskflow', riskflowRoutes);
   app.route('/api/journal', journalRoutes);
   app.route('/api/er', erRoutes);
   app.route('/api/econ', econRoutes);

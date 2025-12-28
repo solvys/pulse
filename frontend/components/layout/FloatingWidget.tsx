@@ -4,7 +4,7 @@ import { EmotionalResonanceMonitor } from '../mission-control/EmotionalResonance
 import { CompactERMonitor } from '../mission-control/CompactERMonitor';
 import { CompactPnLDisplay } from '../mission-control/CompactPnLDisplay';
 import { useBackend } from '../../lib/backend';
-import type { NewsItem } from '../../types/api';
+import type { RiskFlowItem } from '../../types/api';
 import { X, Trash2 } from 'lucide-react';
 
 type LayoutOption = 'movable' | 'tickers-only' | 'combined';
@@ -17,7 +17,7 @@ interface FloatingWidgetProps {
 }
 
 // Track seen news IDs to avoid duplicates
-interface NewsNotification extends NewsItem {
+interface RiskFlowNotification extends RiskFlowItem {
   notificationId: string;
 }
 
@@ -46,7 +46,7 @@ export function FloatingWidget({ vix, ivScore, layoutOption = 'movable', onClose
   useEffect(() => {
     const fetchLatestNews = async () => {
       try {
-        const response = await backend.news.list({ limit: 5 });
+        const response = await backend.riskflow.list({ limit: 5 });
         if (response.items.length > 0) {
           const newItems: NewsNotification[] = [];
           

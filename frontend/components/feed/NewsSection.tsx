@@ -1,12 +1,15 @@
 import { useState, useEffect } from 'react';
 import { Bell, BellOff } from 'lucide-react';
 import { useBackend } from '../../lib/backend';
-import type { NewsItem } from '../../types/api';
+import type { RiskFlowItem } from '../../types/api';
 import { Button } from '../ui/Button';
+import { useSettings } from '../../contexts/SettingsContext';
+import { generateMockRiskFlowItem, generateMockRiskFlowItems } from '../../utils/mockDataGenerator';
 
 export function NewsSection() {
   const backend = useBackend();
-  const [newsItems, setNewsItems] = useState<NewsItem[]>([]);
+  const { mockDataEnabled } = useSettings();
+  const [riskflowItems, setRiskflowItems] = useState<RiskFlowItem[]>([]);
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
   const [loading, setLoading] = useState(true);
 
@@ -15,8 +18,8 @@ export function NewsSection() {
       const permission = await Notification.requestPermission();
       setNotificationsEnabled(permission === 'granted');
       if (permission === 'granted') {
-        new Notification('PULSE News Alerts', {
-          body: 'You will now receive notifications for breaking news',
+        new Notification('PULSE RiskFlow Alerts', {
+          body: 'You will now receive notifications for breaking RiskFlow events',
           icon: '/favicon.ico',
         });
       }
@@ -26,19 +29,37 @@ export function NewsSection() {
   useEffect(() => {
     const fetchNews = async () => {
       try {
-        const response = await backend.news.list({ limit: 50 });
-        setNewsItems(response.items);
+        if (mockDataEnabled) {
+          // Use mock data when enabled
+          const mockItems = generateMockRiskFlowItems(20);
+          setRiskflowItems(mockItems);
+        } else {
+          const response = await backend.riskflow.list({ limit: 50 });
+          setRiskflowItems(response.items);
+        }
       } catch (err) {
-        console.error('Failed to fetch news:', err);
+        console.error('Failed to fetch RiskFlow:', err);
+        // Fallback to mock data on error if enabled
+        if (mockDataEnabled) {
+          setRiskflowItems(generateMockRiskFlowItems(20));
+        }
       } finally {
         setLoading(false);
       }
     };
 
     fetchNews();
-    const interval = setInterval(fetchNews, 30000);
+    const interval = setInterval(() => {
+      if (mockDataEnabled) {
+        // Add new mock item periodically
+        const newItem = generateMockRiskFlowItem();
+        setRiskflowItems(prev => [newItem, ...prev].slice(0, 50));
+      } else {
+        fetchNews();
+      }
+    }, 30000);
     return () => clearInterval(interval);
-  }, []);
+  }, [backend, mockDataEnabled]);
 
   return (
     <div className="h-full p-6">
@@ -74,13 +95,13 @@ export function NewsSection() {
           <div className="text-center text-gray-500 py-12">
             <p>Loading news...</p>
           </div>
-        ) : newsItems.length === 0 ? (
+        ) : riskflowItems.length === 0 ? (
           <div className="text-center text-gray-500 py-12">
-            <p>No news items available</p>
+            <p>No RiskFlow items available</p>
             <p className="text-xs mt-2">Check your API keys in Settings</p>
           </div>
         ) : (
-          newsItems.map(item => {
+          riskflowItems.map(item => {
             const priceBrain = item.priceBrainScore;
             const macroLevel = item.macroLevel || 1;
             const showImpliedPoints = (macroLevel === 3 || macroLevel === 4) && priceBrain?.impliedPoints !== null && priceBrain?.impliedPoints !== undefined;

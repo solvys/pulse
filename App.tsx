@@ -112,7 +112,7 @@ function AppInner() {
 
 export default function App() {
   // Production Clerk publishable key
-  const clerkKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY || 'pk_live_Y2xlcmsuc29sdnlzLmlvJA';
+  const clerkKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY || '';
 
   // In dev mode with auth bypass, skip ClerkProvider
   if (BYPASS_AUTH) {

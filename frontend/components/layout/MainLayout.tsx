@@ -104,7 +104,7 @@ function MainLayoutInner({ onSettingsClick, signOut }: MainLayoutProps & { signO
   useEffect(() => {
     const fetchVIX = async () => {
       try {
-        const data = await backend.news.fetchVIX();
+        const data = await backend.riskflow.fetchVIX();
         if (data && typeof data.value === 'number') {
           setVix(data.value);
         }

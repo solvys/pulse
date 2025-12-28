@@ -1,38 +1,38 @@
 import { useEffect, useState } from "react";
 import { useBackend } from "../lib/backend";
-import type { NewsItem } from "../types/api";
+import type { RiskFlowItem } from "../types/api";
 import { TrendingUp, AlertTriangle, Info } from "lucide-react";
 import { Button } from "./ui/Button";
 import { IVScoreCard } from "./IVScoreCard";
 
 export default function NewsFeed() {
   const backend = useBackend();
-  const [news, setNews] = useState<NewsItem[]>([]);
+  const [riskflow, setRiskflow] = useState<RiskFlowItem[]>([]);
   const [selectedSymbols, setSelectedSymbols] = useState<string[]>([]);
   
   const availableSymbols = ['MNQ', 'ES', 'NQ', 'YM', 'RTY'];
   
   useEffect(() => {
-    loadNews();
+    loadRiskFlow();
     const interval = setInterval(() => {
-      loadNews();
+      loadRiskFlow();
     }, 30000);
     return () => clearInterval(interval);
   }, []);
   
-  const loadNews = async () => {
+  const loadRiskFlow = async () => {
     try {
-      const data = await backend.news.list({ limit: 20 });
-      setNews(data.items);
+      const data = await backend.riskflow.list({ limit: 20 });
+      setRiskflow(data.items);
     } catch (error: any) {
-      console.error('Failed to load news:', error);
+      console.error('Failed to load RiskFlow:', error);
       if (error.code === "not_found" || error.code === "unauthenticated") {
         try {
-          await backend.news.seed();
-          const newData = await backend.news.list({ limit: 20 });
-          setNews(newData.items);
+          await backend.riskflow.seed();
+          const newData = await backend.riskflow.list({ limit: 20 });
+          setRiskflow(newData.items);
         } catch (seedError) {
-          console.error('Failed to seed news:', seedError);
+          console.error('Failed to seed RiskFlow:', seedError);
         }
       }
     }
@@ -75,14 +75,14 @@ export default function NewsFeed() {
     }
   };
   
-  const filteredNews = selectedSymbols.length > 0
-    ? news.filter(item => 
+  const filteredRiskFlow = selectedSymbols.length > 0
+    ? riskflow.filter(item => 
         selectedSymbols.some(symbol => 
           item.title.toLowerCase().includes(symbol.toLowerCase()) ||
           item.content?.toLowerCase().includes(symbol.toLowerCase())
         )
       )
-    : news;
+    : riskflow;
 
   const toggleSymbol = (symbol: string) => {
     setSelectedSymbols(prev =>
@@ -113,7 +113,7 @@ export default function NewsFeed() {
       </div>
       <div className="flex-1 overflow-y-auto p-6">
         <div className="max-w-4xl mx-auto space-y-3">
-        {filteredNews.map((item) => (
+        {filteredRiskFlow.map((item) => (
           <div
             key={item.id}
             className="bg-[#0a0a00] border border-zinc-900 rounded-lg p-4 hover:border-zinc-800 transition-colors"

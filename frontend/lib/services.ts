@@ -27,19 +27,10 @@ export interface Account {
   projectxUsername?: string;
 }
 
-export interface NewsItem {
-  id: string;
-  title: string;
-  content: string;
-  source: string;
-  url?: string;
-  publishedAt: Date;
-  impact?: 'high' | 'medium' | 'low';
-  symbols?: string[];
-}
+import type { RiskFlowItem } from '../types/api';
 
-export interface NewsListResponse {
-  items: NewsItem[];
+export interface RiskFlowListResponse {
+  items: RiskFlowItem[];
   total?: number;
 }
 
@@ -99,17 +90,27 @@ export interface UplinkResponse {
 
 // Account Service
 export class AccountService {
-  constructor(private client: ApiClient) {}
+  constructor(private client: ApiClient) { }
 
   async get(): Promise<Account> {
-    const response = await this.client.get<any>('/account');
+    const response = await this.client.get<any>('/api/account');
+    // Get tier separately since it's not in the account response
+    let tier: Account['tier'] = 'free';
+    try {
+      const tierResponse = await this.client.get<{ tier: Account['tier'] | null; requiresSelection: boolean }>('/api/account/tier');
+      tier = tierResponse.tier || 'free';
+    } catch (error) {
+      // If tier endpoint fails, default to free
+      console.warn('Failed to get tier, defaulting to free:', error);
+    }
+
     // Transform backend response to match frontend expectations
     return {
       id: response.id?.toString() || '',
       userId: '', // Backend doesn't return userId
       balance: response.balance || 0,
       dailyPnl: 0, // Backend doesn't return this
-      tier: 'free', // Backend doesn't return tier
+      tier: tier,
       tradingEnabled: false,
       autoTrade: false,
       riskManagement: false,
@@ -118,91 +119,133 @@ export class AccountService {
   }
 
   async create(data: { initialBalance?: number }): Promise<Account> {
-    // Stub - backend doesn't have POST /account
-    console.warn('Account creation endpoint not available in Hono backend');
-    return this.get();
+    const response = await this.client.post<any>('/api/account', data);
+    // Get tier separately since it's not in the account response
+    let tier: Account['tier'] = 'free';
+    try {
+      const tierResponse = await this.client.get<{ tier: Account['tier'] | null; requiresSelection: boolean }>('/api/account/tier');
+      tier = tierResponse.tier || 'free';
+    } catch (error) {
+      // If tier endpoint fails, default to free
+      console.warn('Failed to get tier, defaulting to free:', error);
+    }
+
+    // Transform backend response to match frontend expectations
+    return {
+      id: response.id?.toString() || '',
+      userId: '', // Backend doesn't return userId
+      balance: response.balance || 0,
+      dailyPnl: 0, // Backend doesn't return this
+      tier: tier,
+      tradingEnabled: false,
+      autoTrade: false,
+      riskManagement: false,
+      algoEnabled: false, // Backend doesn't return this
+    };
   }
 
   async updateSettings(data: Partial<Account>): Promise<Account> {
-    // Stub - backend doesn't have this endpoint
-    console.warn('Account settings update endpoint not available in Hono backend');
+    await this.client.patch('/api/account/settings', data);
     return this.get();
   }
 
   async updateTier(data: { tier: Account['tier'] }): Promise<Account> {
-    await this.client.patch('/account/tier', data);
+    await this.client.patch('/api/account/tier', data);
     return this.get();
   }
 
   async selectTier(data: { tier: Account['tier'] }): Promise<void> {
-    await this.client.post('/account/select-tier', data);
+    await this.client.post('/api/account/select-tier', data);
   }
 
   async getTier(): Promise<{ tier: Account['tier'] | null; requiresSelection: boolean }> {
-    return this.client.get('/account/tier');
+    return this.client.get('/api/account/tier');
   }
 
   async getFeatures(): Promise<{ tier: Account['tier']; features: Array<{ name: string; requiredTier: string; hasAccess: boolean }> }> {
-    return this.client.get('/account/features');
+    return this.client.get('/api/account/features');
   }
 
   async updateProjectXCredentials(data: { username?: string; apiKey?: string }): Promise<void> {
     // Use projectx sync endpoint
     if (data.username && data.apiKey) {
-      await this.client.post('/projectx/sync', data);
+      await this.client.post('/api/projectx/sync', data);
     }
   }
 }
 
-// News Service
-export class NewsService {
-  constructor(private client: ApiClient) {}
+// RiskFlow Service
+export class RiskFlowService {
+  constructor(private client: ApiClient) { }
 
-  async list(params?: { limit?: number; offset?: number }): Promise<NewsListResponse> {
+  async list(params?: { limit?: number; offset?: number }): Promise<RiskFlowListResponse> {
     const query = new URLSearchParams();
     if (params?.limit) query.append('limit', params.limit.toString());
     if (params?.offset) query.append('offset', params.offset.toString());
-    
+
     const queryString = query.toString();
-    const endpoint = `/news/feed${queryString ? `?${queryString}` : ''}`;
-    const response = await this.client.get<{ articles: any[] }>(endpoint);
-    // Transform backend response to match frontend expectations
-    return {
-      items: response.articles.map(article => ({
-        id: article.id?.toString() || '',
-        title: article.title || '',
-        content: article.summary || '',
-        source: article.source || '',
-        url: article.url,
-        publishedAt: article.publishedAt || new Date(),
-        impact: article.ivImpact ? (article.ivImpact > 7 ? 'high' : article.ivImpact > 4 ? 'medium' : 'low') : undefined,
-        symbols: article.symbols || [],
-      })),
-      total: response.articles.length,
-    };
+    const endpoint = `/api/riskflow/feed${queryString ? `?${queryString}` : ''}`;
+    try {
+      const response = await this.client.get<{ articles?: any[] }>(endpoint);
+      // Handle both response formats: { articles: [...] } or { items: [...] }
+      const articles = response.articles || (response as any).items || [];
+
+      // Transform backend response to match frontend expectations
+      return {
+        items: (Array.isArray(articles) ? articles : []).map(article => ({
+          id: article.id?.toString() || '',
+          title: article.title || '',
+          content: article.summary || article.content || '',
+          source: article.source || '',
+          url: article.url,
+          publishedAt: article.publishedAt || article.published_at || new Date(),
+          impact: article.ivImpact || article.iv_impact
+            ? (article.ivImpact || article.iv_impact) > 7 ? 'high'
+              : (article.ivImpact || article.iv_impact) > 4 ? 'medium'
+                : 'low'
+            : undefined,
+          symbols: article.symbols || [],
+          sentiment: article.sentiment,
+          ivScore: article.ivImpact || article.iv_impact || 0,
+          category: article.category || article.source || '',
+        })),
+        total: Array.isArray(articles) ? articles.length : 0,
+      };
+    } catch (error: any) {
+      console.error('Failed to fetch RiskFlow:', error);
+      // Return empty response on error
+      return {
+        items: [],
+        total: 0,
+      };
+    }
   }
 
   async seed(): Promise<void> {
-    // Stub - backend doesn't have this endpoint
-    console.warn('News seed endpoint not available in Hono backend');
+    try {
+      await this.client.post('/api/riskflow/seed', {});
+    } catch (error) {
+      console.error('Failed to seed RiskFlow:', error);
+      throw error;
+    }
   }
 
   async fetchVIX(): Promise<{ value: number }> {
-    return this.client.get<{ value: number }>('/market/vix');
+    return this.client.get<{ value: number }>('/api/market/vix');
   }
 }
 
 // AI Service
 export class AIService {
-  constructor(private client: ApiClient) {}
+  constructor(private client: ApiClient) { }
 
   async chat(data: { message: string; conversationId?: string }): Promise<ChatResponse> {
     try {
-      const response = await this.client.post<ChatResponse>('/ai/chat', {
+      const response = await this.client.post<ChatResponse>('/api/ai/chat', {
         message: data.message,
         conversationId: data.conversationId,
       });
-      
+
       return response;
     } catch (error: any) {
       console.error('AI chat error:', error);
@@ -211,7 +254,7 @@ export class AIService {
   }
 
   async listConversations(): Promise<any[]> {
-    return this.client.get<{ conversations: any[] }>('/ai/conversations').then(r => r.conversations || []);
+    return this.client.get<{ conversations: any[] }>('/api/ai/conversations').then(r => r.conversations || []);
   }
 
   async getConversation(data: { conversationId: string }): Promise<any> {
@@ -245,10 +288,10 @@ export class AIService {
 
 // Trading Service
 export class TradingService {
-  constructor(private client: ApiClient) {}
+  constructor(private client: ApiClient) { }
 
   async listPositions(): Promise<PositionsResponse> {
-    const response = await this.client.get<{ positions: any[] }>('/trading/positions');
+    const response = await this.client.get<{ positions: any[] }>('/api/trading/positions');
     // Transform backend response to match frontend expectations
     return {
       positions: response.positions.map(pos => ({
@@ -287,10 +330,10 @@ export class TradingService {
 
 // ProjectX Service
 export class ProjectXService {
-  constructor(private client: ApiClient) {}
+  constructor(private client: ApiClient) { }
 
   async listAccounts(): Promise<ProjectXAccountsResponse> {
-    const response = await this.client.get<{ accounts: any[] }>('/projectx/accounts');
+    const response = await this.client.get<{ accounts: any[] }>('/api/projectx/accounts');
     // Transform backend response to match frontend expectations
     return {
       accounts: response.accounts.map(acc => ({
@@ -313,13 +356,13 @@ export class ProjectXService {
   }
 
   async syncProjectXAccounts(): Promise<void> {
-    return this.client.post('/projectx/sync', {});
+    return this.client.post('/api/projectx/sync', {});
   }
 }
 
 // Notifications Service
 export class NotificationsService {
-  constructor(private client: ApiClient) {}
+  constructor(private client: ApiClient) { }
 
   async list(): Promise<any[]> {
     const response = await this.client.get<{ notifications: any[] }>('/notifications');
@@ -334,7 +377,7 @@ export class NotificationsService {
 
 // ER Service (Emotional Resonance)
 export class ERService {
-  constructor(private client: ApiClient) {}
+  constructor(private client: ApiClient) { }
 
   async getSessions(): Promise<any[]> {
     // Backend uses /er/date/:date pattern instead of /er/sessions
@@ -349,7 +392,7 @@ export class ERService {
   }
 
   async saveSession(data: any): Promise<any> {
-    return this.client.post('/er/sessions', data);
+    return this.client.post('/api/er/sessions', data);
   }
 
   async saveSnapshot(data: any): Promise<any> {
@@ -367,7 +410,7 @@ export class ERService {
 
 // Events Service
 export class EventsService {
-  constructor(private client: ApiClient) {}
+  constructor(private client: ApiClient) { }
 
   async list(): Promise<any[]> {
     // Stub - backend doesn't have this endpoint
@@ -383,31 +426,31 @@ export class EventsService {
 
 // Polymarket Service
 export class PolymarketService {
-  constructor(private client: ApiClient) {}
+  constructor(private client: ApiClient) { }
 
   async getOdds(): Promise<{ success: boolean; data: { odds: any[] } }> {
-    return this.client.get('/polymarket/odds');
+    return this.client.get('/api/polymarket/odds');
   }
 
   async getUpdates(limit?: number, marketType?: string): Promise<{ success: boolean; data: { updates: any[] } }> {
     const params = new URLSearchParams();
     if (limit) params.append('limit', limit.toString());
     if (marketType) params.append('marketType', marketType);
-    
+
     const queryString = params.toString();
-    const endpoint = `/polymarket/updates${queryString ? `?${queryString}` : ''}`;
+    const endpoint = `/api/polymarket/updates${queryString ? `?${queryString}` : ''}`;
     return this.client.get(endpoint);
   }
 
   async sync(): Promise<{ success: boolean; message: string; oddsCount?: number }> {
-    return this.client.post('/polymarket/sync');
+    return this.client.post('/api/polymarket/sync');
   }
 }
 
 // Main Backend Client Interface
 export interface BackendClient {
   account: AccountService;
-  news: NewsService;
+  riskflow: RiskFlowService;
   ai: AIService;
   trading: TradingService;
   projectx: ProjectXService;
@@ -421,7 +464,7 @@ export interface BackendClient {
 export function createBackendClient(client: ApiClient): BackendClient {
   return {
     account: new AccountService(client),
-    news: new NewsService(client),
+    riskflow: new RiskFlowService(client),
     ai: new AIService(client),
     trading: new TradingService(client),
     projectx: new ProjectXService(client),

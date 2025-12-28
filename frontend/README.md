@@ -64,10 +64,11 @@ This frontend is designed to work with a Hono API backend. The API client expect
 - `PATCH /api/account/settings` - Update account settings
 - `PATCH /api/account/tier` - Update account tier
 
-### News Endpoints
-- `GET /api/news?limit={limit}&offset={offset}` - List news items
-- `POST /api/news/seed` - Seed news data
-- `GET /api/news/vix` - Get VIX value
+### RiskFlow Endpoints
+- `GET /api/riskflow?limit={limit}&offset={offset}` - List RiskFlow items
+- `GET /api/riskflow/feed?limit={limit}&offset={offset}` - Get RiskFlow feed
+- `POST /api/riskflow/seed` - Seed RiskFlow data
+- `GET /api/market/vix` - Get VIX value
 
 ### AI Endpoints
 - `POST /api/ai/chat` - Send chat message
