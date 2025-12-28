@@ -38,7 +38,7 @@ polymarketRoutes.get('/odds', async (c) => {
 
     // If no database entries, try to fetch from API
     const apiOdds = await fetchAllPolymarketOdds();
-    
+
     if (apiOdds.length === 0) {
       return c.json({
         success: true,
@@ -140,7 +140,7 @@ polymarketRoutes.get('/updates', async (c) => {
 polymarketRoutes.post('/sync', async (c) => {
   try {
     const allOdds = await fetchAllPolymarketOdds();
-    
+
     if (allOdds.length === 0) {
       return c.json({
         success: false,
@@ -176,8 +176,7 @@ polymarketRoutes.post('/sync', async (c) => {
       // Check for significant changes
       if (previous) {
         const changeCheck = await checkSignificantChanges(
-          odds,
-          Number(previous.yes_odds)
+          odds
         );
 
         if (changeCheck.hasChange) {
