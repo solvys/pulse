@@ -42,7 +42,7 @@ newsRoutes.get('/', async (c) => {
     }
 
     return c.json({
-      items: news?.map(n => ({
+      items: news?.map((n: any) => ({
         id: n.id,
         title: n.title,
         summary: n.summary,
