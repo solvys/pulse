@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useBackend } from '../../lib/backend';
-import type { NewsItem } from '../../types/api';
+import type { RiskFlowItem } from '../../types/api';
 
 // Track last seen news item ID to count unread items (per session)
 let lastSeenNewsId: number | null = null;
@@ -13,7 +13,7 @@ export function MinimalTapeWidget() {
   useEffect(() => {
     const fetchNews = async () => {
       try {
-        const response = await backend.news.list({ limit: 20 });
+        const response = await backend.riskflow.list({ limit: 20 });
         setTotalItems(response.items.length);
         
         // Calculate unread count
@@ -24,7 +24,7 @@ export function MinimalTapeWidget() {
             setUnreadCount(0);
           } else {
             // Count items newer than last seen
-            const unread = response.items.filter(item => {
+            const unread = response.items.filter((item: RiskFlowItem) => {
               const itemId = typeof item.id === 'number' ? item.id : parseInt(item.id.toString());
               return itemId > lastSeenNewsId!;
             }).length;

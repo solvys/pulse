@@ -27,19 +27,7 @@ export interface Account {
   projectxUsername?: string;
 }
 
-export interface RiskFlowItem {
-  id: string;
-  title: string;
-  content: string;
-  source: string;
-  url?: string;
-  publishedAt: Date;
-  impact?: 'high' | 'medium' | 'low';
-  symbols?: string[];
-  sentiment?: string;
-  ivScore?: number;
-  category?: string;
-}
+import type { RiskFlowItem } from '../types/api';
 
 export interface RiskFlowListResponse {
   items: RiskFlowItem[];

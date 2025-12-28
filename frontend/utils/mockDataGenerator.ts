@@ -1,4 +1,5 @@
 import { FeedItem, IVIndicator } from '../types/feed';
+import type { RiskFlowItem } from '../types/api';
 
 const headlines = [
   'ES Futures holding 5050 support level',
@@ -58,6 +59,61 @@ export function generateInitialFeed(count: number = 10): FeedItem[] {
   return Array.from({ length: count }, (_, i) => {
     const item = generateMockFeedItem();
     item.time = new Date(Date.now() - i * 60000);
+    return item;
+  });
+}
+
+// Generate mock RiskFlowItem for NewsSection component
+export function generateMockRiskFlowItem(): RiskFlowItem {
+  const title = headlines[Math.floor(Math.random() * headlines.length)];
+  const source = sources[Math.floor(Math.random() * sources.length)];
+  const hash = hashString(title);
+  const ivImpact = ((hash % 100) / 10); // 0-10 scale
+  const ivScore = ivImpact;
+  
+  const impacts: ('high' | 'medium' | 'low')[] = ['high', 'medium', 'low'];
+  const impact = ivImpact > 7 ? 'high' : ivImpact > 4 ? 'medium' : 'low';
+  
+  const sentiments: ('positive' | 'negative' | 'neutral' | 'bullish' | 'bearish')[] = 
+    ['positive', 'negative', 'neutral', 'bullish', 'bearish'];
+  const sentiment = sentiments[hash % sentiments.length];
+  
+  const macroLevels: (1 | 2 | 3 | 4)[] = [1, 2, 3, 4];
+  const macroLevel = macroLevels[hash % macroLevels.length] as 1 | 2 | 3 | 4;
+  
+  const priceBrainSentiment = ivImpact > 5 ? 'Bullish' : ivImpact < -5 ? 'Bearish' : 'Neutral';
+  const priceBrainClassification = Math.abs(ivImpact) > 5 ? 'Counter-cyclical' : 'Cyclical';
+  
+  return {
+    id: `riskflow_${Date.now()}_${Math.random()}`,
+    title,
+    content: `${title}. Market analysis and implications for trading strategies.`,
+    summary: `${title}. Key market development with significant trading implications.`,
+    source,
+    url: `https://example.com/article/${hash}`,
+    publishedAt: new Date(),
+    sentiment,
+    ivImpact,
+    ivScore,
+    impact,
+    symbols: ['ES', 'NQ', 'MNQ'],
+    isBreaking: Math.random() > 0.8,
+    category: source,
+    macroLevel,
+    priceBrainScore: {
+      sentiment: priceBrainSentiment,
+      classification: priceBrainClassification,
+      impliedPoints: macroLevel >= 3 ? (ivImpact - 5) * 2 : null,
+      instrument: macroLevel >= 3 ? 'ES' : null,
+    },
+  };
+}
+
+export function generateMockRiskFlowItems(count: number = 20): RiskFlowItem[] {
+  return Array.from({ length: count }, (_, i) => {
+    const item = generateMockRiskFlowItem();
+    item.publishedAt = new Date(Date.now() - i * 60000);
+    item.id = `riskflow_${Date.now() - i * 60000}_${i}`;
     return item;
   });
 }

@@ -124,4 +124,4 @@ After database setup:
    - `GET /api/account/tier` - Get user's billing tier
    - `GET /api/account/features` - List available features
 3. Seed sample data (optional):
-   - `POST /api/news/seed` - Seed sample RiskFlow articles
+   - `POST /api/riskflow/seed` - Seed sample RiskFlow articles

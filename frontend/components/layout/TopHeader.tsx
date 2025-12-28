@@ -144,7 +144,7 @@ export function TopHeader({
   useEffect(() => {
     const fetchVIX = async () => {
       try {
-        const data = await backend.news.fetchVIX();
+        const data = await backend.riskflow.fetchVIX();
         if (data && typeof data.value === 'number') {
           console.log(`[VIX] Successfully fetched: ${data.value}`);
           setVix(data.value);

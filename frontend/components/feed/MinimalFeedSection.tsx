@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { FeedItem as FeedItemType, IVIndicator } from '../../types/feed';
 import { useBackend } from '../../lib/backend';
-import type { NewsItem } from '../../types/api';
+import type { RiskFlowItem } from '../../types/api';
 import { FeedItem } from './FeedItem';
 import { MoveLeft, MoveRight, GripVertical, X, ChevronLeft, ChevronRight } from 'lucide-react';
 import { PanelPosition } from '../layout/DraggablePanel';
@@ -9,10 +9,10 @@ import { PanelPosition } from '../layout/DraggablePanel';
 // Track last seen news item ID to count unread items (per session)
 let lastSeenNewsId: number | null = null;
 
-// Convert NewsItem to FeedItem format
-function convertNewsToFeedItem(newsItem: NewsItem): FeedItemType | null {
-  const title = newsItem.title || '';
-  const content = newsItem.content || '';
+// Convert RiskFlowItem to FeedItem format
+function convertRiskFlowToFeedItem(riskflowItem: RiskFlowItem): FeedItemType | null {
+  const title = riskflowItem.title || '';
+  const content = riskflowItem.content || '';
   
   const rawDataPatterns = [
     /^\[.*\]/,
@@ -29,15 +29,15 @@ function convertNewsToFeedItem(newsItem: NewsItem): FeedItemType | null {
     return null;
   }
   
-  const ivScoreValue = typeof newsItem.ivScore === 'number' ? newsItem.ivScore : 
-                       newsItem.ivScore != null ? Number(newsItem.ivScore) : 0;
+  const ivScoreValue = typeof riskflowItem.ivScore === 'number' ? riskflowItem.ivScore : 
+                       riskflowItem.ivScore != null ? Number(riskflowItem.ivScore) : 0;
   const safeIvScore = isNaN(ivScoreValue) ? 0 : ivScoreValue;
 
   let ivType: 'Bullish' | 'Bearish' | 'Neutral' = 'Neutral';
   
-  if (newsItem.sentiment) {
-    if (newsItem.sentiment === 'bullish') ivType = 'Bullish';
-    else if (newsItem.sentiment === 'bearish') ivType = 'Bearish';
+  if (riskflowItem.sentiment) {
+    if (riskflowItem.sentiment === 'bullish') ivType = 'Bullish';
+    else if (riskflowItem.sentiment === 'bearish') ivType = 'Bearish';
   } else if (safeIvScore >= 6) {
     const titleLower = title.toLowerCase();
     const bullishKeywords = ['surge', 'rally', 'soar', 'jump', 'gain', 'rise', 'upgrade', 'beats', 'record high', 'increase', 'beat'];
@@ -51,7 +51,7 @@ function convertNewsToFeedItem(newsItem: NewsItem): FeedItemType | null {
   }
 
   let classification: 'Cyclical' | 'Countercyclical' | 'Neutral' = 'Neutral';
-  const category = newsItem.category || ''.toLowerCase();
+  const category = riskflowItem.category || ''.toLowerCase();
   if (category.includes('fed') || category.includes('economic') || category.includes('political') || category.includes('geopolitical')) {
     classification = 'Countercyclical';
   } else if (category.includes('earning') || category.includes('corporate') || category.includes('technical')) {
@@ -65,10 +65,10 @@ function convertNewsToFeedItem(newsItem: NewsItem): FeedItemType | null {
   };
 
   return {
-    id: newsItem.id.toString(),
-    time: typeof newsItem.publishedAt === 'string' ? new Date(newsItem.publishedAt) : newsItem.publishedAt,
+    id: riskflowItem.id.toString(),
+    time: typeof riskflowItem.publishedAt === 'string' ? new Date(riskflowItem.publishedAt) : riskflowItem.publishedAt,
     text: title,
-    source: newsItem.source,
+    source: riskflowItem.source,
     type: 'news',
     iv: iv,
   };
@@ -96,9 +96,9 @@ export function MinimalFeedSection({
   useEffect(() => {
     const fetchNews = async () => {
       try {
-        const response = await backend.news.list({ limit: 20 });
+        const response = await backend.riskflow.list({ limit: 20 });
         const convertedItems = response.items
-          .map(convertNewsToFeedItem)
+          .map((item: RiskFlowItem) => convertRiskFlowToFeedItem(item))
           .filter((item): item is FeedItemType => item !== null);
         setFeedItems(convertedItems);
         
@@ -110,7 +110,7 @@ export function MinimalFeedSection({
             setUnreadCount(0);
           } else {
             // Count items newer than last seen
-            const unread = response.items.filter(item => {
+            const unread = response.items.filter((item: RiskFlowItem) => {
               const itemId = typeof item.id === 'number' ? item.id : parseInt(item.id.toString());
               return itemId > lastSeenNewsId!;
             }).length;
