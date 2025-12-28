@@ -19,10 +19,42 @@ type UIMessage = {
 
 export async function handleChat(c: Context) {
   const userId = c.get('userId');
+
+  // #region agent log - hypothesis B, E
+  fetch('http://127.0.0.1:7244/ingest/fbebf980-5e49-4327-9406-872372234680', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      location: 'chat.ts:handleChat',
+      message: 'Chat request received',
+      data: { userId, method: c.req.method, path: c.req.path },
+      timestamp: Date.now(),
+      sessionId: 'debug-session',
+      runId: 'initial',
+      hypothesisId: 'B,E'
+    })
+  }).catch(() => {});
+  // #endregion
+
   const body = await c.req.json();
   const result = chatRequestSchema.safeParse(body);
 
   if (!result.success) {
+    // #region agent log - hypothesis B
+    fetch('http://127.0.0.1:7244/ingest/fbebf980-5e49-4327-9406-872372234680', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        location: 'chat.ts:validation-failed',
+        message: 'Request validation failed',
+        data: { errors: result.error.flatten(), userId },
+        timestamp: Date.now(),
+        sessionId: 'debug-session',
+        runId: 'initial',
+        hypothesisId: 'B'
+      })
+    }).catch(() => {});
+    // #endregion
     return c.json({ error: 'Invalid request body', details: result.error.flatten() }, 400);
   }
 

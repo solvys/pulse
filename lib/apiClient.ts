@@ -27,7 +27,23 @@ class ApiClient {
     options: RequestInit = {}
   ): Promise<T> {
     const url = `${this.baseUrl}${endpoint}`;
-    
+
+    // #region agent log - hypothesis A, B, C, D
+    fetch('http://127.0.0.1:7244/ingest/fbebf980-5e49-4327-9406-872372234680', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        location: 'apiClient.ts:request',
+        message: 'API request starting',
+        data: { url, endpoint, method: options.method || 'GET' },
+        timestamp: Date.now(),
+        sessionId: 'debug-session',
+        runId: 'initial',
+        hypothesisId: 'A,B,C,D'
+      })
+    }).catch(() => {});
+    // #endregion
+
     const headers: HeadersInit = {
       'Content-Type': 'application/json',
       ...options.headers,
@@ -36,12 +52,43 @@ class ApiClient {
     // Add auth token if available
     if (this.getAuthToken) {
       const token = await this.getAuthToken();
+      // #region agent log - hypothesis C
+      fetch('http://127.0.0.1:7244/ingest/fbebf980-5e49-4327-9406-872372234680', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          location: 'apiClient.ts:request',
+          message: 'Auth token check',
+          data: { hasToken: !!token, tokenLength: token ? token.length : 0 },
+          timestamp: Date.now(),
+          sessionId: 'debug-session',
+          runId: 'initial',
+          hypothesisId: 'C'
+        })
+      }).catch(() => {});
+      // #endregion
       if (token) {
         headers['Authorization'] = `Bearer ${token}`;
       }
     }
 
     try {
+      // #region agent log - hypothesis A, B
+      fetch('http://127.0.0.1:7244/ingest/fbebf980-5e49-4327-9406-872372234680', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          location: 'apiClient.ts:fetch',
+          message: 'About to make fetch request',
+          data: { url, headers: Object.keys(headers), method: options.method || 'GET' },
+          timestamp: Date.now(),
+          sessionId: 'debug-session',
+          runId: 'initial',
+          hypothesisId: 'A,B'
+        })
+      }).catch(() => {});
+      // #endregion
+
       const response = await fetch(url, {
         ...options,
         headers,
