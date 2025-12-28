@@ -5,6 +5,7 @@
 
 import { generateText } from 'ai';
 import { getModel } from './model-config.js';
+import { buildSystemPrompt, AI_PRICE_QUICK_ANALYSIS, AI_PRICE_THREAT_ANALYSIS } from './firmware.js';
 
 export async function generateAIResponse(
   prompt: string,
@@ -13,9 +14,7 @@ export async function generateAIResponse(
 ): Promise<string> {
   try {
     const model = getModel(modelName);
-    const systemPrompt = context
-      ? `Context: ${context.join('\n')}\n\nYou are a trading assistant helping with analysis and coaching.`
-      : 'You are a trading assistant helping with analysis and coaching.';
+    const systemPrompt = buildSystemPrompt(context);
 
     const { text } = await generateText({
       model: model as any,

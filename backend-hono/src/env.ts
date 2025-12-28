@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import { z } from 'zod';
 
 const envSchema = z.object({
@@ -12,6 +13,7 @@ const envSchema = z.object({
   // Option 2: Use provider API keys directly (if not using gateway)
   ANTHROPIC_API_KEY: z.string().default(''),
   XAI_API_KEY: z.string().default(''),
+  GROQ_API_KEY: z.string().default(''),
 
   // Twitter/X API credentials
   X_BEARER_TOKEN: z.string().default(''),

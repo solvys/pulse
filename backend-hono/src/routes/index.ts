@@ -14,6 +14,7 @@ import { polymarketRoutes } from './polymarket.js';
 import { aiRoutes } from './ai/index.js';
 import { autopilotRoutes } from './autopilot/index.js';
 import { autopilotTestRoutes } from './autopilot-test.js';
+import { adminRoutes } from './admin.js';
 
 export function registerRoutes(app: Hono, includePublicRoutes = true) {
   app.route('/api/account', accountRoutes);
@@ -32,7 +33,7 @@ export function registerRoutes(app: Hono, includePublicRoutes = true) {
   app.route('/api/polymarket', polymarketRoutes);
   app.route('/api/ai', aiRoutes);
   app.route('/api/autopilot', autopilotRoutes);
-
+  app.route('/api/admin', adminRoutes);
   // Test routes (only available when AUTOPILOT_TEST_MODE=true)
   if (process.env.AUTOPILOT_TEST_MODE === 'true') {
     app.route('/api/autopilot/test', autopilotTestRoutes);

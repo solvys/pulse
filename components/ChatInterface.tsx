@@ -1,8 +1,8 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import { ArrowRight, Paperclip, Image, FileText, Link2, AlertTriangle, TrendingUp, History, X, Pin, Archive, Edit2, MoreVertical } from "lucide-react";
+import { ArrowRight, Paperclip, Image, FileText, Link2, AlertTriangle, TrendingUp, History, X, Pin, Archive, Edit2, MoreVertical, ChevronDown } from "lucide-react";
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
-import { useAuth } from "@clerk/clerk-react";
+import { useAuth, useUser } from "@clerk/clerk-react";
 import { useBackend } from "../lib/backend";
 import { healingBowlPlayer } from "../utils/healingBowlSounds";
 import { useSettings } from "../contexts/SettingsContext";
@@ -30,6 +30,14 @@ const SUGGESTION_CHIPS = [
   { label: "How's my ER this week?", prompt: "How's my ER this week?" },
   { label: "Update my Blindspots", prompt: "Update my Blindspots" },
 ];
+
+// AI Model Configuration with reasoning level categories
+const AI_MODELS = [
+  { id: 'claude-opus-4', name: 'Claude Opus 4', level: 'Complex Reasoning', description: 'Best for deep analysis' },
+  { id: 'grok-4', name: 'Grok 4', level: 'Complex Reasoning', description: 'X.AI reasoning model' },
+  { id: 'claude-sonnet-4.5', name: 'Claude Sonnet', level: 'Moderate Reasoning', description: 'Balanced performance' },
+  { id: 'groq-llama-3-70b', name: 'Llama 3 70B', level: 'Fast Reasoning', description: 'Speed optimized' },
+] as const;
 
 const THINKING_TERMS = [
   "finagling",
@@ -80,6 +88,7 @@ export default function ChatInterface() {
   const backend = useBackend();
   const { alertConfig } = useSettings();
   const { getToken } = useAuth();
+  const { user } = useUser();
   const [showSuggestions, setShowSuggestions] = useState(true);
   const [showAttachMenu, setShowAttachMenu] = useState(false);
   const [conversationId, setConversationId] = useState<string | undefined>();
@@ -96,19 +105,26 @@ export default function ChatInterface() {
   // Local input state for textarea
   const [input, setInput] = useState("");
 
+  // Model selector state
+  const [selectedModel, setSelectedModel] = useState<string>('claude-opus-4');
+  const [showModelSelector, setShowModelSelector] = useState(false);
+
+  // Admin detection (hidden tier - not visible to regular users)
+  const isAdmin = user?.publicMetadata?.role === 'admin';
+
   // Custom fetch function for useChat with auth
   const fetchWithAuth = useCallback(async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
     const token = await getToken();
     const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
-    
+
     // If URL is relative, prepend API_BASE_URL
     const fullUrl = url.startsWith('http') ? url : `${API_BASE_URL}${url}`;
-    
+
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
       ...(init?.headers as Record<string, string> || {}),
     };
-    
+
     if (token) {
       headers['Authorization'] = `Bearer ${token}`;
     }
@@ -177,7 +193,7 @@ export default function ChatInterface() {
         ?.filter((part: any) => part.type === 'text')
         .map((part: any) => part.text)
         .join('') || '';
-      
+
       return {
         id: msg.id,
         role: msg.role === 'user' ? 'user' : 'assistant',
@@ -201,7 +217,7 @@ export default function ChatInterface() {
       textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 200)}px`;
     }
   }, [input]);
-  
+
   // Sync input with textarea value for useChat
   useEffect(() => {
     if (textareaRef.current) {
@@ -256,7 +272,7 @@ export default function ChatInterface() {
           // Try to get ER status and P&L for this session
           let erStatus: "Stable" | "Tilt" | "Neutral" | undefined;
           let pnl: number | undefined;
-          
+
           try {
             // Get ER sessions for the day of this conversation
             const erSessions = await backend.er.getERSessions();
@@ -265,7 +281,7 @@ export default function ChatInterface() {
             const sessionForDay = sessions.find(
               (s: any) => new Date(s.sessionStart).toDateString() === convDay
             );
-            
+
             if (sessionForDay) {
               erStatus = sessionForDay.finalScore > 0.5 ? "Stable" : sessionForDay.finalScore < -0.5 ? "Tilt" : "Neutral";
             }
@@ -299,19 +315,19 @@ export default function ChatInterface() {
   };
 
   const handleArchiveConversation = (convId: string) => {
-    setConversations(prev => prev.map(c => 
+    setConversations(prev => prev.map(c =>
       c.conversationId === convId ? { ...c, isArchived: !c.isArchived } : c
     ));
   };
 
   const handlePinConversation = (convId: string) => {
-    setConversations(prev => prev.map(c => 
+    setConversations(prev => prev.map(c =>
       c.conversationId === convId ? { ...c, isPinned: !c.isPinned } : c
     ));
   };
 
   const handleRenameConversation = (convId: string, newName: string) => {
-    setConversations(prev => prev.map(c => 
+    setConversations(prev => prev.map(c =>
       c.conversationId === convId ? { ...c, customName: newName } : c
     ));
     setEditingConversationId(null);
@@ -336,7 +352,7 @@ export default function ChatInterface() {
       alert("This chat thread has gone stale after 24 hours. You can view it, but cannot send new messages. Start a new chat to continue the conversation.");
       // Still load it for viewing
     }
-    
+
     setShowHistory(false);
     try {
       const response = await backend.ai.getConversation({ conversationId: convId });
@@ -379,7 +395,7 @@ export default function ChatInterface() {
 
     // Send message using useChat's sendMessage
     sendMessage({ text: messageText });
-    
+
     // Clear input if not a custom message
     if (!customMessage) {
       setInput("");
@@ -495,9 +511,8 @@ export default function ChatInterface() {
                     return (
                       <div
                         key={conv.conversationId}
-                        className={`group relative w-full p-3 bg-zinc-900/50 border ${
-                          isStale ? "border-zinc-700/50 opacity-60" : "border-zinc-800"
-                        } hover:border-[#FFC038]/40 hover:bg-zinc-900 rounded-lg transition-all ${isStale ? "cursor-not-allowed" : ""}`}
+                        className={`group relative w-full p-3 bg-zinc-900/50 border ${isStale ? "border-zinc-700/50 opacity-60" : "border-zinc-800"
+                          } hover:border-[#FFC038]/40 hover:bg-zinc-900 rounded-lg transition-all ${isStale ? "cursor-not-allowed" : ""}`}
                       >
                         {isStale && (
                           <div className="text-xs text-amber-500 mb-2 font-medium">
@@ -690,6 +705,52 @@ export default function ChatInterface() {
 
       {/* Input */}
       <div className="sticky bottom-0 pt-6 pb-4 px-4 bg-[#050500]/80 backdrop-blur-md">
+        {/* Model Selector - Vercel AI SDK style */}
+        <div className="w-full max-w-3xl mx-auto mb-3 flex items-center justify-start">
+          <div className="relative">
+            <button
+              onClick={() => setShowModelSelector(!showModelSelector)}
+              className="flex items-center gap-2 px-3 py-1.5 bg-zinc-900/80 border border-zinc-700 hover:border-zinc-600 rounded-lg text-xs text-zinc-400 hover:text-zinc-300 transition-all"
+              type="button"
+            >
+              <span className="font-medium">{AI_MODELS.find(m => m.id === selectedModel)?.name || 'Claude Opus 4'}</span>
+              <span className="text-zinc-500">•</span>
+              <span className="text-zinc-500">{AI_MODELS.find(m => m.id === selectedModel)?.level || 'Complex Reasoning'}</span>
+              <ChevronDown className="w-3 h-3 ml-1" />
+            </button>
+
+            {showModelSelector && (
+              <div className="absolute bottom-full left-0 mb-2 bg-zinc-900/95 backdrop-blur-md border border-zinc-700 rounded-xl p-2 shadow-xl min-w-[280px] z-20">
+                <div className="text-xs text-zinc-500 px-3 py-1.5 font-medium">Select Model</div>
+                {AI_MODELS.map((model) => (
+                  <button
+                    key={model.id}
+                    onClick={() => {
+                      setSelectedModel(model.id);
+                      setShowModelSelector(false);
+                    }}
+                    className={`w-full flex items-center justify-between px-3 py-2 text-sm rounded-lg transition-colors ${selectedModel === model.id
+                        ? 'bg-[#FFC038]/10 text-[#FFC038]'
+                        : 'text-zinc-300 hover:bg-zinc-800'
+                      }`}
+                  >
+                    <div className="flex flex-col items-start">
+                      <span className="font-medium">{model.name}</span>
+                      <span className="text-xs text-zinc-500">{model.description}</span>
+                    </div>
+                    <span className={`text-xs px-2 py-0.5 rounded-full ${model.level === 'Complex Reasoning' ? 'bg-purple-500/20 text-purple-400' :
+                        model.level === 'Moderate Reasoning' ? 'bg-blue-500/20 text-blue-400' :
+                          'bg-green-500/20 text-green-400'
+                      }`}>
+                      {model.level.split(' ')[0]}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
         <div className="w-full max-w-3xl mx-auto flex gap-2 items-end">
           {/* Attachment button - side by side with input, aligned to bottom */}
           <button
@@ -698,7 +759,7 @@ export default function ChatInterface() {
             type="button"
           >
             <Paperclip className="w-4 h-4 text-zinc-400 hover:text-[#FFC038] transition-colors" />
-            
+
             {showAttachMenu && (
               <div className="absolute bottom-full left-0 mb-2 bg-black/95 backdrop-blur-md border border-white/10 rounded-xl p-2 shadow-xl min-w-[200px] z-10">
                 <button
@@ -731,7 +792,7 @@ export default function ChatInterface() {
               </div>
             )}
           </button>
-          
+
           {/* Input box - multi-line textarea with paragraph styling */}
           <textarea
             id="chat-message-input"

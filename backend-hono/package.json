@@ -17,14 +17,17 @@
   "dependencies": {
     "@ai-sdk/anthropic": "^1.0.0",
     "@ai-sdk/gateway": "^1.0.0",
+    "@ai-sdk/groq": "^3.0.1",
     "@ai-sdk/xai": "^1.0.0",
     "@clerk/backend": "^1.27.0",
     "@hono/node-server": "^1.13.0",
     "@neondatabase/serverless": "^0.10.4",
     "ai": "^3.0.0",
+    "dotenv": "^17.2.3",
     "hono": "^4.6.0",
     "pino": "^9.6.0",
     "pino-pretty": "^11.0.0",
+    "redis": "^5.10.0",
     "zod": "^3.24.1"
   },
   "devDependencies": {

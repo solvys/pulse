@@ -8,13 +8,14 @@ import { sql } from '../../../db/index.js';
 import { getActiveBlindSpots } from '../../../services/blind-spots-service.js';
 import { createStreamingChatResponse } from '../../../services/ai-service.js';
 import { chatRequestSchema } from '../schemas.js';
+import { getRelevantAnnotationsForContext } from '../../../services/admin-annotations-service.js';
 
 // UIMessage type definition (matches @ai-sdk/react UIMessage structure)
 type UIMessage = {
   id: string;
   role: 'user' | 'assistant' | 'system';
   content: string;
-  parts?: Array<{ type: string; text?: string; [key: string]: any }>;
+  parts?: Array<{ type: string; text?: string;[key: string]: any }>;
 };
 
 export async function handleChat(c: Context) {
@@ -33,7 +34,7 @@ export async function handleChat(c: Context) {
       runId: 'initial',
       hypothesisId: 'B,E'
     })
-  }).catch(() => {});
+  }).catch(() => { });
   // #endregion
 
   const body = await c.req.json();
@@ -53,12 +54,12 @@ export async function handleChat(c: Context) {
         runId: 'initial',
         hypothesisId: 'B'
       })
-    }).catch(() => {});
+    }).catch(() => { });
     // #endregion
     return c.json({ error: 'Invalid request body', details: result.error.flatten() }, 400);
   }
 
-  const { messages: uiMessages, conversationId, model = 'grok-4' } = result.data;
+  const { messages: uiMessages, conversationId, model = 'claude-opus-4' } = result.data;
 
   if (!uiMessages || uiMessages.length === 0) {
     return c.json({ error: 'Messages array is required' }, 400);
@@ -112,14 +113,23 @@ export async function handleChat(c: Context) {
       ORDER BY published_at DESC
       LIMIT 10
     `;
-    
+
     const newsContext = recentNews.length > 0
-      ? [`Recent high-priority news (${recentNews.length} items):\n${recentNews.map((n: any) => 
-          `- [Level ${n.macro_level}] ${n.title} (${n.source}) - ${n.price_brain_sentiment || 'Neutral'} / ${n.price_brain_classification || 'Neutral'}`
-        ).join('\n')}`]
+      ? [`Recent high-priority news (${recentNews.length} items):\n${recentNews.map((n: any) =>
+        `- [Level ${n.macro_level}] ${n.title} (${n.source}) - ${n.price_brain_sentiment || 'Neutral'} / ${n.price_brain_classification || 'Neutral'}`
+      ).join('\n')}`]
       : [];
 
-    const context = [...blindSpotContext, ...newsContext];
+    // Fetch admin annotations for RAG-based learning (improves IV scoring and analysis)
+    let adminAnnotations: string[] = [];
+    try {
+      adminAnnotations = await getRelevantAnnotationsForContext(15);
+    } catch (error) {
+      console.error('Error fetching admin annotations:', error);
+      // Continue without annotations if fetch fails
+    }
+
+    const context = [...blindSpotContext, ...newsContext, ...adminAnnotations];
 
     const formattedUIMessages: UIMessage[] = uiMessages.map((msg) => ({
       id: msg.id || `msg-${Date.now()}-${Math.random()}`,
@@ -147,7 +157,9 @@ export async function handleChat(c: Context) {
         } catch (error) {
           console.error('Error storing assistant message:', error);
         }
-      }
+      },
+      // Enable tools for all models or conditionally
+      true
     );
 
     return new Response(streamingResponse.body, {
@@ -161,7 +173,7 @@ export async function handleChat(c: Context) {
     });
   } catch (error) {
     console.error('Chat error:', error);
-    return c.json({ 
+    return c.json({
       error: 'Failed to process chat message',
       message: error instanceof Error ? error.message : 'Unknown error'
     }, 500);
