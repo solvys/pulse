@@ -61,7 +61,6 @@ accountRoutes.get('/', async (c) => {
   }
 });
 
-export { accountRoutes };
 
 // PATCH /account/settings - Update account settings
 accountRoutes.patch('/settings', async (c) => {
@@ -114,3 +113,4 @@ accountRoutes.patch('/tier', async (c) => {
     return c.json({ error: 'Failed to update billing tier' }, 500);
   }
 });
+export { accountRoutes };

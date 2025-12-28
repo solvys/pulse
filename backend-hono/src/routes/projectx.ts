@@ -195,7 +195,6 @@ projectxRoutes.get('/contracts/:symbol', async (c) => {
   return c.json({ contracts });
 });
 
-export { projectxRoutes };
 
 // POST /projectx/uplink - Uplink to ProjectX (establish connection)
 projectxRoutes.post('/uplink', async (c) => {
@@ -212,3 +211,4 @@ projectxRoutes.post('/uplink', async (c) => {
     return c.json({ error: 'Failed to establish ProjectX connection' }, 500);
   }
 });
+export { projectxRoutes };

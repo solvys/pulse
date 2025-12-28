@@ -35,7 +35,6 @@ notificationsRoutes.get('/', async (c) => {
   }
 });
 
-export { notificationsRoutes };
 
 // POST /notifications/:id/read - Mark notification as read
 notificationsRoutes.post('/:id/read', async (c) => {
@@ -53,3 +52,4 @@ notificationsRoutes.post('/:id/read', async (c) => {
     return c.json({ error: 'Failed to mark notification as read' }, 500);
   }
 });
+export { notificationsRoutes };

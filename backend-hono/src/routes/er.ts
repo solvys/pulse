@@ -223,7 +223,6 @@ erRoutes.post('/sessions', async (c) => {
   }
 });
 
-export { erRoutes };
 
 // GET /er/sessions - Get ER sessions
 erRoutes.get('/sessions', async (c) => {
@@ -258,3 +257,4 @@ erRoutes.get('/sessions', async (c) => {
     return c.json({ error: 'Failed to get ER sessions' }, 500);
   }
 });
+export { erRoutes };

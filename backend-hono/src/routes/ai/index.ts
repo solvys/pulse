@@ -43,13 +43,6 @@ aiRoutes.get('/blind-spots', blindSpotHandlers.handleGetBlindSpots);
 aiRoutes.post('/blind-spots', blindSpotHandlers.handleUpsertBlindSpot);
 aiRoutes.delete('/blind-spots/:id', blindSpotHandlers.handleDeleteBlindSpot);
 
-// Legacy Endpoints (for frontend compatibility)
-aiRoutes.get('/user-settings', legacyHandlers.handleGetUserSettings);
-aiRoutes.get('/get-conversation', legacyHandlers.handleGetConversation);
-aiRoutes.post('/check-tape', legacyHandlers.handleCheckTape);
-aiRoutes.post('/generate-daily-recap', legacyHandlers.handleGenerateDailyRecap);
-
-export { aiRoutes };
 // POST /ai/ntn-report - Generate NTN (Non-Trading News) report
 aiRoutes.post('/ntn-report', async (c) => {
   const userId = c.get('userId');
@@ -67,3 +60,11 @@ aiRoutes.post('/ntn-report', async (c) => {
     return c.json({ error: 'Failed to generate NTN report' }, 500);
   }
 });
+
+// Legacy Endpoints (for frontend compatibility)
+aiRoutes.get('/user-settings', legacyHandlers.handleGetUserSettings);
+aiRoutes.get('/get-conversation', legacyHandlers.handleGetConversation);
+aiRoutes.post('/check-tape', legacyHandlers.handleCheckTape);
+aiRoutes.post('/generate-daily-recap', legacyHandlers.handleGenerateDailyRecap);
+
+export { aiRoutes };

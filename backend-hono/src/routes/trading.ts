@@ -164,7 +164,6 @@ tradingRoutes.get('/positions', async (c) => {
   }
 });
 
-export { tradingRoutes };
 
 // POST /trading/positions/seed - Seed positions data (for development)
 tradingRoutes.post('/positions/seed', async (c) => {
@@ -178,3 +177,4 @@ tradingRoutes.post('/positions/seed', async (c) => {
     return c.json({ error: 'Failed to seed positions data' }, 500);
   }
 });
+export { tradingRoutes };
