@@ -154,16 +154,16 @@ export function NewsSection() {
                 <div className="flex gap-2 mt-4 pt-4 border-t border-[#FFC038]/10">
                   {/* Bullish/Bearish Mini Card - Shows on ALL levels */}
                   <div className={`flex-1 px-3 py-2 rounded text-xs font-semibold text-center ${priceBrain?.sentiment === 'Bullish' ? 'bg-green-500/20 text-green-400' :
-                      priceBrain?.sentiment === 'Bearish' ? 'bg-red-500/20 text-red-400' :
-                        'bg-gray-500/20 text-gray-400'
+                    priceBrain?.sentiment === 'Bearish' ? 'bg-red-500/20 text-red-400' :
+                      'bg-gray-500/20 text-gray-400'
                     }`}>
                     {priceBrain?.sentiment || 'Neutral'}
                   </div>
 
                   {/* Cyclical/Counter-cyclical Mini Card - Shows on ALL levels */}
                   <div className={`flex-1 px-3 py-2 rounded text-xs font-semibold text-center ${priceBrain?.classification === 'Cyclical' ? 'bg-blue-500/20 text-blue-400' :
-                      priceBrain?.classification === 'Counter-cyclical' ? 'bg-orange-500/20 text-orange-400' :
-                        'bg-gray-500/20 text-gray-400'
+                    priceBrain?.classification === 'Counter-cyclical' ? 'bg-orange-500/20 text-orange-400' :
+                      'bg-gray-500/20 text-gray-400'
                     }`}>
                     {priceBrain?.classification || 'Neutral'}
                   </div>
@@ -171,8 +171,8 @@ export function NewsSection() {
                   {/* Implied Points Mini Card - Shows ONLY on Level 3 and 4 */}
                   {showImpliedPoints ? (
                     <div className={`flex-1 px-3 py-2 rounded text-xs font-semibold text-center ${(priceBrain?.impliedPoints || 0) > 0 ? 'bg-green-500/20 text-green-400' :
-                        (priceBrain?.impliedPoints || 0) < 0 ? 'bg-red-500/20 text-red-400' :
-                          'bg-gray-500/20 text-gray-400'
+                      (priceBrain?.impliedPoints || 0) < 0 ? 'bg-red-500/20 text-red-400' :
+                        'bg-gray-500/20 text-gray-400'
                       }`}>
                       {(priceBrain?.impliedPoints || 0) > 0 ? '+' : ''}{priceBrain?.impliedPoints?.toFixed(1)} pts
                     </div>

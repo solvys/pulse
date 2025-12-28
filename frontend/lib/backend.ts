@@ -1,4 +1,5 @@
 import { useAuth } from "@clerk/clerk-react";
+import { useMemo } from "react";
 import ApiClient from "./apiClient";
 import { createBackendClient, type BackendClient } from "./services";
 
@@ -13,17 +14,19 @@ const baseBackendClient = createBackendClient(baseApiClient);
 // Hook for when Clerk is available (normal mode)
 function useBackendWithClerk(): BackendClient {
   const { getToken, isSignedIn } = useAuth();
-  
-  if (!isSignedIn) {
-    return baseBackendClient;
-  }
-  
-  const authenticatedClient = baseApiClient.withAuth(async () => {
-    const token = await getToken();
-    return token;
-  });
-  
-  return createBackendClient(authenticatedClient);
+
+  return useMemo(() => {
+    if (!isSignedIn) {
+      return baseBackendClient;
+    }
+
+    const authenticatedClient = baseApiClient.withAuth(async () => {
+      const token = await getToken();
+      return token;
+    });
+
+    return createBackendClient(authenticatedClient);
+  }, [isSignedIn, getToken]);
 }
 
 // Hook for dev mode without Clerk
@@ -40,3 +43,4 @@ export default baseBackendClient;
 // Re-export types and services
 export { default as ApiClient } from "./apiClient";
 export * from "./services";
+

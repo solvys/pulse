@@ -15,7 +15,7 @@ export function MinimalTapeWidget() {
       try {
         const response = await backend.riskflow.list({ limit: 20 });
         setTotalItems(response.items.length);
-        
+
         // Calculate unread count
         if (response.items.length > 0) {
           const latestId = typeof response.items[0].id === 'number' ? response.items[0].id : parseInt(response.items[0].id.toString());
@@ -39,14 +39,14 @@ export function MinimalTapeWidget() {
     fetchNews();
     const interval = setInterval(fetchNews, 30000);
     return () => clearInterval(interval);
-  }, []);
+  }, [backend]);
 
   return (
     <div className="flex flex-col gap-2 p-2 bg-[#0a0a00] border border-[#FFC038]/20 rounded w-full">
       <div className="text-center">
         <span className="text-[10px] font-semibold text-[#FFC038]">Tape</span>
       </div>
-      
+
       <div className="flex flex-col items-center gap-2 pt-1">
         <div className="text-center">
           <div className="text-xs text-gray-400">{totalItems} items</div>
