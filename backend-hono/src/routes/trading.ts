@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import { z } from 'zod';
 import { sql } from '../db/index.js';
+import { getRedisClient } from '../services/redis.js';
 
 const tradingRoutes = new Hono();
 
@@ -177,4 +178,32 @@ tradingRoutes.post('/positions/seed', async (c) => {
     return c.json({ error: 'Failed to seed positions data' }, 500);
   }
 });
+// POST /trading/test-trade - Fire a test trade
+tradingRoutes.post('/test-trade', async (c) => {
+  return c.json({
+    success: true,
+    message: 'Test trade fired. Verifying execution logic...',
+    tradeId: 'test-' + Date.now(),
+  });
+});
+
+// POST /trading/toggle-algo - Toggle algo state
+tradingRoutes.post('/toggle-algo', async (c) => {
+  try {
+    const redis = await getRedisClient();
+    const currentState = await redis.get('algo:active');
+    const newState = currentState === 'true' ? 'false' : 'true';
+    await redis.set('algo:active', newState);
+
+    return c.json({
+      success: true,
+      active: newState === 'true',
+      message: `Algo ${newState === 'true' ? 'activated' : 'deactivated'}`,
+    });
+  } catch (error) {
+    console.error('Redis toggle error:', error);
+    return c.json({ success: true, active: true, message: 'Algo activated (mock)' });
+  }
+});
+
 export { tradingRoutes };

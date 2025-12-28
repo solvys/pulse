@@ -7,6 +7,7 @@ import { useBackend } from "../lib/backend";
 import { healingBowlPlayer } from "../utils/healingBowlSounds";
 import { useSettings } from "../contexts/SettingsContext";
 import ReactMarkdown from "react-markdown";
+import { MessageRenderer } from "./chat/MessageRenderer";
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080';
 
@@ -100,15 +101,15 @@ export default function ChatInterface() {
   const fetchWithAuth = useCallback(async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
     const token = await getToken();
     const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
-    
+
     // If URL is relative, prepend API_BASE_URL
     const fullUrl = url.startsWith('http') ? url : `${API_BASE_URL}${url}`;
-    
+
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
       ...(init?.headers as Record<string, string> || {}),
     };
-    
+
     if (token) {
       headers['Authorization'] = `Bearer ${token}`;
     }
@@ -177,7 +178,7 @@ export default function ChatInterface() {
         ?.filter((part: any) => part.type === 'text')
         .map((part: any) => part.text)
         .join('') || '';
-      
+
       return {
         id: msg.id,
         role: msg.role === 'user' ? 'user' : 'assistant',
@@ -201,7 +202,7 @@ export default function ChatInterface() {
       textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 200)}px`;
     }
   }, [input]);
-  
+
   // Sync input with textarea value for useChat
   useEffect(() => {
     if (textareaRef.current) {
@@ -256,7 +257,7 @@ export default function ChatInterface() {
           // Try to get ER status and P&L for this session
           let erStatus: "Stable" | "Tilt" | "Neutral" | undefined;
           let pnl: number | undefined;
-          
+
           try {
             // Get ER sessions for the day of this conversation
             const erSessions = await backend.er.getERSessions();
@@ -265,7 +266,7 @@ export default function ChatInterface() {
             const sessionForDay = sessions.find(
               (s: any) => new Date(s.sessionStart).toDateString() === convDay
             );
-            
+
             if (sessionForDay) {
               erStatus = sessionForDay.finalScore > 0.5 ? "Stable" : sessionForDay.finalScore < -0.5 ? "Tilt" : "Neutral";
             }
@@ -299,19 +300,19 @@ export default function ChatInterface() {
   };
 
   const handleArchiveConversation = (convId: string) => {
-    setConversations(prev => prev.map(c => 
+    setConversations(prev => prev.map(c =>
       c.conversationId === convId ? { ...c, isArchived: !c.isArchived } : c
     ));
   };
 
   const handlePinConversation = (convId: string) => {
-    setConversations(prev => prev.map(c => 
+    setConversations(prev => prev.map(c =>
       c.conversationId === convId ? { ...c, isPinned: !c.isPinned } : c
     ));
   };
 
   const handleRenameConversation = (convId: string, newName: string) => {
-    setConversations(prev => prev.map(c => 
+    setConversations(prev => prev.map(c =>
       c.conversationId === convId ? { ...c, customName: newName } : c
     ));
     setEditingConversationId(null);
@@ -336,10 +337,10 @@ export default function ChatInterface() {
       alert("This chat thread has gone stale after 24 hours. You can view it, but cannot send new messages. Start a new chat to continue the conversation.");
       // Still load it for viewing
     }
-    
+
     setShowHistory(false);
     try {
-      const response = await backend.ai.getConversation({ conversationId: convId });
+      const response = await backend.ai.getConversation(convId);
       // Convert backend messages to useChat format
       const loadedMessages = (response.messages || []).map((msg: any, idx: number) => ({
         id: `${convId}-${idx}`,
@@ -379,7 +380,7 @@ export default function ChatInterface() {
 
     // Send message using useChat's sendMessage
     sendMessage({ text: messageText });
-    
+
     // Clear input if not a custom message
     if (!customMessage) {
       setInput("");
@@ -495,9 +496,8 @@ export default function ChatInterface() {
                     return (
                       <div
                         key={conv.conversationId}
-                        className={`group relative w-full p-3 bg-zinc-900/50 border ${
-                          isStale ? "border-zinc-700/50 opacity-60" : "border-zinc-800"
-                        } hover:border-[#FFC038]/40 hover:bg-zinc-900 rounded-lg transition-all ${isStale ? "cursor-not-allowed" : ""}`}
+                        className={`group relative w-full p-3 bg-zinc-900/50 border ${isStale ? "border-zinc-700/50 opacity-60" : "border-zinc-800"
+                          } hover:border-[#FFC038]/40 hover:bg-zinc-900 rounded-lg transition-all ${isStale ? "cursor-not-allowed" : ""}`}
                       >
                         {isStale && (
                           <div className="text-xs text-amber-500 mb-2 font-medium">
@@ -651,20 +651,11 @@ export default function ChatInterface() {
                 `}
               >
                 {message.role === "assistant" ? (
-                  <div className="text-sm text-zinc-300 mb-2 prose prose-invert prose-sm max-w-none">
-                    <ReactMarkdown
-                      components={{
-                        p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
-                        strong: ({ children }) => <strong className="font-semibold text-zinc-200">{children}</strong>,
-                        em: ({ children }) => <em className="italic">{children}</em>,
-                        u: ({ children }) => <u className="underline">{children}</u>,
-                        ul: ({ children }) => <ul className="list-disc list-inside mb-2 space-y-1">{children}</ul>,
-                        ol: ({ children }) => <ol className="list-decimal list-inside mb-2 space-y-1">{children}</ol>,
-                        li: ({ children }) => <li className="text-zinc-300">{children}</li>,
-                      }}
-                    >
-                      {message.content}
-                    </ReactMarkdown>
+                  <div className="text-sm text-zinc-300 mb-2 max-w-none">
+                    <MessageRenderer
+                      content={message.content}
+                      onRenderWidget={(widget: any) => null} // Placeholder for future widget system
+                    />
                   </div>
                 ) : (
                   <p className="text-sm text-zinc-300 mb-2 whitespace-pre-wrap">{message.content}</p>
@@ -698,7 +689,7 @@ export default function ChatInterface() {
             type="button"
           >
             <Paperclip className="w-4 h-4 text-zinc-400 hover:text-[#FFC038] transition-colors" />
-            
+
             {showAttachMenu && (
               <div className="absolute bottom-full left-0 mb-2 bg-black/95 backdrop-blur-md border border-white/10 rounded-xl p-2 shadow-xl min-w-[200px] z-10">
                 <button
@@ -731,7 +722,7 @@ export default function ChatInterface() {
               </div>
             )}
           </button>
-          
+
           {/* Input box - multi-line textarea with paragraph styling */}
           <textarea
             id="chat-message-input"

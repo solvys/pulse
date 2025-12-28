@@ -257,22 +257,19 @@ export class AIService {
     return this.client.get<{ conversations: any[] }>('/api/ai/conversations').then(r => r.conversations || []);
   }
 
-  async getConversation(data: { conversationId: string }): Promise<any> {
-    // Stub - backend doesn't have this endpoint yet
-    console.warn('AI get conversation endpoint not available in Hono backend');
-    return { messages: [] };
+  async getConversation(id: string): Promise<any> {
+    const response = await this.client.get<any>(`/api/ai/conversations/${id}`);
+    return response;
   }
 
-  async checkTape(): Promise<{ message: string; insights: any[] }> {
-    // Stub - backend doesn't have this endpoint yet
-    console.warn('AI check tape endpoint not available in Hono backend');
-    return { message: 'Check tape not yet implemented', insights: [] };
+  async checkTape(): Promise<any> {
+    const response = await this.client.post<any>('/api/ai/check-tape', {});
+    return response;
   }
 
-  async generateDailyRecap(): Promise<{ message: string; recap: string }> {
-    // Stub - backend doesn't have this endpoint yet
-    console.warn('AI daily recap endpoint not available in Hono backend');
-    return { message: 'Daily recap not yet implemented', recap: '' };
+  async generateDailyRecap(): Promise<any> {
+    const response = await this.client.post<any>('/api/ai/generate-daily-recap', {});
+    return response;
   }
 
   async generateNTNReport(): Promise<NTNReport> {
@@ -315,16 +312,14 @@ export class TradingService {
     console.warn('Position seed endpoint not available in Hono backend');
   }
 
-  async toggleAlgo(data: any): Promise<{ success: boolean; message: string; algoEnabled?: boolean }> {
-    // Stub - backend doesn't have this endpoint
-    console.warn('Toggle algo endpoint not available in Hono backend');
-    return { success: false, message: 'Not implemented', algoEnabled: false };
+  async toggleAlgo(data: any): Promise<any> {
+    const response = await this.client.post<any>('/api/trading/toggle-algo', data);
+    return response;
   }
 
-  async fireTestTrade(data: any): Promise<{ success: boolean; message: string }> {
-    // Stub - backend doesn't have this endpoint
-    console.warn('Test trade endpoint not available in Hono backend');
-    return { success: false, message: 'Not implemented' };
+  async fireTestTrade(data: any): Promise<any> {
+    const response = await this.client.post<any>('/api/trading/test-trade', data);
+    return response;
   }
 }
 
