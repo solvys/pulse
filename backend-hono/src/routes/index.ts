@@ -9,7 +9,7 @@ import { econRoutes } from './econ.js';
 import { accountRoutes } from './account.js';
 import { notificationsRoutes } from './notifications.js';
 import { aiRoutes } from './ai.js';
-import { autopilotRoutes } from './autopilot.js';
+import { autopilotRoutes } from './autopilot/index.js';
 import { autopilotTestRoutes } from './autopilot-test.js';
 
 export function registerRoutes(app: Hono) {
