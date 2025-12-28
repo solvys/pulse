@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { ArrowRight, Paperclip, Image, FileText, Link2, AlertTriangle, TrendingUp, History, X, Pin, Archive, Edit2, MoreVertical } from "lucide-react";
 import { useChat } from "@ai-sdk/react";
+import { DefaultChatTransport } from "ai";
 import { useAuth } from "@clerk/clerk-react";
 import { useBackend } from "../lib/backend";
 import { healingBowlPlayer } from "../utils/healingBowlSounds";
@@ -151,8 +152,10 @@ export default function ChatInterface() {
     status,
     setMessages: setUseChatMessages,
   } = useChat({
-    api: `${API_BASE_URL}/ai/chat`,
-    fetch: fetchWithAuth,
+    transport: new DefaultChatTransport({
+      api: `${API_BASE_URL}/ai/chat`,
+      fetch: fetchWithAuth,
+    }),
     onFinish: (message) => {
       setIsStreaming(false);
       console.log('Message finished:', message);
