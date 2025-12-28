@@ -150,7 +150,7 @@ tradingRoutes.get('/positions', async (c) => {
     `;
 
     // Calculate pnlPercentage for each position if pnl exists
-    const positionsWithPercentage = positions.map(pos => ({
+    const positionsWithPercentage = positions.map((pos: any) => ({
       ...pos,
       pnlPercentage: pos.pnl ? (pos.pnl / (pos.entryPrice * pos.size)) * 100 : 0,
     }));

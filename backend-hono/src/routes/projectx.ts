@@ -25,7 +25,7 @@ projectxRoutes.get('/accounts', async (c) => {
   `;
 
   return c.json({
-    accounts: rows.map((row) => ({
+    accounts: rows.map((row: any) => ({
       id: row.id,
       accountId: row.account_id,
       accountName: row.account_name,

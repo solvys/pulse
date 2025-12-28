@@ -117,7 +117,7 @@ journalRoutes.get('/calendar', async (c) => {
   `;
 
   return c.json({
-    days: days.map((day) => ({
+    days: days.map((day: any) => ({
       date: day.date,
       pnl: Number(day.pnl),
       tradeCount: day.trade_count,
@@ -169,11 +169,11 @@ journalRoutes.get('/date/:date', async (c) => {
   return c.json({
     date,
     netPnL: Number(totals[0]?.net_pnl) || 0,
-    pnlByTime: pnlByTime.map((p) => ({
+    pnlByTime: pnlByTime.map((p: any) => ({
       hour: p.hour,
       pnl: Number(p.pnl),
     })),
-    orders: orders.map((o) => ({
+    orders: orders.map((o: any) => ({
       id: o.id,
       time: o.time,
       symbol: o.symbol,

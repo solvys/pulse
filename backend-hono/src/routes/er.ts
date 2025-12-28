@@ -19,7 +19,7 @@ erRoutes.get('/date/:date', async (c) => {
 
   if (storedScores.length > 0) {
     return c.json({
-      erByTime: storedScores.map((s) => ({
+      erByTime: storedScores.map((s: any) => ({
         hour: s.hour,
         score: Number(s.score),
       })),
@@ -46,7 +46,7 @@ erRoutes.get('/date/:date', async (c) => {
     ORDER BY hour
   `;
 
-  const erByTime = tradePatterns.map((p) => {
+  const erByTime = tradePatterns.map((p: any) => {
     const revengeRatio = p.revenge_trades / Math.max(p.losses, 1);
     const overtradingFactor = Math.min(p.trade_count / 5, 2);
     const score = Math.min(10, revengeRatio * 3 + overtradingFactor * 2);

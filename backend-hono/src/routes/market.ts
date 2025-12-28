@@ -122,7 +122,7 @@ marketRoutes.get('/contracts/search', async (c) => {
   `;
 
   return c.json({
-    contracts: contracts.map((c) => ({
+    contracts: contracts.map((c: any) => ({
       id: c.id,
       name: c.name,
       symbol: c.symbol,

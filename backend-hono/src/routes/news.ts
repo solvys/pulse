@@ -48,7 +48,7 @@ newsRoutes.get('/feed', async (c) => {
     }
 
     return c.json({
-      articles: news.map((n) => ({
+      articles: news.map((n: any) => ({
         id: n.id,
         title: n.title,
         summary: n.summary,

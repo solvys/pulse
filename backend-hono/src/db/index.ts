@@ -3,9 +3,30 @@ import { env } from '../env.js';
 
 neonConfig.fetchConnectionCache = true;
 
-export const sql = neon(env.NEON_DATABASE_URL);
+// Create SQL client with error handling
+let sqlClient: any = null;
+let connectionError: Error | null = null;
+
+try {
+  sqlClient = neon(env.NEON_DATABASE_URL);
+} catch (error) {
+  console.error('Failed to create database client:', error);
+  connectionError = error as Error;
+}
+
+export const sql = sqlClient;
 
 export async function checkDatabase(): Promise<boolean> {
+  if (connectionError) {
+    console.error('Database client creation failed:', connectionError);
+    return false;
+  }
+
+  if (!sqlClient) {
+    console.error('Database client not initialized');
+    return false;
+  }
+
   try {
     await sql`SELECT 1`;
     return true;
