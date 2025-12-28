@@ -1,7 +1,111 @@
 /**
  * Nitter Service
  * Scrapes news from Nitter (Twitter alternative) sources
+ * Falls back to X API when Nitter is unavailable
  */
+
+/**
+ * X API v2 Client for fallback when Nitter fails
+ * Includes rate limit handling with exponential backoff
+ */
+class XAPIClient {
+  private bearerToken: string;
+  private baseUrl = 'https://api.twitter.com/2';
+  private userIdCache = new Map<string, string>();
+  private isRateLimited = false;
+  private rateLimitResetTime = 0;
+
+  constructor(bearerToken: string) {
+    this.bearerToken = bearerToken;
+  }
+
+  private async request(endpoint: string, params?: Record<string, string>, retryCount = 0): Promise<any> {
+    // If rate limited, check if we can retry
+    if (this.isRateLimited) {
+      if (Date.now() < this.rateLimitResetTime) {
+        console.warn('[X API] Still rate limited, skipping request');
+        return null;
+      }
+      this.isRateLimited = false;
+    }
+
+    const url = new URL(`${this.baseUrl}${endpoint}`);
+
+    if (params) {
+      Object.entries(params).forEach(([key, value]) => {
+        url.searchParams.append(key, value);
+      });
+    }
+
+    const response = await fetch(url.toString(), {
+      headers: {
+        'Authorization': `Bearer ${this.bearerToken}`,
+        'Content-Type': 'application/json',
+      },
+    });
+
+    // Handle rate limits (429)
+    if (response.status === 429) {
+      const resetHeader = response.headers.get('x-rate-limit-reset');
+      const resetTime = resetHeader ? parseInt(resetHeader) * 1000 : Date.now() + 15 * 60 * 1000;
+      this.isRateLimited = true;
+      this.rateLimitResetTime = resetTime;
+      console.warn(`[X API] Rate limited. Reset at: ${new Date(resetTime).toISOString()}`);
+
+      // Retry with exponential backoff (max 2 retries)
+      if (retryCount < 2) {
+        const delay = Math.pow(2, retryCount) * 1000;
+        console.log(`[X API] Retrying in ${delay}ms...`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+        return this.request(endpoint, params, retryCount + 1);
+      }
+      return null;
+    }
+
+    if (!response.ok) {
+      throw new Error(`X API error: ${response.status} ${response.statusText}`);
+    }
+
+    return response.json();
+  }
+
+  async getUserId(username: string): Promise<string | null> {
+    // Check cache first
+    if (this.userIdCache.has(username)) {
+      return this.userIdCache.get(username)!;
+    }
+
+    try {
+      const data = await this.request(`/users/by/username/${username}`);
+      if (data?.data?.id) {
+        this.userIdCache.set(username, data.data.id);
+        return data.data.id;
+      }
+    } catch (error) {
+      console.warn(`Failed to get user ID for ${username}:`, error);
+    }
+    return null;
+  }
+
+  async getUserTweets(username: string, maxResults = 10): Promise<any[]> {
+    const userId = await this.getUserId(username);
+    if (!userId) return [];
+
+    try {
+      const data = await this.request(`/users/${userId}/tweets`, {
+        'tweet.fields': 'id,text,author_id,created_at,public_metrics,entities',
+        'max_results': maxResults.toString(),
+      });
+
+      return data?.data || [];
+    } catch (error) {
+      console.warn(`Failed to get tweets for ${username}:`, error);
+      return [];
+    }
+  }
+}
+
+
 
 export interface NitterNewsItem {
   id: string;
@@ -79,7 +183,7 @@ async function scrapeNitterSource(sourceHandle: string, limit = 10): Promise<Nit
         if (content && content.length > 20) { // Filter out very short content
           // Check if this is macroeconomic data
           const macroCheck = isMacroEconomicData(content);
-          
+
           // Only include items that match macro criteria
           if (!macroCheck.isMacro) {
             continue;
@@ -133,7 +237,7 @@ function extractSymbols(content: string): string[] {
  */
 export function isMacroEconomicData(content: string): { isMacro: boolean; level: 1 | 2 | 3 | 4 } {
   const lowerContent = content.toLowerCase();
-  
+
   // Level 4: Emoji indicators (highest priority)
   const level4Emojis = ['🔴', '⚠️', '[🔴⚠️]'];
   const hasLevel4Emoji = level4Emojis.some(emoji => content.includes(emoji));
@@ -170,10 +274,10 @@ export function isMacroEconomicData(content: string): { isMacro: boolean; level:
   // Level 1: Notable individual commentary or minor geopolitical
   const notableIndividuals = ['howard lutnick', 'peter navarro'];
   const highLevelKeywords = ['fed', 'powell', 'rate cut', 'inflation', 'recession', 'cpi', 'nfp', 'fomc', 'tariff', 'china'];
-  
+
   const hasNotableIndividual = notableIndividuals.some(individual => lowerContent.includes(individual));
   const hasHighLevelKeyword = highLevelKeywords.some(keyword => lowerContent.includes(keyword));
-  
+
   // Level 1 if notable individual mentions high-level keywords
   if (hasNotableIndividual && hasHighLevelKeyword) {
     return { isMacro: true, level: 1 };
@@ -223,9 +327,9 @@ function calculateSimilarity(str1: string, str2: string): number {
   const s2 = normalizeText(str2);
   const longer = s1.length > s2.length ? s1 : s2;
   const shorter = s1.length > s2.length ? s2 : s1;
-  
+
   if (longer.length === 0) return 1.0;
-  
+
   const distance = levenshteinDistance(longer, shorter);
   return (longer.length - distance) / longer.length;
 }
@@ -256,7 +360,7 @@ function levenshteinDistance(str1: string, str2: string): number {
 
 export function deduplicateNewsItems(items: NitterNewsItem[]): NitterNewsItem[] {
   const now = Date.now();
-  
+
   // Clean up old entries
   for (const [key, value] of seenItems.entries()) {
     if (now - value.timestamp > DEDUP_TTL) {
@@ -265,7 +369,7 @@ export function deduplicateNewsItems(items: NitterNewsItem[]): NitterNewsItem[] 
   }
 
   const uniqueItems: NitterNewsItem[] = [];
-  
+
   for (const item of items) {
     // Check by URL first (most reliable)
     if (item.url) {
@@ -332,15 +436,83 @@ function analyzeSentiment(content: string): 'positive' | 'negative' | 'neutral' 
 }
 
 /**
+ * Fetch news from X API as fallback when Nitter fails
+ * Converts X API responses to NitterNewsItem format
+ */
+async function fetchFromXAPI(
+  sources: NitterSource[],
+  limitPerSource: number
+): Promise<NitterNewsItem[]> {
+  const bearerToken = process.env.X_BEARER_TOKEN || process.env.xBearerToken;
+  if (!bearerToken) {
+    console.warn('X API fallback unavailable: No bearer token configured');
+    return [];
+  }
+
+  console.log('[Nitter Service] Fetching from X API fallback...');
+  const xClient = new XAPIClient(bearerToken);
+  const allNews: NitterNewsItem[] = [];
+
+  for (const source of sources) {
+    try {
+      const tweets = await xClient.getUserTweets(source.handle, limitPerSource);
+
+      for (let i = 0; i < tweets.length; i++) {
+        const tweet = tweets[i];
+        const content = tweet.text || '';
+
+        // Apply macro filtering
+        const macroCheck = isMacroEconomicData(content);
+        if (!macroCheck.isMacro) continue;
+
+        // Check for emoji classification (Level 4)
+        const emojiLevel = classifyEmojiLevel(content);
+        const finalLevel = emojiLevel || macroCheck.level;
+
+        const newsItem: NitterNewsItem = {
+          id: tweet.id || `${source.handle}_${Date.now()}_${i}`,
+          title: content.substring(0, 100) + (content.length > 100 ? '...' : ''),
+          content,
+          author: source.name,
+          authorHandle: source.handle,
+          url: `https://twitter.com/${source.handle}/status/${tweet.id}`,
+          timestamp: tweet.created_at || new Date().toISOString(),
+          likes: tweet.public_metrics?.like_count || 0,
+          retweets: tweet.public_metrics?.retweet_count || 0,
+          replies: tweet.public_metrics?.reply_count || 0,
+          source: source.handle,
+          symbols: extractSymbols(content),
+          sentiment: analyzeSentiment(content),
+          macroLevel: finalLevel,
+        };
+
+        allNews.push(newsItem);
+      }
+
+      // Small delay between API calls to respect rate limits
+      await new Promise(resolve => setTimeout(resolve, 200));
+    } catch (error) {
+      console.error(`[X API] Failed to fetch from ${source.handle}:`, error);
+    }
+  }
+
+  return allNews;
+}
+
+/**
  * Fetch news from all configured Nitter sources
+ * Primary: Nitter scraping
+ * Fallback: X API when Nitter returns 0 items
  * Applies macro filtering, deduplication, and emoji classification
  */
 export async function fetchNitterNews(
   sources: NitterSource[] = DEFAULT_NITTER_SOURCES,
   limitPerSource = 5
 ): Promise<NitterNewsItem[]> {
-  const allNews: NitterNewsItem[] = [];
+  let allNews: NitterNewsItem[] = [];
 
+  // Try Nitter first (primary source)
+  console.log('[Nitter Service] Attempting to fetch from Nitter...');
   for (const source of sources) {
     try {
       const sourceNews = await scrapeNitterSource(source.handle, limitPerSource);
@@ -351,6 +523,14 @@ export async function fetchNitterNews(
 
     // Add small delay to be respectful to Nitter instances
     await new Promise(resolve => setTimeout(resolve, 1000));
+  }
+
+  // If Nitter returned no items, fall back to X API
+  if (allNews.length === 0) {
+    console.log('[Nitter Service] Nitter returned 0 items, falling back to X API...');
+    allNews = await fetchFromXAPI(sources, limitPerSource);
+  } else {
+    console.log(`[Nitter Service] Got ${allNews.length} items from Nitter`);
   }
 
   // Apply macro filtering - only keep items that match macro criteria
@@ -381,7 +561,7 @@ export async function fetchNitterNews(
   return classifiedNews.sort((a, b) => {
     const levelA = a.macroLevel || 0;
     const levelB = b.macroLevel || 0;
-    
+
     if (levelA !== levelB) {
       return levelB - levelA; // Higher level first
     }
@@ -408,11 +588,11 @@ export async function storeNitterNewsInDatabase(
   priceBrainScores?: Map<string, { sentiment: string; classification: string; impliedPoints: number | null; instrument: string | null }>
 ): Promise<void> {
   const { sql } = await import('../db/index.js');
-  
+
   for (const item of items) {
     try {
       const score = priceBrainScores?.get(item.id);
-      
+
       // Only insert if URL exists, otherwise use title+timestamp as unique key
       if (item.url) {
         await sql`
@@ -490,13 +670,13 @@ export async function processAndStoreNitterNews(
 ): Promise<{ count: number; items: NitterNewsItem[] }> {
   const { fetchNitterNews, DEFAULT_NITTER_SOURCES, storeNitterNewsInDatabase } = await import('./nitter-service.js');
   const { scoreNewsBatch } = await import('./price-brain-service.js');
-  
+
   // Fetch news from Nitter sources
   const newsItems = await fetchNitterNews(DEFAULT_NITTER_SOURCES, 5);
-  
+
   // Score with Price Brain Layer
   const scores = await scoreNewsBatch(newsItems, userInstrument);
-  
+
   // Convert scores to format for storage
   const scoresMap = new Map<string, { sentiment: string; classification: string; impliedPoints: number | null; instrument: string | null }>();
   for (const [id, score] of scores.entries()) {
@@ -507,10 +687,10 @@ export async function processAndStoreNitterNews(
       instrument: score.instrument,
     });
   }
-  
+
   // Store in database
   await storeNitterNewsInDatabase(newsItems, scoresMap);
-  
+
   return {
     count: newsItems.length,
     items: newsItems,
