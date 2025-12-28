@@ -28,6 +28,12 @@ Each new conversation thread/conversation feature **MUST** follow this exact seq
 6. **Deploy** - Deploy to Fly.io: `fly deploy -a pulse-api-withered-dust-1394`
 
 ### **Database (Neon - Optional)**
+- **Schema Setup**: Run database migrations when schema changes are needed
+- **Migration Files**: Located in `backend-hono/migrations/`
+- **Connection**: Set `NEON_DATABASE_URL` in Fly.io secrets
+- **Branching**: Use Neon branching workflow for isolated development
+
+### **Database (Neon - Optional)**
 - **Only deploy database changes** when schema migrations are needed
 - Use Neon branching workflow for isolated development
 - Deploy production schema changes through migration scripts
@@ -81,13 +87,23 @@ Types: feat, fix, docs, style, refactor, test, chore
 - [ ] Performance optimized
 
 ### **Backend Requirements:**
-- [ ] TypeScript compilation passes (`npm run typecheck`)
-- [ ] Build succeeds (`npm run build`)
-- [ ] All endpoints tested locally
-- [ ] CORS headers configured
-- [ ] Authentication middleware working
-- [ ] Error handling implemented
-- [ ] Database migrations ready (if needed)
+- [ ] **Code Quality Checks Pass:**
+  - [ ] TypeScript compilation (`npm run typecheck`)
+  - [ ] Build succeeds (`npm run build`)
+  - [ ] ESLint passes (`npm run lint`) - if available
+  - [ ] No duplicate imports or identifiers
+  - [ ] All route prefixes correct (`/api/` not `/api/api/`)
+- [ ] **Error Resolution Required:**
+  - [ ] Fix ALL TypeScript errors before merging
+  - [ ] Fix ALL linting errors before merging
+  - [ ] Resolve ALL build failures before merging
+  - [ ] Test locally to ensure no runtime errors
+- [ ] **Functionality Verification:**
+  - [ ] All endpoints tested locally
+  - [ ] CORS headers configured correctly
+  - [ ] Authentication middleware working
+  - [ ] Error handling implemented
+  - [ ] Database migrations ready (if needed)
 
 ### **General Requirements:**
 - [ ] Branch follows naming convention
@@ -96,6 +112,33 @@ Types: feat, fix, docs, style, refactor, test, chore
 - [ ] Tests written or test plan documented
 - [ ] Documentation updated (if needed)
 - [ ] Breaking changes documented
+
+## 🚫 **PRE-MERGE QUALITY GATES - NO EXCEPTIONS**
+
+### **❌ BLOCKED FROM MERGE:**
+- **ANY TypeScript compilation errors**
+- **ANY build failures**
+- **ANY duplicate imports/identifiers**
+- **ANY incorrect route configurations**
+- **ANY unhandled runtime errors**
+- **ANY authentication failures**
+- **ANY CORS misconfigurations**
+
+### **💰 COST PREVENTION:**
+- **Fix errors BEFORE merging** to prevent:
+  - ❌ Wasted Vercel deployment costs
+  - ❌ Wasted Fly.io deployment costs
+  - ❌ Wasted Neon compute costs
+  - ❌ Excessive context token usage in deployments
+  - ❌ Time wasted on rollbacks and fixes
+
+### **🔧 REQUIRED FIXES BEFORE MERGE:**
+1. **Run**: `npm run typecheck` - Fix all TypeScript errors
+2. **Run**: `npm run build` - Ensure clean build
+3. **Run**: `npm run lint` - Fix code quality issues (if available)
+4. **Test**: All endpoints locally with real data
+5. **Verify**: CORS and authentication work correctly
+6. **Check**: No duplicate imports or route prefix issues
 
 ## 🚀 **Deployment Checklist**
 
@@ -123,8 +166,36 @@ curl https://pulse-api-withered-dust-1394.fly.dev/health
 - [ ] Application responds correctly
 - [ ] CORS headers present
 - [ ] Authentication working
+- [ ] Database connections working
 - [ ] No console errors in frontend
 - [ ] Performance metrics acceptable
+
+## 🗄️ **Database Setup (Neon)**
+
+### **Initial Setup:**
+1. **Go to Neon Console**: https://console.neon.tech
+2. **Create Project** or use existing one
+3. **Go to SQL Editor**
+4. **Run Migration**: Copy contents of `backend-hono/migrations/001_initial_schema.sql`
+5. **Execute** the SQL to create all tables
+
+### **Get Connection String:**
+1. **Dashboard** → **Connection Details**
+2. **Copy** the connection string (looks like: `postgresql://user:password@ep-xxx.us-east-1.aws.neon.tech/dbname?sslmode=require`)
+3. **Set in Fly.io**: `fly secrets set NEON_DATABASE_URL="your_connection_string" -a pulse-api-withered-dust-1394`
+
+### **Database Tables Created:**
+- `broker_accounts` - Trading accounts
+- `trades` - Individual trades
+- `orders` - Trading orders
+- `ai_conversations` - Chat sessions
+- `ai_messages` - Chat messages
+- `system_events` - System notifications
+- `news_articles` - Market news
+- `autopilot_settings` - AI trading settings
+- `autopilot_proposals` - Suggested trades
+- `emotional_resonance_scores` - Trading psychology
+- And 15+ more tables for full functionality
 
 ## 🔧 **Environment Setup**
 
