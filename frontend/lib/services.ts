@@ -365,7 +365,7 @@ export class NotificationsService {
   constructor(private client: ApiClient) { }
 
   async list(): Promise<any[]> {
-    const response = await this.client.get<{ notifications: any[] }>('/notifications');
+    const response = await this.client.get<{ notifications: any[] }>('/api/notifications');
     return response.notifications || [];
   }
 

@@ -70,8 +70,8 @@ riskflowRoutes.get('/', async (c) => {
       total: riskflowItems?.length || 0,
     });
   } catch (error) {
-    console.error('Failed to fetch RiskFlow:', error);
-    return c.json({ error: 'Failed to fetch RiskFlow' }, 500);
+    console.error('Failed to fetch RiskFlow:', error instanceof Error ? { message: error.message, stack: error.stack } : error);
+    return c.json({ error: 'Failed to fetch RiskFlow', details: error instanceof Error ? error.message : 'Unknown error' }, 500);
   }
 });
 
@@ -146,8 +146,8 @@ riskflowRoutes.get('/feed', async (c) => {
       })),
     });
   } catch (error) {
-    console.error('Failed to get RiskFlow feed:', error);
-    return c.json({ error: 'Failed to get RiskFlow feed' }, 500);
+    console.error('Failed to get RiskFlow feed:', error instanceof Error ? { message: error.message, stack: error.stack } : error);
+    return c.json({ error: 'Failed to get RiskFlow feed', details: error instanceof Error ? error.message : 'Unknown error' }, 500);
   }
 });
 
