@@ -105,21 +105,23 @@ export { FEATURE_TIER_MAP };
 /**
  * Middleware to require billing tier selection
  */
-export async function requireBillingTier(c: Context, next: Next) {
+export async function requireBillingTier(c: Context, next: Next): Promise<void> {
   const userId = c.get('userId');
   
   if (!userId) {
-    return c.json({ error: 'Unauthorized' }, 401);
+    c.json({ error: 'Unauthorized' }, 401);
+    return;
   }
 
   const tier = await getUserBillingTier(userId);
   
   if (!tier) {
-    return c.json({
+    c.json({
       error: 'Billing tier not selected',
       message: 'Please select a billing tier to continue',
       requiresTierSelection: true,
     }, 403);
+    return;
   }
 
   await next();
@@ -129,23 +131,25 @@ export async function requireBillingTier(c: Context, next: Next) {
  * Middleware to check feature access
  */
 export function checkFeatureAccessMiddleware(featureName: string) {
-  return async (c: Context, next: Next) => {
+  return async (c: Context, next: Next): Promise<void> => {
     const userId = c.get('userId');
     
     if (!userId) {
-      return c.json({ error: 'Unauthorized' }, 401);
+      c.json({ error: 'Unauthorized' }, 401);
+      return;
     }
 
     const tier = await getUserBillingTier(userId);
     const access = checkFeatureAccess(tier, featureName);
 
     if (!access.hasAccess) {
-      return c.json({
+      c.json({
         error: 'Feature not available',
         message: `This feature requires ${access.requiredTier} tier. Please upgrade to unlock.`,
         requiredTier: access.requiredTier,
         currentTier: tier || 'none',
       }, 403);
+      return;
     }
 
     await next();
