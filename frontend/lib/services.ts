@@ -130,9 +130,20 @@ export class AccountService {
   }
 
   async updateTier(data: { tier: Account['tier'] }): Promise<Account> {
-    // Stub - backend doesn't have this endpoint
-    console.warn('Account tier update endpoint not available in Hono backend');
+    await this.client.patch('/account/tier', data);
     return this.get();
+  }
+
+  async selectTier(data: { tier: Account['tier'] }): Promise<void> {
+    await this.client.post('/account/select-tier', data);
+  }
+
+  async getTier(): Promise<{ tier: Account['tier'] | null; requiresSelection: boolean }> {
+    return this.client.get('/account/tier');
+  }
+
+  async getFeatures(): Promise<{ tier: Account['tier']; features: Array<{ name: string; requiredTier: string; hasAccess: boolean }> }> {
+    return this.client.get('/account/features');
   }
 
   async updateProjectXCredentials(data: { username?: string; apiKey?: string }): Promise<void> {
@@ -370,6 +381,29 @@ export class EventsService {
   }
 }
 
+// Polymarket Service
+export class PolymarketService {
+  constructor(private client: ApiClient) {}
+
+  async getOdds(): Promise<{ success: boolean; data: { odds: any[] } }> {
+    return this.client.get('/polymarket/odds');
+  }
+
+  async getUpdates(limit?: number, marketType?: string): Promise<{ success: boolean; data: { updates: any[] } }> {
+    const params = new URLSearchParams();
+    if (limit) params.append('limit', limit.toString());
+    if (marketType) params.append('marketType', marketType);
+    
+    const queryString = params.toString();
+    const endpoint = `/polymarket/updates${queryString ? `?${queryString}` : ''}`;
+    return this.client.get(endpoint);
+  }
+
+  async sync(): Promise<{ success: boolean; message: string; oddsCount?: number }> {
+    return this.client.post('/polymarket/sync');
+  }
+}
+
 // Main Backend Client Interface
 export interface BackendClient {
   account: AccountService;
@@ -380,6 +414,7 @@ export interface BackendClient {
   notifications: NotificationsService;
   er: ERService;
   events: EventsService;
+  polymarket: PolymarketService;
 }
 
 // Create backend client from API client
@@ -393,5 +428,6 @@ export function createBackendClient(client: ApiClient): BackendClient {
     notifications: new NotificationsService(client),
     er: new ERService(client),
     events: new EventsService(client),
+    polymarket: new PolymarketService(client),
   };
 }

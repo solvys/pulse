@@ -5,15 +5,61 @@
  * Update these to match your actual backend response types.
  */
 
+export interface PriceBrainScore {
+  sentiment: 'Bullish' | 'Bearish' | 'Neutral';
+  classification: 'Cyclical' | 'Counter-cyclical' | 'Neutral';
+  impliedPoints: number | null;
+  instrument: string | null;
+}
+
+export type PolymarketMarketType = 
+  | 'rate_cut' 
+  | 'cpi' 
+  | 'nfp' 
+  | 'interest_rate'
+  | 'jerome_powell'
+  | 'donald_trump_tariffs'
+  | 'politics'
+  | 'gdp'
+  | 'interest_rate_futures';
+
+export interface PolymarketOdds {
+  marketId: string;
+  marketType: PolymarketMarketType;
+  question?: string;
+  yesOdds: number;
+  noOdds: number;
+  timestamp: string;
+}
+
+export interface PolymarketUpdate {
+  id: string;
+  marketType: PolymarketMarketType;
+  previousOdds: number;
+  currentOdds: number;
+  changePercentage: number;
+  triggeredByNewsId?: string;
+  timestamp: string;
+}
+
 export interface NewsItem {
   id: string;
   title: string;
   content: string;
+  summary?: string;
   source: string;
   url?: string;
   publishedAt: Date | string;
   impact?: 'high' | 'medium' | 'low';
   symbols?: string[];
+  macroLevel?: 1 | 2 | 3 | 4;
+  priceBrainScore?: PriceBrainScore;
+  authorHandle?: string;
+  isBreaking?: boolean;
+  sentiment?: 'positive' | 'negative' | 'neutral' | 'bullish' | 'bearish';
+  ivImpact?: number;
+  ivScore?: number;
+  polymarketUpdate?: PolymarketUpdate;
 }
 
 export interface Account {

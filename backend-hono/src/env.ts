@@ -18,6 +18,13 @@ const envSchema = z.object({
   X_API_KEY: z.string().default(''),
   X_API_SECRET: z.string().default(''),
 
+  // Additional API keys
+  FMP_API_KEY: z.string().default(''),
+  REDIS_URL: z.string().default(''),
+  CLAUDE_API_KEY: z.string().default(''),
+  NITTER_BASE_URL: z.string().default('https://nitter.net'),
+  POLYMARKET_API_KEY: z.string().default(''),
+
   DEFAULT_AI_MODEL: z.string().default('grok-4'),
   PORT: z.string().default('8080'),
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),

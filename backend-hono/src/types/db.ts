@@ -73,6 +73,7 @@ export interface NewsArticleRow {
   id: number;
   title: string;
   summary: string | null;
+  content: string | null;
   source: string | null;
   url: string | null;
   published_at: Date | null;
@@ -80,6 +81,12 @@ export interface NewsArticleRow {
   iv_impact: number | null;
   symbols: string[] | null;
   is_breaking: boolean;
+  macro_level: number | null;
+  price_brain_sentiment: string | null;
+  price_brain_classification: string | null;
+  implied_points: number | null;
+  instrument: string | null;
+  author_handle: string | null;
 }
 
 export interface EconPlanRow {
@@ -87,4 +94,35 @@ export interface EconPlanRow {
   events: unknown;
   source: string;
   cached_at: Date;
+}
+
+export type PolymarketMarketType = 
+  | 'rate_cut' 
+  | 'cpi' 
+  | 'nfp' 
+  | 'interest_rate'
+  | 'jerome_powell'
+  | 'donald_trump_tariffs'
+  | 'politics'
+  | 'gdp'
+  | 'interest_rate_futures';
+
+export interface PolymarketOddsRow {
+  id: number;
+  market_id: string;
+  market_type: PolymarketMarketType;
+  yes_odds: number;
+  no_odds: number;
+  timestamp: Date;
+  created_at: Date;
+}
+
+export interface PolymarketUpdateRow {
+  id: number;
+  market_type: PolymarketMarketType;
+  previous_odds: number;
+  current_odds: number;
+  change_percentage: number;
+  triggered_by_news_id: number | null;
+  created_at: Date;
 }

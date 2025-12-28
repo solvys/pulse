@@ -23,20 +23,24 @@ newsRoutes.get('/', async (c) => {
     if (symbol) {
       news = await sql`
         SELECT
-          id, title, summary, source, url, published_at,
-          sentiment, iv_impact, symbols, is_breaking
+          id, title, summary, content, source, url, published_at,
+          sentiment, iv_impact, symbols, is_breaking,
+          macro_level, price_brain_sentiment, price_brain_classification,
+          implied_points, instrument, author_handle
         FROM news_articles
         WHERE ${symbol} = ANY(symbols)
-        ORDER BY published_at DESC
+        ORDER BY macro_level DESC NULLS LAST, published_at DESC
         LIMIT ${limit} OFFSET ${offset}
       `;
     } else {
       news = await sql`
         SELECT
-          id, title, summary, source, url, published_at,
-          sentiment, iv_impact, symbols, is_breaking
+          id, title, summary, content, source, url, published_at,
+          sentiment, iv_impact, symbols, is_breaking,
+          macro_level, price_brain_sentiment, price_brain_classification,
+          implied_points, instrument, author_handle
         FROM news_articles
-        ORDER BY published_at DESC
+        ORDER BY macro_level DESC NULLS LAST, published_at DESC
         LIMIT ${limit} OFFSET ${offset}
       `;
     }
@@ -46,6 +50,7 @@ newsRoutes.get('/', async (c) => {
         id: n.id,
         title: n.title,
         summary: n.summary,
+        content: n.content,
         source: n.source,
         url: n.url,
         publishedAt: n.published_at,
@@ -53,6 +58,14 @@ newsRoutes.get('/', async (c) => {
         ivImpact: n.iv_impact,
         symbols: n.symbols,
         isBreaking: n.is_breaking,
+        macroLevel: n.macro_level,
+        priceBrainScore: n.price_brain_sentiment || n.price_brain_classification ? {
+          sentiment: n.price_brain_sentiment,
+          classification: n.price_brain_classification,
+          impliedPoints: n.implied_points,
+          instrument: n.instrument,
+        } : undefined,
+        authorHandle: n.author_handle,
       })) || [],
       total: news?.length || 0,
     });
@@ -87,20 +100,24 @@ newsRoutes.get('/feed', async (c) => {
     if (symbol) {
       news = await sql`
         SELECT 
-          id, title, summary, source, url, published_at,
-          sentiment, iv_impact, symbols, is_breaking
+          id, title, summary, content, source, url, published_at,
+          sentiment, iv_impact, symbols, is_breaking,
+          macro_level, price_brain_sentiment, price_brain_classification,
+          implied_points, instrument, author_handle
         FROM news_articles
         WHERE ${symbol} = ANY(symbols)
-        ORDER BY published_at DESC
+        ORDER BY macro_level DESC NULLS LAST, published_at DESC
         LIMIT ${limit} OFFSET ${offset}
       `;
     } else {
       news = await sql`
         SELECT 
-          id, title, summary, source, url, published_at,
-          sentiment, iv_impact, symbols, is_breaking
+          id, title, summary, content, source, url, published_at,
+          sentiment, iv_impact, symbols, is_breaking,
+          macro_level, price_brain_sentiment, price_brain_classification,
+          implied_points, instrument, author_handle
         FROM news_articles
-        ORDER BY published_at DESC
+        ORDER BY macro_level DESC NULLS LAST, published_at DESC
         LIMIT ${limit} OFFSET ${offset}
       `;
     }
@@ -110,6 +127,7 @@ newsRoutes.get('/feed', async (c) => {
         id: n.id,
         title: n.title,
         summary: n.summary,
+        content: n.content,
         source: n.source,
         url: n.url,
         publishedAt: n.published_at,
@@ -117,6 +135,14 @@ newsRoutes.get('/feed', async (c) => {
         ivImpact: n.iv_impact,
         symbols: n.symbols || [],
         isBreaking: n.is_breaking || false,
+        macroLevel: n.macro_level,
+        priceBrainScore: n.price_brain_sentiment || n.price_brain_classification ? {
+          sentiment: n.price_brain_sentiment,
+          classification: n.price_brain_classification,
+          impliedPoints: n.implied_points,
+          instrument: n.instrument,
+        } : undefined,
+        authorHandle: n.author_handle,
       })),
     });
   } catch (error) {

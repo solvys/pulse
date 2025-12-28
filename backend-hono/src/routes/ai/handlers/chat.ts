@@ -104,6 +104,23 @@ export async function handleChat(c: Context) {
       ? [`Active blind spots: ${activeBlindSpots.map(bs => bs.name).join(', ')}`]
       : [];
 
+    // Fetch recent news items for context (last 10 items, Level 3 and 4 only)
+    const recentNews = await sql`
+      SELECT title, content, source, macro_level, price_brain_sentiment, price_brain_classification
+      FROM news_articles
+      WHERE macro_level IN (3, 4)
+      ORDER BY published_at DESC
+      LIMIT 10
+    `;
+    
+    const newsContext = recentNews.length > 0
+      ? [`Recent high-priority news (${recentNews.length} items):\n${recentNews.map((n: any) => 
+          `- [Level ${n.macro_level}] ${n.title} (${n.source}) - ${n.price_brain_sentiment || 'Neutral'} / ${n.price_brain_classification || 'Neutral'}`
+        ).join('\n')}`]
+      : [];
+
+    const context = [...blindSpotContext, ...newsContext];
+
     const formattedUIMessages: UIMessage[] = uiMessages.map((msg) => ({
       id: msg.id || `msg-${Date.now()}-${Math.random()}`,
       role: msg.role,
@@ -114,7 +131,7 @@ export async function handleChat(c: Context) {
     const streamingResponse = await createStreamingChatResponse(
       formattedUIMessages,
       model,
-      blindSpotContext,
+      context,
       async (fullResponse: string) => {
         try {
           await sql`

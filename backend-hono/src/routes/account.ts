@@ -1,5 +1,13 @@
 import { Hono } from 'hono';
+import { z } from 'zod';
 import { sql } from '../db/index.js';
+import {
+  getUserBillingTier,
+  setUserBillingTier,
+  checkFeatureAccess,
+  FEATURE_TIER_MAP,
+  type BillingTier,
+} from '../middleware/billing-guard.js';
 
 const accountRoutes = new Hono();
 
@@ -88,24 +96,31 @@ accountRoutes.patch('/settings', async (c) => {
 });
 
 // PATCH /account/tier - Update billing tier
+const tierSchema = z.object({
+  tier: z.enum(['free', 'pulse', 'pulse_plus', 'pulse_pro']),
+});
+
 accountRoutes.patch('/tier', async (c) => {
   const userId = c.get('userId');
-  const body = await c.req.json();
+  const result = tierSchema.safeParse(await c.req.json());
 
-  const { tier } = body;
-  const validTiers = ['free', 'pulse', 'pulse_plus', 'pulse_pro'];
-
-  if (!tier || !validTiers.includes(tier)) {
+  if (!result.success) {
     return c.json({
       error: 'Invalid tier',
-      validTiers
+      validTiers: ['free', 'pulse', 'pulse_plus', 'pulse_pro'],
+      details: result.error.flatten(),
     }, 400);
   }
 
   try {
+    const success = await setUserBillingTier(userId, result.data.tier);
+    if (!success) {
+      return c.json({ error: 'Failed to update billing tier' }, 500);
+    }
+
     return c.json({
       message: 'Tier updated successfully',
-      tier,
+      tier: result.data.tier,
       effectiveDate: new Date().toISOString(),
     });
   } catch (error) {
@@ -113,4 +128,87 @@ accountRoutes.patch('/tier', async (c) => {
     return c.json({ error: 'Failed to update billing tier' }, 500);
   }
 });
+
+// POST /account/select-tier - Force user to select tier (required on first login)
+accountRoutes.post('/select-tier', async (c) => {
+  const userId = c.get('userId');
+  const result = tierSchema.safeParse(await c.req.json());
+
+  if (!result.success) {
+    return c.json({
+      error: 'Invalid tier',
+      validTiers: ['free', 'pulse', 'pulse_plus', 'pulse_pro'],
+      details: result.error.flatten(),
+    }, 400);
+  }
+
+  try {
+    const success = await setUserBillingTier(userId, result.data.tier);
+    if (!success) {
+      return c.json({ error: 'Failed to set billing tier' }, 500);
+    }
+
+    return c.json({
+      message: 'Billing tier selected successfully',
+      tier: result.data.tier,
+    });
+  } catch (error) {
+    console.error('Failed to select tier:', error);
+    return c.json({ error: 'Failed to select billing tier' }, 500);
+  }
+});
+
+// GET /account/features - List available features for user's tier
+accountRoutes.get('/features', async (c) => {
+  const userId = c.get('userId');
+
+  try {
+    const tier = await getUserBillingTier(userId);
+    if (!tier) {
+      return c.json({
+        error: 'Billing tier not selected',
+        message: 'Please select a billing tier first',
+        requiresTierSelection: true,
+      }, 403);
+    }
+
+    // Get all features and filter by tier access
+    const allFeatures = Object.entries(FEATURE_TIER_MAP);
+
+    // Resolve all access checks
+    const featuresWithAccess = allFeatures.map(([name, requiredTier]) => {
+      const accessCheck = checkFeatureAccess(tier, name);
+      return {
+        name,
+        requiredTier,
+        hasAccess: accessCheck.hasAccess,
+      };
+    });
+
+    return c.json({
+      tier,
+      features: featuresWithAccess,
+    });
+  } catch (error) {
+    console.error('Failed to get user features:', error);
+    return c.json({ error: 'Failed to get user features' }, 500);
+  }
+});
+
+// GET /account/tier - Get user's current billing tier
+accountRoutes.get('/tier', async (c) => {
+  const userId = c.get('userId');
+
+  try {
+    const tier = await getUserBillingTier(userId);
+    return c.json({
+      tier: tier || null,
+      requiresSelection: !tier,
+    });
+  } catch (error) {
+    console.error('Failed to get user tier:', error);
+    return c.json({ error: 'Failed to get billing tier' }, 500);
+  }
+});
+
 export { accountRoutes };

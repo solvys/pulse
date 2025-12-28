@@ -90,19 +90,34 @@ nitterRoutes.get('/sources', async (c) => {
   });
 });
 
-// POST /nitter/seed - Seed news database with Nitter data
+// POST /nitter/seed - Process and store Nitter news in database
 nitterRoutes.post('/seed', async (c) => {
   try {
-    // This will be implemented when the user provides their sources
+    const { processAndStoreNitterNews } = await import('../services/nitter-service.js');
+    const body = await c.req.json().catch(() => ({}));
+    const userInstrument = body.instrument;
+    
+    const result = await processAndStoreNitterNews(userInstrument);
+    
     return c.json({
       success: true,
-      message: 'Nitter seeding ready - waiting for source configuration',
+      message: `Processed and stored ${result.count} news items`,
+      data: {
+        count: result.count,
+        items: result.items.map(item => ({
+          id: item.id,
+          title: item.title,
+          source: item.source,
+          macroLevel: item.macroLevel,
+        })),
+      },
     });
   } catch (error) {
     console.error('Failed to seed Nitter data:', error);
     return c.json({
       success: false,
       error: 'Failed to seed news data',
+      details: error instanceof Error ? error.message : 'Unknown error',
     }, 500);
   }
 });
