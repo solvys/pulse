@@ -43,7 +43,7 @@ const protectedRoutes = [
   '/api/account',
   '/api/projectx',
   '/api/trading',
-  '/api/news',
+  '/api/riskflow',
   '/api/journal',
   '/api/er',
   '/api/econ',

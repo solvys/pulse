@@ -2,17 +2,87 @@ import { Hono } from 'hono';
 import { z } from 'zod';
 import { sql } from '../db/index.js';
 
-const newsRoutes = new Hono();
+const riskflowRoutes = new Hono();
 
-// Schema definitions
+// GET /riskflow - Main RiskFlow list endpoint (alias for /riskflow/feed)
+riskflowRoutes.get('/', async (c) => {
+  const result = feedSchema.safeParse({
+    limit: c.req.query('limit'),
+    offset: c.req.query('offset'),
+    symbol: c.req.query('symbol'),
+  });
+
+  if (!result.success) {
+    return c.json({ error: 'Invalid query parameters', details: result.error.flatten() }, 400);
+  }
+
+  const { limit, offset, symbol } = result.data;
+
+  try {
+    let riskflowItems;
+    if (symbol) {
+      riskflowItems = await sql`
+        SELECT
+          id, title, summary, content, source, url, published_at,
+          sentiment, iv_impact, symbols, is_breaking,
+          macro_level, price_brain_sentiment, price_brain_classification,
+          implied_points, instrument, author_handle
+        FROM news_articles
+        WHERE ${symbol} = ANY(symbols)
+        ORDER BY macro_level DESC NULLS LAST, published_at DESC
+        LIMIT ${limit} OFFSET ${offset}
+      `;
+    } else {
+      riskflowItems = await sql`
+        SELECT
+          id, title, summary, content, source, url, published_at,
+          sentiment, iv_impact, symbols, is_breaking,
+          macro_level, price_brain_sentiment, price_brain_classification,
+          implied_points, instrument, author_handle
+        FROM news_articles
+        ORDER BY macro_level DESC NULLS LAST, published_at DESC
+        LIMIT ${limit} OFFSET ${offset}
+      `;
+    }
+
+    return c.json({
+      items: riskflowItems?.map((n: any) => ({
+        id: n.id,
+        title: n.title,
+        summary: n.summary,
+        content: n.content,
+        source: n.source,
+        url: n.url,
+        publishedAt: n.published_at,
+        sentiment: n.sentiment,
+        ivImpact: n.iv_impact,
+        symbols: n.symbols,
+        isBreaking: n.is_breaking,
+        macroLevel: n.macro_level,
+        priceBrainScore: n.price_brain_sentiment || n.price_brain_classification ? {
+          sentiment: n.price_brain_sentiment,
+          classification: n.price_brain_classification,
+          impliedPoints: n.implied_points,
+          instrument: n.instrument,
+        } : undefined,
+        authorHandle: n.author_handle,
+      })) || [],
+      total: riskflowItems?.length || 0,
+    });
+  } catch (error) {
+    console.error('Failed to fetch RiskFlow:', error);
+    return c.json({ error: 'Failed to fetch RiskFlow' }, 500);
+  }
+});
+
+// GET /riskflow/feed - RiskFlow feed with IV impact + sentiment
 const feedSchema = z.object({
   limit: z.coerce.number().min(1).max(100).default(20),
   offset: z.coerce.number().min(0).default(0),
   symbol: z.string().optional(),
 });
 
-// GET /news - Main news list endpoint (alias for /news/feed)
-newsRoutes.get('/', async (c) => {
+riskflowRoutes.get('/feed', async (c) => {
   const result = feedSchema.safeParse({
     limit: c.req.query('limit'),
     offset: c.req.query('offset'),
@@ -26,82 +96,9 @@ newsRoutes.get('/', async (c) => {
   const { limit, offset, symbol } = result.data;
 
   try {
-    let news;
+    let riskflowItems;
     if (symbol) {
-      news = await sql`
-        SELECT
-          id, title, summary, content, source, url, published_at,
-          sentiment, iv_impact, symbols, is_breaking,
-          macro_level, price_brain_sentiment, price_brain_classification,
-          implied_points, instrument, author_handle
-        FROM news_articles
-        WHERE ${symbol} = ANY(symbols)
-        ORDER BY macro_level DESC NULLS LAST, published_at DESC
-        LIMIT ${limit} OFFSET ${offset}
-      `;
-    } else {
-      news = await sql`
-        SELECT
-          id, title, summary, content, source, url, published_at,
-          sentiment, iv_impact, symbols, is_breaking,
-          macro_level, price_brain_sentiment, price_brain_classification,
-          implied_points, instrument, author_handle
-        FROM news_articles
-        ORDER BY macro_level DESC NULLS LAST, published_at DESC
-        LIMIT ${limit} OFFSET ${offset}
-      `;
-    }
-
-    const articles = Array.isArray(news) ? news : [];
-    
-    return c.json({
-      items: articles.map((n: any) => ({
-        id: n.id,
-        title: n.title,
-        summary: n.summary,
-        content: n.content,
-        source: n.source,
-        url: n.url,
-        publishedAt: n.published_at,
-        sentiment: n.sentiment,
-        ivImpact: n.iv_impact,
-        symbols: n.symbols || [],
-        isBreaking: n.is_breaking || false,
-        macroLevel: n.macro_level,
-        priceBrainScore: n.price_brain_sentiment || n.price_brain_classification ? {
-          sentiment: n.price_brain_sentiment,
-          classification: n.price_brain_classification,
-          impliedPoints: n.implied_points,
-          instrument: n.instrument,
-        } : undefined,
-        authorHandle: n.author_handle,
-      })),
-      total: articles.length,
-    });
-  } catch (error) {
-    console.error('Failed to fetch news:', error);
-    return c.json({ error: 'Failed to fetch news' }, 500);
-  }
-});
-
-// GET /news/feed - News feed with IV impact + sentiment
-newsRoutes.get('/feed', async (c) => {
-  const result = feedSchema.safeParse({
-    limit: c.req.query('limit'),
-    offset: c.req.query('offset'),
-    symbol: c.req.query('symbol'),
-  });
-
-  if (!result.success) {
-    return c.json({ error: 'Invalid query parameters', details: result.error.flatten() }, 400);
-  }
-
-  const { limit, offset, symbol } = result.data;
-
-  try {
-    let news;
-    if (symbol) {
-      news = await sql`
+      riskflowItems = await sql`
         SELECT 
           id, title, summary, content, source, url, published_at,
           sentiment, iv_impact, symbols, is_breaking,
@@ -113,7 +110,7 @@ newsRoutes.get('/feed', async (c) => {
         LIMIT ${limit} OFFSET ${offset}
       `;
     } else {
-      news = await sql`
+      riskflowItems = await sql`
         SELECT 
           id, title, summary, content, source, url, published_at,
           sentiment, iv_impact, symbols, is_breaking,
@@ -125,10 +122,8 @@ newsRoutes.get('/feed', async (c) => {
       `;
     }
 
-    const articles = Array.isArray(news) ? news : [];
-    
     return c.json({
-      articles: articles.map((n: any) => ({
+      articles: riskflowItems.map((n: any) => ({
         id: n.id,
         title: n.title,
         summary: n.summary,
@@ -151,8 +146,8 @@ newsRoutes.get('/feed', async (c) => {
       })),
     });
   } catch (error) {
-    console.error('Failed to get news feed:', error);
-    return c.json({ error: 'Failed to get news feed' }, 500);
+    console.error('Failed to get RiskFlow feed:', error);
+    return c.json({ error: 'Failed to get RiskFlow feed' }, 500);
   }
 });
 
@@ -160,13 +155,13 @@ newsRoutes.get('/feed', async (c) => {
 // Scheduled Events Endpoints (for Autopilot Integration)
 // ============================================================================
 
-// GET /news/scheduled - Get scheduled news events
+// GET /riskflow/scheduled - Get scheduled RiskFlow events
 const scheduledSchema = z.object({
   startTime: z.string().datetime(),
   endTime: z.string().datetime(),
 });
 
-newsRoutes.get('/scheduled', async (c) => {
+riskflowRoutes.get('/scheduled', async (c) => {
   const result = scheduledSchema.safeParse({
     startTime: c.req.query('startTime'),
     endTime: c.req.query('endTime'),
@@ -208,23 +203,23 @@ newsRoutes.get('/scheduled', async (c) => {
 });
 
 // ============================================================================
-// Breaking News Endpoints (for Autopilot Integration)
+// Breaking RiskFlow Endpoints (for Autopilot Integration)
 // ============================================================================
 
-// GET /news/breaking - Get breaking news for symbol
-newsRoutes.get('/breaking', async (c) => {
+// GET /riskflow/breaking - Get breaking RiskFlow for symbol
+riskflowRoutes.get('/breaking', async (c) => {
   const symbol = c.req.query('symbol');
 
   try {
-    // Get breaking news from last 5-10 minutes
+    // Get breaking RiskFlow from last 5-10 minutes
     const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000);
     const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
 
-    let breakingNews;
+    let breakingRiskFlow;
 
     if (symbol) {
-      // Get symbol-specific + general market breaking news
-      breakingNews = await sql`
+      // Get symbol-specific + general market breaking RiskFlow
+      breakingRiskFlow = await sql`
         SELECT 
           id, title, published_at, sentiment, iv_impact, symbols, is_breaking
         FROM news_articles
@@ -243,8 +238,8 @@ newsRoutes.get('/breaking', async (c) => {
         LIMIT 10
       `;
     } else {
-      // Get all breaking news
-      breakingNews = await sql`
+      // Get all breaking RiskFlow
+      breakingRiskFlow = await sql`
         SELECT 
           id, title, published_at, sentiment, iv_impact, symbols, is_breaking
         FROM news_articles
@@ -259,12 +254,12 @@ newsRoutes.get('/breaking', async (c) => {
       `;
     }
 
-    const hasBreakingNews = breakingNews.length > 0;
+    const hasBreakingRiskFlow = breakingRiskFlow.length > 0;
 
-    // Calculate pause duration (5-10 minutes from most recent breaking news)
+    // Calculate pause duration (5-10 minutes from most recent breaking RiskFlow)
     let pausedUntil: string | undefined;
-    if (hasBreakingNews && breakingNews[0]) {
-      const mostRecent = new Date(breakingNews[0].published_at);
+    if (hasBreakingRiskFlow && breakingRiskFlow[0]) {
+      const mostRecent = new Date(breakingRiskFlow[0].published_at);
       const pauseDuration = 10 * 60 * 1000; // 10 minutes
       pausedUntil = new Date(mostRecent.getTime() + pauseDuration).toISOString();
     }
@@ -278,32 +273,32 @@ newsRoutes.get('/breaking', async (c) => {
     };
 
     return c.json({
-      hasBreakingNews,
-      events: breakingNews.map((news: any) => ({
-        id: news.id.toString(),
-        title: news.title,
-        publishedAt: news.published_at.toISOString(),
-        impact: mapImpact(news.iv_impact, news.sentiment),
-        symbols: news.symbols || [],
+      hasBreakingRiskFlow,
+      events: breakingRiskFlow.map((item: any) => ({
+        id: item.id.toString(),
+        title: item.title,
+        publishedAt: item.published_at.toISOString(),
+        impact: mapImpact(item.iv_impact, item.sentiment),
+        symbols: item.symbols || [],
       })),
       pausedUntil,
     });
   } catch (error) {
-    console.error('Failed to get breaking news:', error);
-    // Fallback: assume no breaking news
+    console.error('Failed to get breaking RiskFlow:', error);
+    // Fallback: assume no breaking RiskFlow
     return c.json({
-      hasBreakingNews: false,
+      hasBreakingRiskFlow: false,
       events: [],
     });
   }
 });
 
 
-// POST /news/seed - Seed news data (for development)
-newsRoutes.post('/seed', async (c) => {
+// POST /riskflow/seed - Seed RiskFlow data (for development)
+riskflowRoutes.post('/seed', async (c) => {
   try {
-    // Sample news data for development
-    const sampleNews = [
+    // Sample RiskFlow data for development
+    const sampleRiskFlow = [
       {
         title: "Fed Signals Potential Rate Cuts Amid Economic Uncertainty",
         summary: "Federal Reserve officials indicated potential interest rate reductions as inflation shows signs of cooling, though labor market remains strong.",
@@ -386,8 +381,8 @@ newsRoutes.post('/seed', async (c) => {
       }
     ];
 
-    // Insert sample news articles
-    for (const article of sampleNews) {
+    // Insert sample RiskFlow articles
+    for (const article of sampleRiskFlow) {
       await sql`
         INSERT INTO news_articles (
           title, summary, source, url, published_at,
@@ -409,12 +404,12 @@ newsRoutes.post('/seed', async (c) => {
 
     return c.json({
       success: true,
-      message: 'News data seeded successfully',
-      count: sampleNews.length,
+      message: 'RiskFlow data seeded successfully',
+      count: sampleRiskFlow.length,
     });
   } catch (error) {
-    console.error('Failed to seed news:', error);
-    return c.json({ error: 'Failed to seed news data' }, 500);
+    console.error('Failed to seed RiskFlow:', error);
+    return c.json({ error: 'Failed to seed RiskFlow data' }, 500);
   }
 });
-export { newsRoutes };
+export { riskflowRoutes };

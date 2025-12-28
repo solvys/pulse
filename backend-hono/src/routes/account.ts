@@ -69,6 +69,129 @@ accountRoutes.get('/', async (c) => {
   }
 });
 
+// POST /account - Create a new account for the user
+const createAccountSchema = z.object({
+  initialBalance: z.number().optional().default(10000),
+});
+
+accountRoutes.post('/', async (c) => {
+  const userId = c.get('userId');
+
+  try {
+    const body = await c.req.json().catch(() => ({}));
+    const result = createAccountSchema.safeParse(body);
+
+    if (!result.success) {
+      return c.json({
+        error: 'Invalid request body',
+        details: result.error.flatten(),
+      }, 400);
+    }
+
+    const { initialBalance } = result.data;
+
+    // Check if user already has an account
+    const [existingAccount] = await sql`
+      SELECT 
+        id,
+        account_id,
+        account_name,
+        account_type,
+        balance,
+        equity,
+        margin_used,
+        buying_power,
+        last_synced_at
+      FROM broker_accounts
+      WHERE user_id = ${userId}
+      ORDER BY created_at DESC
+      LIMIT 1
+    `;
+
+    // If account exists, return it
+    if (existingAccount) {
+      // Ensure user has a billing tier set (default to 'free' if not set)
+      const tier = await getUserBillingTier(userId);
+      if (!tier) {
+        await setUserBillingTier(userId, 'free');
+      }
+
+      return c.json({
+        id: existingAccount.id,
+        accountId: existingAccount.account_id,
+        accountName: existingAccount.account_name,
+        accountType: existingAccount.account_type || null,
+        balance: existingAccount.balance,
+        equity: existingAccount.equity,
+        marginUsed: existingAccount.margin_used,
+        buyingPower: existingAccount.buying_power,
+        provider: 'projectx',
+        isPaper: false,
+        lastSyncedAt: existingAccount.last_synced_at || null,
+      });
+    }
+
+    // Create a new default account
+    const accountId = `default-${userId}`;
+    const [newAccount] = await sql`
+      INSERT INTO broker_accounts (
+        user_id,
+        account_id,
+        account_name,
+        account_type,
+        balance,
+        equity,
+        margin_used,
+        buying_power,
+        last_synced_at
+      )
+      VALUES (
+        ${userId},
+        ${accountId},
+        'Default Account',
+        'paper',
+        ${initialBalance},
+        ${initialBalance},
+        0,
+        ${initialBalance},
+        NOW()
+      )
+      RETURNING 
+        id,
+        account_id,
+        account_name,
+        account_type,
+        balance,
+        equity,
+        margin_used,
+        buying_power,
+        last_synced_at
+    `;
+
+    // Ensure user has a billing tier set (default to 'free' if not set)
+    const tier = await getUserBillingTier(userId);
+    if (!tier) {
+      await setUserBillingTier(userId, 'free');
+    }
+
+    return c.json({
+      id: newAccount.id,
+      accountId: newAccount.account_id,
+      accountName: newAccount.account_name,
+      accountType: newAccount.account_type || null,
+      balance: newAccount.balance,
+      equity: newAccount.equity,
+      marginUsed: newAccount.margin_used,
+      buyingPower: newAccount.buying_power,
+      provider: 'projectx',
+      isPaper: true,
+      lastSyncedAt: newAccount.last_synced_at || null,
+    }, 201);
+  } catch (error) {
+    console.error('Failed to create account:', error);
+    return c.json({ error: 'Failed to create account' }, 500);
+  }
+});
 
 // PATCH /account/settings - Update account settings
 accountRoutes.patch('/settings', async (c) => {

@@ -2,16 +2,16 @@ import { useState, useEffect } from 'react';
 import { FileText, Trash2 } from 'lucide-react';
 import { FeedItem as FeedItemType, IVIndicator } from '../../types/feed';
 import { useBackend } from '../../lib/backend';
-import type { NewsItem } from '../../types/api';
+import type { RiskFlowItem } from '../../types/api';
 import { FeedItem } from './FeedItem';
 import { NTNReportModal } from '../NTNReportModal';
 
-// Convert NewsItem to FeedItem format
+// Convert RiskFlowItem to FeedItem format
 // Filters out raw/unprocessed data and ensures only interpreted messages are shown
-function convertNewsToFeedItem(newsItem: NewsItem): FeedItemType | null {
+function convertRiskFlowToFeedItem(riskflowItem: RiskFlowItem): FeedItemType | null {
   // Filter out items that look like raw system logs or unprocessed data
-  const title = newsItem.title || '';
-  const content = newsItem.content || '';
+  const title = riskflowItem.title || '';
+  const content = riskflowItem.content || '';
   
   // Skip items that look like raw API responses or system logs
   const rawDataPatterns = [
@@ -31,18 +31,18 @@ function convertNewsToFeedItem(newsItem: NewsItem): FeedItemType | null {
   }
   
   // Ensure ivScore is always a valid number first
-  const ivScoreValue = typeof newsItem.ivScore === 'number' ? newsItem.ivScore : 
-                       newsItem.ivScore != null ? Number(newsItem.ivScore) : 0;
+  const ivScoreValue = typeof riskflowItem.ivScore === 'number' ? riskflowItem.ivScore : 
+                       riskflowItem.ivScore != null ? Number(riskflowItem.ivScore) : 0;
   const safeIvScore = isNaN(ivScoreValue) ? 0 : ivScoreValue;
 
   // Determine IV type based on sentiment from Logic Matrix (database)
   // Use sentiment from database if available, otherwise fall back to keyword analysis
   let ivType: 'Bullish' | 'Bearish' | 'Neutral' = 'Neutral';
   
-  if (newsItem.sentiment) {
+  if (riskflowItem.sentiment) {
     // Use sentiment from Logic Matrix interpretation
-    if (newsItem.sentiment === 'bullish') ivType = 'Bullish';
-    else if (newsItem.sentiment === 'bearish') ivType = 'Bearish';
+    if (riskflowItem.sentiment === 'bullish') ivType = 'Bullish';
+    else if (riskflowItem.sentiment === 'bearish') ivType = 'Bearish';
   } else if (safeIvScore >= 6) {
     // Fallback: High volatility - check title for sentiment keywords
     const titleLower = title.toLowerCase();
@@ -58,7 +58,7 @@ function convertNewsToFeedItem(newsItem: NewsItem): FeedItemType | null {
 
   // Determine classification based on category
   let classification: 'Cyclical' | 'Countercyclical' | 'Neutral' = 'Neutral';
-  const category = newsItem.category || ''.toLowerCase();
+  const category = riskflowItem.category || ''.toLowerCase();
   if (category.includes('fed') || category.includes('economic') || category.includes('political') || category.includes('geopolitical')) {
     classification = 'Countercyclical';
   } else if (category.includes('earning') || category.includes('corporate') || category.includes('technical')) {
@@ -72,10 +72,10 @@ function convertNewsToFeedItem(newsItem: NewsItem): FeedItemType | null {
   };
 
   return {
-    id: newsItem.id.toString(),
-    time: typeof newsItem.publishedAt === 'string' ? new Date(newsItem.publishedAt) : newsItem.publishedAt,
+    id: riskflowItem.id.toString(),
+    time: typeof riskflowItem.publishedAt === 'string' ? new Date(riskflowItem.publishedAt) : riskflowItem.publishedAt,
     text: title, // Use interpreted title (already processed by Logic Matrix)
-    source: newsItem.source,
+    source: riskflowItem.source,
     type: 'news',
     iv: iv,
   };

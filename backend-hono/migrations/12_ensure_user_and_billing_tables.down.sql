@@ -1,0 +1,12 @@
+-- Rollback migration for user and billing tables
+-- Note: This does NOT drop tables as they may contain important data
+-- Instead, this is a placeholder for potential future rollback needs
+
+-- If you need to rollback, you would manually drop tables:
+-- DROP TABLE IF EXISTS feature_tier_mapping;
+-- DROP TABLE IF EXISTS user_billing;
+-- DROP TABLE IF EXISTS users;
+-- DROP TABLE IF EXISTS broker_accounts;
+-- DROP TABLE IF EXISTS projectx_credentials;
+-- DROP TABLE IF EXISTS news_articles;
+-- DROP TABLE IF EXISTS scheduled_events;

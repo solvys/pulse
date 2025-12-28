@@ -31,8 +31,8 @@ function isTestMode(): boolean {
 // Get test credentials from environment
 function getTestCredentials(): { username: string; apiKey: string } {
   return {
-    username: process.env.PROJECTX_TEST_USERNAME || 'wallstreetwave',
-    apiKey: process.env.PROJECTX_TEST_API_KEY || 'II+9VjHpNj4oUXLNOavHvKbcQ1P87OgiM6IQFcI4GI4=',
+    username: process.env.PROJECTX_TEST_USERNAME || 'YOUR_PROJECTX_USERNAME',
+    apiKey: process.env.PROJECTX_TEST_API_KEY || 'YOUR_PROJECTX_API_KEY',
   };
 }
 
