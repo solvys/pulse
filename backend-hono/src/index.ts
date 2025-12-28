@@ -6,6 +6,7 @@ import { authMiddleware } from './middleware/auth.js';
 import { corsMiddleware } from './middleware/cors.js';
 import { loggerMiddleware, logger } from './middleware/logger.js';
 import { registerRoutes } from './routes/index.js';
+import { marketRoutes } from './routes/market.js';
 
 const app = new Hono();
 
@@ -37,11 +38,14 @@ app.get('/', (c) => {
   });
 });
 
+// Register public market routes (before auth middleware)
+app.route('/api/market', marketRoutes);
+
 const protectedApp = new Hono();
 // Apply CORS to protected routes as well (redundant but ensures headers are set)
 protectedApp.use('*', corsMiddleware);
 protectedApp.use('*', authMiddleware);
-registerRoutes(protectedApp);
+registerRoutes(protectedApp, false); // Don't include public routes in protected app
 
 app.route('/', protectedApp);
 

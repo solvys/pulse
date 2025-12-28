@@ -13,11 +13,13 @@ import { aiRoutes } from './ai/index.js';
 import { autopilotRoutes } from './autopilot/index.js';
 import { autopilotTestRoutes } from './autopilot-test.js';
 
-export function registerRoutes(app: Hono) {
+export function registerRoutes(app: Hono, includePublicRoutes = true) {
   app.route('/api/account', accountRoutes);
   app.route('/api/projectx', projectxRoutes);
   app.route('/api/trading', tradingRoutes);
-  app.route('/api/market', marketRoutes);
+  if (includePublicRoutes) {
+    app.route('/api/market', marketRoutes);
+  }
   app.route('/api/news', newsRoutes);
   app.route('/api/journal', journalRoutes);
   app.route('/api/er', erRoutes);
