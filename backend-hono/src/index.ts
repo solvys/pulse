@@ -66,6 +66,13 @@ registerRoutes(app, true);
 app.route('/api/market', marketRoutes);
 
 app.onError((err, c) => {
+  // Add CORS headers even on errors (safety net)
+  const origin = c.req.header('Origin');
+  if (origin && (origin.endsWith('.solvys.io') || origin.endsWith('.vercel.app'))) {
+    c.header('Access-Control-Allow-Origin', origin);
+    c.header('Access-Control-Allow-Credentials', 'true');
+  }
+
   logger.error({ err }, 'Unhandled error');
   return c.json(
     {
@@ -77,6 +84,13 @@ app.onError((err, c) => {
 });
 
 app.notFound((c) => {
+  // Add CORS headers to 404 responses
+  const origin = c.req.header('Origin');
+  if (origin && (origin.endsWith('.solvys.io') || origin.endsWith('.vercel.app'))) {
+    c.header('Access-Control-Allow-Origin', origin);
+    c.header('Access-Control-Allow-Credentials', 'true');
+  }
+
   return c.json({ error: 'Not found' }, 404);
 });
 
