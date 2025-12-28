@@ -8,7 +8,14 @@ import { sql } from '../../../db/index.js';
 import { getActiveBlindSpots } from '../../../services/blind-spots-service.js';
 import { createStreamingChatResponse } from '../../../services/ai-service.js';
 import { chatRequestSchema } from '../schemas.js';
-import type { UIMessage } from 'ai';
+
+// UIMessage type definition (matches @ai-sdk/react UIMessage structure)
+type UIMessage = {
+  id: string;
+  role: 'user' | 'assistant' | 'system';
+  content: string;
+  parts?: Array<{ type: string; text?: string; [key: string]: any }>;
+};
 
 export async function handleChat(c: Context) {
   const userId = c.get('userId');
@@ -68,6 +75,7 @@ export async function handleChat(c: Context) {
     const formattedUIMessages: UIMessage[] = uiMessages.map((msg) => ({
       id: msg.id || `msg-${Date.now()}-${Math.random()}`,
       role: msg.role,
+      content: msg.content || (msg.parts?.find((p: any) => p.type === 'text')?.text || ''),
       parts: msg.parts || [{ type: 'text', text: msg.content }],
     }));
 
