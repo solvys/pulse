@@ -10,13 +10,9 @@ import { registerRoutes } from './routes/index.js';
 const app = new Hono();
 
 // CORS must be first to handle preflight requests
+// Apply CORS to all routes including protected ones
 app.use('*', corsMiddleware);
 app.use('*', loggerMiddleware);
-
-// Explicitly handle OPTIONS requests for all routes
-app.options('*', (c) => {
-  return new Response(null, { status: 204 });
-});
 
 app.get('/health', async (c) => {
   // Health check should always return 200 for Fly.io routing
@@ -42,6 +38,8 @@ app.get('/', (c) => {
 });
 
 const protectedApp = new Hono();
+// Apply CORS to protected routes as well (redundant but ensures headers are set)
+protectedApp.use('*', corsMiddleware);
 protectedApp.use('*', authMiddleware);
 registerRoutes(protectedApp);
 

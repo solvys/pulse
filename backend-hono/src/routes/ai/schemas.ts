@@ -38,8 +38,8 @@ export const threatAnalyzeSchema = z.object({
 });
 
 export const blindSpotSchema = z.object({
-  id: z.string().optional(),
-  name: z.string().min(1),
-  description: z.string().optional(),
-  severity: z.enum(['low', 'medium', 'high']).optional(),
+    id: z.string().optional(),
+    name: z.string().min(1),
+    description: z.string().optional(),
+    severity: z.enum(['low', 'medium', 'high']).optional(),
 });
