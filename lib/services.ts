@@ -203,6 +203,33 @@ export class EventsService {
   }
 }
 
+// Nitter Service
+export class NitterService {
+  constructor(private client: ApiClient) {}
+
+  async getNews(sources?: string[], limit?: number): Promise<any> {
+    const params = new URLSearchParams();
+    if (sources) params.append('sources', sources.join(','));
+    if (limit) params.append('limit', limit.toString());
+
+    const queryString = params.toString();
+    const endpoint = `/api/nitter/news${queryString ? `?${queryString}` : ''}`;
+    return this.client.get(endpoint);
+  }
+
+  async getTrends(): Promise<any> {
+    return this.client.get('/api/nitter/trends');
+  }
+
+  async getSources(): Promise<any> {
+    return this.client.get('/api/nitter/sources');
+  }
+
+  async seedNews(): Promise<any> {
+    return this.client.post('/api/nitter/seed');
+  }
+}
+
 // Twitter Service
 export class TwitterService {
   constructor(private client: ApiClient) {}
@@ -246,7 +273,7 @@ export interface BackendClient {
   notifications: NotificationsService;
   er: ERService;
   events: EventsService;
-  twitter: TwitterService;
+  nitter: NitterService;
 }
 
 // Create backend client from API client
@@ -260,6 +287,6 @@ export function createBackendClient(client: ApiClient): BackendClient {
     notifications: new NotificationsService(client),
     er: new ERService(client),
     events: new EventsService(client),
-    twitter: new TwitterService(client),
+    nitter: new NitterService(client),
   };
 }
