@@ -22,12 +22,17 @@ interface Tweet {
     isRetweet: boolean;
 }
 
+import { env } from '../env.js';
+
 // Public Nitter instances - rotated to avoid rate limits
+// Updated list based on recent availability
 const NITTER_INSTANCES: string[] = [
+    'https://nitter.lucabased.xyz',
     'https://nitter.privacydev.net',
     'https://nitter.poast.org',
     'https://nitter.woodland.cafe',
     'https://nitter.esmailelbob.xyz',
+    'https://nitter.soopy.moe',
 ];
 
 // Financial news accounts to follow
@@ -42,6 +47,7 @@ const FINANCIAL_ACCOUNTS = [
 class NitterClient {
     private instances: NitterInstance[];
     private currentIndex: number = 0;
+    private useOfficialApi: boolean = false;
 
     constructor() {
         this.instances = NITTER_INSTANCES.map(url => ({
@@ -104,11 +110,79 @@ class NitterClient {
     }
 
     /**
+     * Fetch from Official X API
+     */
+    private async fetchFromOfficialApi(account: string, limit: number): Promise<Tweet[]> {
+        if (!env.X_BEARER_TOKEN) {
+            throw new Error('No X API Bearer Token provided');
+        }
+
+        // Search recent tweets from user
+        // Note: Free/Basic tier access is limited
+        try {
+            const query = `from:${account} -is:retweet`;
+            const response = await fetch(
+                `https://api.twitter.com/2/tweets/search/recent?query=${encodeURIComponent(query)}&max_results=${Math.min(limit, 100)}&tweet.fields=created_at,author_id,public_metrics,entities`,
+                {
+                    headers: {
+                        'Authorization': `Bearer ${env.X_BEARER_TOKEN}`,
+                        'Content-Type': 'application/json',
+                    },
+                }
+            );
+
+            if (!response.ok) {
+                const error = await response.text();
+                throw new Error(`X API Error ${response.status}: ${error}`);
+            }
+
+            const data = await response.json() as any;
+            if (!data.data) return [];
+
+            return data.data.map((t: any) => ({
+                id: t.id,
+                text: this.cleanText(t.text),
+                author: account,
+                authorHandle: `@${account}`,
+                createdAt: new Date(t.created_at),
+                url: `https://twitter.com/${account}/status/${t.id}`,
+                retweets: t.public_metrics?.retweet_count || 0,
+                likes: t.public_metrics?.like_count || 0,
+                isRetweet: false,
+            }));
+        } catch (error) {
+            console.error('Official X API fetch failed:', error);
+            throw error;
+        }
+    }
+
+    /**
      * Fetch tweets from a specific account
      */
     async fetchAccountTweets(account: string, limit: number = 20): Promise<Tweet[]> {
+        // Try Official API first if enabled or if cached failure mode
+        if (this.useOfficialApi) {
+            try {
+                return await this.fetchFromOfficialApi(account, limit);
+            } catch (error) {
+                console.warn('Official API failed, falling back to Nitter', error);
+                this.useOfficialApi = false; // Switch back to Nitter
+            }
+        }
+
         const instance = this.getNextInstance();
         if (!instance) {
+            // If all Nitter instances are down, try Official API as last resort
+            if (env.X_BEARER_TOKEN) {
+                console.log('All Nitter instances down, trying Official API...');
+                try {
+                    const tweets = await this.fetchFromOfficialApi(account, limit);
+                    this.useOfficialApi = true; // Stick to official API for now
+                    return tweets;
+                } catch (err) {
+                    console.error('Both Nitter and Official API failed');
+                }
+            }
             throw new Error('No healthy Nitter instances available');
         }
 
@@ -137,6 +211,15 @@ class NitterClient {
             const nextInstance = this.getNextInstance();
             if (nextInstance && nextInstance.url !== instance.url) {
                 return this.fetchAccountTweets(account, limit);
+            }
+
+            // Final fallback to Official API
+            if (env.X_BEARER_TOKEN) {
+                try {
+                    return await this.fetchFromOfficialApi(account, limit);
+                } catch (apiErr) {
+                    throw error; // Throw original Nitter error if API also fails
+                }
             }
 
             throw error;
