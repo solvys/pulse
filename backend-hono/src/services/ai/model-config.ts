@@ -20,7 +20,7 @@ if (env.VERCEL_AI_GATEWAY_API_KEY) {
   });
 }
 
-export function getModel(modelName: string = 'grok-4') {
+export function getModel(modelName: string = 'grok-4'): any {
   if (gateway) {
     switch (modelName) {
       case 'claude-opus-4':
@@ -59,7 +59,7 @@ export function getModel(modelName: string = 'grok-4') {
   }
 }
 
-export function getVisionModel() {
+export function getVisionModel(): any {
   if (gateway) {
     return gateway(`xai/${GROK_VISION_MODEL}`);
   }

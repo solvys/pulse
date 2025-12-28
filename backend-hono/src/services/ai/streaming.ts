@@ -3,8 +3,16 @@
  * Streaming text generation with fallback support
  */
 
-import { streamText, convertToModelMessages, type UIMessage } from 'ai';
+import { streamText, convertToCoreMessages } from 'ai';
 import { getModel } from './model-config.js';
+
+// UIMessage type definition (matches @ai-sdk/react UIMessage structure)
+type UIMessage = {
+  id: string;
+  role: 'user' | 'assistant' | 'system';
+  content: string;
+  parts?: Array<{ type: string; text?: string; [key: string]: any }>;
+};
 
 type FallbackModel = 'claude-opus-4' | 'grok-4' | 'claude-sonnet-4.5';
 
@@ -27,9 +35,16 @@ export async function createStreamingChatResponse(
     ? `Context: ${context.join('\n')}\n\nYou are a trading assistant helping with analysis and coaching. Reference blind spots when relevant in E-VALS conversations.`
     : 'You are a trading assistant helping with analysis and coaching. Reference blind spots when relevant in E-VALS conversations.';
 
-  const modelMessages = convertToModelMessages(uiMessages);
+  // Convert UI messages to core messages (convertToCoreMessages expects messages with content property)
+  const messagesForConversion = uiMessages.map((msg) => ({
+    id: msg.id,
+    role: msg.role,
+    content: msg.content || (msg.parts?.find(p => p.type === 'text')?.text || ''),
+  }));
   
-  const messages = modelMessages.some(msg => msg.role === 'system')
+  const modelMessages = convertToCoreMessages(messagesForConversion as any);
+  
+  const messages = modelMessages.some((msg: any) => msg.role === 'system')
     ? modelMessages
     : [{ role: 'system' as const, content: systemPrompt }, ...modelMessages];
 
@@ -38,7 +53,7 @@ export async function createStreamingChatResponse(
     try {
       const model = getModel(fallbackModel);
       
-      const result = streamText({
+      const result = await streamText({
         model: model as any,
         messages,
         temperature: 0.7,
@@ -50,13 +65,9 @@ export async function createStreamingChatResponse(
         },
       });
 
-      return result.toUIMessageStreamResponse({
-        onError: (error) => {
-          console.error('Stream error:', error);
-          return error instanceof Error ? error.message : 'An error occurred';
-        },
-      });
-    } catch (error) {
+      // Return data stream response (compatible with useChat)
+      return result.toDataStreamResponse();
+    } catch (error: any) {
       console.error(`AI streaming error with ${fallbackModel}:`, error);
       lastError = error instanceof Error ? error : new Error(String(error));
     }
