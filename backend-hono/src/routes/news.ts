@@ -4,6 +4,64 @@ import { sql } from '../db/index.js';
 
 const newsRoutes = new Hono();
 
+// GET /news - Main news list endpoint (alias for /news/feed)
+newsRoutes.get('/', async (c) => {
+  const result = feedSchema.safeParse({
+    limit: c.req.query('limit'),
+    offset: c.req.query('offset'),
+    symbol: c.req.query('symbol'),
+  });
+
+  if (!result.success) {
+    return c.json({ error: 'Invalid query parameters', details: result.error.flatten() }, 400);
+  }
+
+  const { limit, offset, symbol } = result.data;
+
+  try {
+    let news;
+    if (symbol) {
+      news = await sql`
+        SELECT
+          id, title, summary, source, url, published_at,
+          sentiment, iv_impact, symbols, is_breaking
+        FROM news_articles
+        WHERE ${symbol} = ANY(symbols)
+        ORDER BY published_at DESC
+        LIMIT ${limit} OFFSET ${offset}
+      `;
+    } else {
+      news = await sql`
+        SELECT
+          id, title, summary, source, url, published_at,
+          sentiment, iv_impact, symbols, is_breaking
+        FROM news_articles
+        ORDER BY published_at DESC
+        LIMIT ${limit} OFFSET ${offset}
+      `;
+    }
+
+    return c.json({
+      items: news?.map((n: any) => ({
+        id: n.id,
+        title: n.title,
+        summary: n.summary,
+        source: n.source,
+        url: n.url,
+        publishedAt: n.published_at,
+        sentiment: n.sentiment,
+        ivImpact: n.iv_impact,
+        symbols: n.symbols,
+        isBreaking: n.is_breaking,
+      })) || [],
+      total: news?.length || 0,
+    });
+  } catch (error) {
+    console.error('Failed to fetch news:', error);
+    return c.json({ error: 'Failed to fetch news' }, 500);
+  }
+});
+
 // GET /news/feed - News feed with IV impact + sentiment
 const feedSchema = z.object({
   limit: z.coerce.number().min(1).max(100).default(20),
