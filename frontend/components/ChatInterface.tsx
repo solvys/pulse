@@ -1,7 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { ArrowRight, Paperclip, Image, FileText, Link2, AlertTriangle, TrendingUp, History, X, Pin, Archive, Edit2, MoreVertical } from "lucide-react";
 import { useChat } from "@ai-sdk/react";
-import { DefaultChatTransport } from "ai";
 import { useAuth } from "@clerk/clerk-react";
 import { useBackend } from "../lib/backend";
 import { healingBowlPlayer } from "../utils/healingBowlSounds";
@@ -113,12 +112,12 @@ export default function ChatInterface() {
       headers['Authorization'] = `Bearer ${token}`;
     }
 
-    // Add conversationId to body if available
+    // Add conversationId to request body if available (per AI SDK best practices)
     let body = init?.body;
     if (body && conversationId) {
       try {
         const bodyObj = typeof body === 'string' ? JSON.parse(body) : body;
-        if (typeof bodyObj === 'object' && bodyObj !== null) {
+        if (typeof bodyObj === 'object' && bodyObj !== null && Array.isArray(bodyObj.messages)) {
           bodyObj.conversationId = conversationId;
           body = JSON.stringify(bodyObj);
         }
@@ -140,46 +139,22 @@ export default function ChatInterface() {
     }
 
     return response;
-  }, [getToken, conversationId]);
+  }, [getToken, conversationId, setConversationId]);
 
   // Track loading state manually
   const [isStreaming, setIsStreaming] = useState(false);
 
-  // Use useChat hook for streaming chat (v3 API with DefaultChatTransport)
+  // Use useChat hook for streaming chat (per video best practices)
   const {
     messages: useChatMessages,
     sendMessage,
     status,
     setMessages: setUseChatMessages,
   } = useChat({
-    transport: new DefaultChatTransport({
-      api: `${API_BASE_URL}/ai/chat`,
-      fetch: fetchWithAuth,
-      prepareSendMessagesRequest: ({ messages, id }) => {
-        // Convert useChat messages format to our backend format
-        const lastMessage = messages[messages.length - 1];
-        const textContent = lastMessage.parts
-          ?.filter((part: any) => part.type === 'text')
-          .map((part: any) => part.text)
-          .join('') || '';
-        
-        return {
-          body: {
-            messages: messages.map((msg) => ({
-              role: msg.role,
-              content: msg.parts
-                ?.filter((part: any) => part.type === 'text')
-                .map((part: any) => part.text)
-                .join('') || '',
-            })),
-            conversationId: conversationId || id,
-          },
-        };
-      },
-    }),
+    api: `${API_BASE_URL}/ai/chat`,
+    fetch: fetchWithAuth,
     onFinish: (message) => {
       setIsStreaming(false);
-      // Handle any post-processing after message is complete
       console.log('Message finished:', message);
     },
     onError: (error) => {
