@@ -24,7 +24,7 @@ export const authMiddleware = createMiddleware(async (c, next) => {
         runId: 'initial',
         hypothesisId: 'A'
       })
-    }).catch(() => {});
+    }).catch(() => { });
     // #endregion
     await next();
     return;
@@ -45,7 +45,7 @@ export const authMiddleware = createMiddleware(async (c, next) => {
       runId: 'initial',
       hypothesisId: 'C'
     })
-  }).catch(() => {});
+  }).catch(() => { });
   // #endregion
 
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -62,7 +62,7 @@ export const authMiddleware = createMiddleware(async (c, next) => {
         runId: 'initial',
         hypothesisId: 'C'
       })
-    }).catch(() => {});
+    }).catch(() => { });
     // #endregion
     return c.json({ error: 'Unauthorized: Missing or invalid token' }, 401);
   }
@@ -83,11 +83,19 @@ export const authMiddleware = createMiddleware(async (c, next) => {
         runId: 'initial',
         hypothesisId: 'C'
       })
-    }).catch(() => {});
+    }).catch(() => { });
     // #endregion
+
+    console.log(`[AUTH] Verifying token for ${c.req.path}, CLERK_SECRET_KEY prefix: ${env.CLERK_SECRET_KEY?.substring(0, 15)}...`);
 
     const result = await verifyToken(token, {
       secretKey: env.CLERK_SECRET_KEY,
+    });
+
+    console.log(`[AUTH] verifyToken result:`, {
+      hasPayload: !!result?.payload,
+      hasErrors: !!(result as any)?.errors,
+      errorDetails: (result as any)?.errors || null
     });
 
     if (!result || result.errors || !result.payload) {
@@ -104,7 +112,7 @@ export const authMiddleware = createMiddleware(async (c, next) => {
           runId: 'initial',
           hypothesisId: 'C'
         })
-      }).catch(() => {});
+      }).catch(() => { });
       // #endregion
       return c.json({ error: 'Unauthorized: Invalid token' }, 401);
     }
@@ -124,7 +132,7 @@ export const authMiddleware = createMiddleware(async (c, next) => {
           runId: 'initial',
           hypothesisId: 'C'
         })
-      }).catch(() => {});
+      }).catch(() => { });
       // #endregion
       return c.json({ error: 'Unauthorized: Invalid token payload' }, 401);
     }
@@ -142,7 +150,7 @@ export const authMiddleware = createMiddleware(async (c, next) => {
         runId: 'initial',
         hypothesisId: 'C'
       })
-    }).catch(() => {});
+    }).catch(() => { });
     // #endregion
 
     c.set('userId', userId);
@@ -163,7 +171,7 @@ export const authMiddleware = createMiddleware(async (c, next) => {
         runId: 'initial',
         hypothesisId: 'C'
       })
-    }).catch(() => {});
+    }).catch(() => { });
     // #endregion
     return c.json({ error: 'Unauthorized: Token verification failed' }, 401);
   }

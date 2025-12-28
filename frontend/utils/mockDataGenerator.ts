@@ -34,7 +34,7 @@ function hashString(str: string): number {
 function calculateIV(text: string): IVIndicator {
   const hash = hashString(text);
   const value = ((hash % 200) - 100) / 10;
-  
+
   const type = value > 2 ? 'Bullish' : value < -2 ? 'Bearish' : 'Neutral';
   const classification = Math.abs(value) > 5 ? 'Countercyclical' : 'Cyclical';
 
@@ -44,7 +44,7 @@ function calculateIV(text: string): IVIndicator {
 export function generateMockFeedItem(): FeedItem {
   const text = headlines[Math.floor(Math.random() * headlines.length)];
   const source = sources[Math.floor(Math.random() * sources.length)];
-  
+
   return {
     id: `feed_${Date.now()}_${Math.random()}`,
     time: new Date(),
@@ -70,20 +70,20 @@ export function generateMockRiskFlowItem(): RiskFlowItem {
   const hash = hashString(title);
   const ivImpact = ((hash % 100) / 10); // 0-10 scale
   const ivScore = ivImpact;
-  
+
   const impacts: ('high' | 'medium' | 'low')[] = ['high', 'medium', 'low'];
   const impact = ivImpact > 7 ? 'high' : ivImpact > 4 ? 'medium' : 'low';
-  
-  const sentiments: ('positive' | 'negative' | 'neutral' | 'bullish' | 'bearish')[] = 
+
+  const sentiments: ('positive' | 'negative' | 'neutral' | 'bullish' | 'bearish')[] =
     ['positive', 'negative', 'neutral', 'bullish', 'bearish'];
   const sentiment = sentiments[hash % sentiments.length];
-  
+
   const macroLevels: (1 | 2 | 3 | 4)[] = [1, 2, 3, 4];
   const macroLevel = macroLevels[hash % macroLevels.length] as 1 | 2 | 3 | 4;
-  
+
   const priceBrainSentiment = ivImpact > 5 ? 'Bullish' : ivImpact < -5 ? 'Bearish' : 'Neutral';
   const priceBrainClassification = Math.abs(ivImpact) > 5 ? 'Counter-cyclical' : 'Cyclical';
-  
+
   return {
     id: `riskflow_${Date.now()}_${Math.random()}`,
     title,
@@ -109,8 +109,10 @@ export function generateMockRiskFlowItem(): RiskFlowItem {
   };
 }
 
-export function generateMockRiskFlowItems(count: number = 20): RiskFlowItem[] {
-  return Array.from({ length: count }, (_, i) => {
+export function generateMockRiskFlowItems(count: number = 10): RiskFlowItem[] {
+  // Safeguard: never generate more than 25 items at once
+  const safeCount = Math.min(count, 25);
+  return Array.from({ length: safeCount }, (_, i) => {
     const item = generateMockRiskFlowItem();
     item.publishedAt = new Date(Date.now() - i * 60000);
     item.id = `riskflow_${Date.now() - i * 60000}_${i}`;

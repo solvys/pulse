@@ -7,6 +7,29 @@
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080';
 
+// Global auth failure state - stops all polling when auth fails
+let authFailed = false;
+let authFailedTimestamp: number | null = null;
+const AUTH_RETRY_DELAY_MS = 30000; // Wait 30s before retrying after auth failure
+
+// Export function to reset auth state (call on successful login)
+export function resetAuthState() {
+  authFailed = false;
+  authFailedTimestamp = null;
+}
+
+// Check if auth has failed and we should skip requests
+function shouldSkipRequest(): boolean {
+  if (!authFailed) return false;
+  // Allow retry after AUTH_RETRY_DELAY_MS
+  if (authFailedTimestamp && Date.now() - authFailedTimestamp > AUTH_RETRY_DELAY_MS) {
+    authFailed = false;
+    authFailedTimestamp = null;
+    return false;
+  }
+  return true;
+}
+
 export interface ApiError {
   code: string;
   message: string;
@@ -26,8 +49,17 @@ class ApiClient {
     endpoint: string,
     options: RequestInit = {}
   ): Promise<T> {
+    // Skip request if auth has failed recently (prevents error cascade)
+    if (shouldSkipRequest()) {
+      throw {
+        code: 'auth_skipped',
+        message: 'Skipping request due to recent auth failure. Will retry in 30s.',
+        status: 401,
+      } as ApiError;
+    }
+
     const url = `${this.baseUrl}${endpoint}`;
-    
+
     const headers: HeadersInit = {
       'Content-Type': 'application/json',
       ...options.headers,
@@ -65,6 +97,10 @@ class ApiClient {
         // Handle specific status codes
         if (response.status === 401) {
           error.code = 'unauthenticated';
+          // Set global auth failure flag to stop future requests
+          authFailed = true;
+          authFailedTimestamp = Date.now();
+          console.warn('[API] Auth failed - pausing API requests for 30 seconds');
         } else if (response.status === 404) {
           error.code = 'not_found';
         }

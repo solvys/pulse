@@ -31,7 +31,7 @@ export function NewsSection() {
       try {
         if (mockDataEnabled) {
           // Use mock data when enabled
-          const mockItems = generateMockRiskFlowItems(20);
+          const mockItems = generateMockRiskFlowItems(10); // Reduced from 20
           setRiskflowItems(mockItems);
         } else {
           const response = await backend.riskflow.list({ limit: 50 });
@@ -53,11 +53,11 @@ export function NewsSection() {
       if (mockDataEnabled) {
         // Add new mock item periodically
         const newItem = generateMockRiskFlowItem();
-        setRiskflowItems(prev => [newItem, ...prev].slice(0, 50));
+        setRiskflowItems(prev => [newItem, ...prev].slice(0, 20)); // Cap at 20, not 50
       } else {
         fetchNews();
       }
-    }, 30000);
+    }, 60000); // Slowed from 30s to 60s
     return () => clearInterval(interval);
   }, [backend, mockDataEnabled]);
 
@@ -153,30 +153,27 @@ export function NewsSection() {
                 {/* Three Mini Cards at Bottom */}
                 <div className="flex gap-2 mt-4 pt-4 border-t border-[#FFC038]/10">
                   {/* Bullish/Bearish Mini Card - Shows on ALL levels */}
-                  <div className={`flex-1 px-3 py-2 rounded text-xs font-semibold text-center ${
-                    priceBrain?.sentiment === 'Bullish' ? 'bg-green-500/20 text-green-400' :
-                    priceBrain?.sentiment === 'Bearish' ? 'bg-red-500/20 text-red-400' :
-                    'bg-gray-500/20 text-gray-400'
-                  }`}>
+                  <div className={`flex-1 px-3 py-2 rounded text-xs font-semibold text-center ${priceBrain?.sentiment === 'Bullish' ? 'bg-green-500/20 text-green-400' :
+                      priceBrain?.sentiment === 'Bearish' ? 'bg-red-500/20 text-red-400' :
+                        'bg-gray-500/20 text-gray-400'
+                    }`}>
                     {priceBrain?.sentiment || 'Neutral'}
                   </div>
 
                   {/* Cyclical/Counter-cyclical Mini Card - Shows on ALL levels */}
-                  <div className={`flex-1 px-3 py-2 rounded text-xs font-semibold text-center ${
-                    priceBrain?.classification === 'Cyclical' ? 'bg-blue-500/20 text-blue-400' :
-                    priceBrain?.classification === 'Counter-cyclical' ? 'bg-orange-500/20 text-orange-400' :
-                    'bg-gray-500/20 text-gray-400'
-                  }`}>
+                  <div className={`flex-1 px-3 py-2 rounded text-xs font-semibold text-center ${priceBrain?.classification === 'Cyclical' ? 'bg-blue-500/20 text-blue-400' :
+                      priceBrain?.classification === 'Counter-cyclical' ? 'bg-orange-500/20 text-orange-400' :
+                        'bg-gray-500/20 text-gray-400'
+                    }`}>
                     {priceBrain?.classification || 'Neutral'}
                   </div>
 
                   {/* Implied Points Mini Card - Shows ONLY on Level 3 and 4 */}
                   {showImpliedPoints ? (
-                    <div className={`flex-1 px-3 py-2 rounded text-xs font-semibold text-center ${
-                      (priceBrain?.impliedPoints || 0) > 0 ? 'bg-green-500/20 text-green-400' :
-                      (priceBrain?.impliedPoints || 0) < 0 ? 'bg-red-500/20 text-red-400' :
-                      'bg-gray-500/20 text-gray-400'
-                    }`}>
+                    <div className={`flex-1 px-3 py-2 rounded text-xs font-semibold text-center ${(priceBrain?.impliedPoints || 0) > 0 ? 'bg-green-500/20 text-green-400' :
+                        (priceBrain?.impliedPoints || 0) < 0 ? 'bg-red-500/20 text-red-400' :
+                          'bg-gray-500/20 text-gray-400'
+                      }`}>
                       {(priceBrain?.impliedPoints || 0) > 0 ? '+' : ''}{priceBrain?.impliedPoints?.toFixed(1)} pts
                     </div>
                   ) : (
