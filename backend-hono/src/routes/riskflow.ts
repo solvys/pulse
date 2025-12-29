@@ -9,7 +9,6 @@ import {
     getNewsFeed,
     getBreakingNews,
     fetchAndStoreNews,
-    getNitterHealth,
 } from '../services/news-service.js';
 
 const riskflowRoutes = new Hono();
@@ -163,7 +162,7 @@ riskflowRoutes.get('/breaking', async (c) => {
 
 /**
  * POST /riskflow/refresh
- * Manually refresh news feed from Nitter
+ * Manually refresh news feed from X API
  */
 riskflowRoutes.post('/refresh', async (c) => {
     try {
@@ -174,20 +173,5 @@ riskflowRoutes.post('/refresh', async (c) => {
     }
 });
 
-/**
- * GET /riskflow/health
- * Get Nitter instance health status (public endpoint)
- */
-riskflowRoutes.get('/health', async (c) => {
-    const instances = getNitterHealth();
-    const healthyCount = instances.filter(i => i.healthy).length;
-    return c.json({
-        status: healthyCount > 0 ? 'operational' : 'degraded',
-        instances,
-        healthyCount,
-        totalCount: instances.length,
-        nitterNote: 'Nitter is free and requires no API keys',
-    });
-});
 
 export { riskflowRoutes };

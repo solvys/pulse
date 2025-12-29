@@ -81,7 +81,7 @@ news_articles (
 ```
 
 **Data Flow**:
-1. News articles ingested from various sources (Nitter, RSS, manual entry)
+1. News articles ingested from X API and Polymarket.
 2. IV impact calculated based on content analysis
 3. Sentiment extracted via NLP
 4. Macro level assigned (1=low impact, 4=high impact)

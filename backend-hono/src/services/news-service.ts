@@ -6,7 +6,6 @@
  */
 
 import { sql } from '../db/index.js';
-import { nitterClient } from './nitter-client.js';
 import { xClient, Tweet, FINANCIAL_ACCOUNTS } from './x-client.js';
 import { fetchAllPolymarketOdds, checkSignificantChanges, PolymarketOdds } from './polymarket-service.js';
 import { fetchGeneralNews, FMPArticle } from './fmp-service.js';
@@ -208,11 +207,6 @@ export async function fetchAndStoreNews(limit: number = 15): Promise<{ fetched: 
             const xTweets = await xClient.fetchAllFinancialNews(Math.ceil(limit / FINANCIAL_ACCOUNTS.length));
             if (xTweets.length > 0) {
                 articles.push(...xTweets.map(tweetToArticle));
-            } else {
-                // Fallback to Nitter if X API fails/rate-limited
-                console.warn('X API yielded no results, trying Nitter fallback...');
-                const nitterTweets = await nitterClient.fetchAllFinancialNews(Math.ceil(limit / FINANCIAL_ACCOUNTS.length));
-                articles.push(...nitterTweets.map(tweetToArticle));
             }
         } catch (e) {
             console.error('X Source failed:', e);
@@ -394,6 +388,3 @@ export async function getBreakingNews(options: {
     }
 }
 
-export function getNitterHealth() {
-    return nitterClient.getHealthStatus();
-}

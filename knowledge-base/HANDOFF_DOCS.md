@@ -50,10 +50,10 @@ The Autopilot Trading System is a backend-driven logic engine that manages algor
   - Calculates "IV Scores" based on news sentiment to adjust sizing or pause trading.
 
 #### 2.2 News Feed Integration ("The Tape")
-- **Source**: `backend-hono/src/services/news-service.ts` & `nitter-client.ts`.
+- **Source**: `backend-hono/src/services/news-service.ts` & `x-client.ts`.
 - **Mechanism**:
   - **Auto-Fetch**: On server startup, fetches the latest 15 financial news items.
-  - **Sources**: Nitter (primary, rotated instances) -> Official X API (fallback).
+  - **Sources**: Official X API (primary).
   - **Impact**: News items are scored (-10 to +10) for "Implied Volatility (IV) Impact".
   - **Action**: High IV impact events (e.g., "Rate Hike") can trigger a "Circuit Breaker" to pause Autopilot.
 
@@ -63,8 +63,7 @@ The Autopilot Trading System is a backend-driven logic engine that manages algor
 - **Safety**: If the connection to ProjectX (Broker) is lost, Autopilot attempts to flatten positions (verify implementation).
 
 ### Maintenance & Operations
-- **Nitter Health**: Monitor logs for `Nitter instance marked unhealthy`. Update `NITTER_INSTANCES` in `nitter-client.ts` as needed.
-- **X API Quota**: If falling back to X API frequently, monitor usage to avoid `429 Too Many Requests`. Consider upgrading the plan if consistent reliability is needed.
+- **X API Quota**: Monitor usage to avoid `429 Too Many Requests`. Consider upgrading the plan if consistent reliability is needed.
 - **Startup**: creating `news_articles` table is handled via SQL migration (already applied).
 
 ## 3. Integration Points
@@ -75,5 +74,5 @@ The Autopilot Trading System is a backend-driven logic engine that manages algor
 
 ### Backend <-> External
 - **ProjectX**: Used for trade execution and account data.
-- **Nitter/X**: Used for "The Tape".
+- **Twitter/X**: Used for "The Tape".
 - **AI Gateway**: Used for AI reasoning (if connecting backend to AI directly).

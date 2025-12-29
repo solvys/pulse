@@ -100,10 +100,10 @@ export async function handleChat(c: Context) { ... }
 ### Service Pattern (for business logic)
 ```typescript
 // services/news-service.ts - Orchestration (< 150 lines)
-import { nitterClient } from './nitter-client.js';
+import { xClient } from './x-client.js';
 import { classifyMacroLevel } from './news-classifier.js';
 
-// services/nitter-client.ts - External API (< 200 lines)
+// services/x-client.ts - External API (< 200 lines)
 // services/news-classifier.ts - Classification logic (< 100 lines)
 ```
 

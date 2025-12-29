@@ -83,7 +83,7 @@ export interface UplinkResponse {
 
 // Account Service
 export class AccountService {
-  constructor(private client: ApiClient) {}
+  constructor(private client: ApiClient) { }
 
   async get(): Promise<Account> {
     return this.client.get<Account>('/api/account');
@@ -104,13 +104,13 @@ export class AccountService {
 
 // News Service
 export class NewsService {
-  constructor(private client: ApiClient) {}
+  constructor(private client: ApiClient) { }
 
   async list(params?: { limit?: number; offset?: number }): Promise<NewsListResponse> {
     const query = new URLSearchParams();
     if (params?.limit) query.append('limit', params.limit.toString());
     if (params?.offset) query.append('offset', params.offset.toString());
-    
+
     const queryString = query.toString();
     const endpoint = `/api/news${queryString ? `?${queryString}` : ''}`;
     return this.client.get<NewsListResponse>(endpoint);
@@ -127,7 +127,7 @@ export class NewsService {
 
 // AI Service
 export class AIService {
-  constructor(private client: ApiClient) {}
+  constructor(private client: ApiClient) { }
 
   async chat(data: { message: string; conversationId?: string }): Promise<ChatResponse> {
     return this.client.post<ChatResponse>('/api/ai/chat', data);
@@ -140,7 +140,7 @@ export class AIService {
 
 // Trading Service
 export class TradingService {
-  constructor(private client: ApiClient) {}
+  constructor(private client: ApiClient) { }
 
   async listPositions(): Promise<PositionsResponse> {
     return this.client.get<PositionsResponse>('/api/trading/positions');
@@ -153,7 +153,7 @@ export class TradingService {
 
 // ProjectX Service
 export class ProjectXService {
-  constructor(private client: ApiClient) {}
+  constructor(private client: ApiClient) { }
 
   async listAccounts(): Promise<ProjectXAccountsResponse> {
     return this.client.get<ProjectXAccountsResponse>('/api/projectx/accounts');
@@ -170,7 +170,7 @@ export class ProjectXService {
 
 // Notifications Service
 export class NotificationsService {
-  constructor(private client: ApiClient) {}
+  constructor(private client: ApiClient) { }
 
   async list(): Promise<any[]> {
     return this.client.get<any[]>('/api/notifications');
@@ -183,7 +183,7 @@ export class NotificationsService {
 
 // ER Service (Emotional Resonance)
 export class ERService {
-  constructor(private client: ApiClient) {}
+  constructor(private client: ApiClient) { }
 
   async getSessions(): Promise<any[]> {
     return this.client.get<any[]>('/api/er/sessions');
@@ -196,43 +196,17 @@ export class ERService {
 
 // Events Service
 export class EventsService {
-  constructor(private client: ApiClient) {}
+  constructor(private client: ApiClient) { }
 
   async list(): Promise<any[]> {
     return this.client.get<any[]>('/api/events');
   }
 }
 
-// Nitter Service
-export class NitterService {
-  constructor(private client: ApiClient) {}
-
-  async getNews(sources?: string[], limit?: number): Promise<any> {
-    const params = new URLSearchParams();
-    if (sources) params.append('sources', sources.join(','));
-    if (limit) params.append('limit', limit.toString());
-
-    const queryString = params.toString();
-    const endpoint = `/api/nitter/news${queryString ? `?${queryString}` : ''}`;
-    return this.client.get(endpoint);
-  }
-
-  async getTrends(): Promise<any> {
-    return this.client.get('/api/nitter/trends');
-  }
-
-  async getSources(): Promise<any> {
-    return this.client.get('/api/nitter/sources');
-  }
-
-  async seedNews(): Promise<any> {
-    return this.client.post('/api/nitter/seed');
-  }
-}
 
 // Twitter Service
 export class TwitterService {
-  constructor(private client: ApiClient) {}
+  constructor(private client: ApiClient) { }
 
   async getMarketSentiment(symbols?: string[], hoursBack?: number): Promise<any> {
     const params = new URLSearchParams();
@@ -273,7 +247,6 @@ export interface BackendClient {
   notifications: NotificationsService;
   er: ERService;
   events: EventsService;
-  nitter: NitterService;
 }
 
 // Create backend client from API client
@@ -287,6 +260,5 @@ export function createBackendClient(client: ApiClient): BackendClient {
     notifications: new NotificationsService(client),
     er: new ERService(client),
     events: new EventsService(client),
-    nitter: new NitterService(client),
   };
 }

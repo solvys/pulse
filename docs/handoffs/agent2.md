@@ -25,7 +25,7 @@ If your implementation would exceed 300 lines, split it into:
 Follow the patterns established by Agent 1:
 - Route structure: See `routes/riskflow.ts` (202 lines)
 - Service structure: See `services/news-service.ts` (342 lines - NEEDS REFACTOR)
-- Client structure: See `services/nitter-client.ts` (262 lines)
+- Client structure: See `services/x-client.ts` (162 lines)
 
 ### 3. Implementation Plan
 Follow: `docs/HANDOFF-NEW-BACKEND-IMPLEMENTATION.md` (Agent 1 section, lines 51-390)
