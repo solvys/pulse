@@ -121,7 +121,7 @@ export default function ChatInterface() {
       setIsStreaming(false);
       console.error('Chat error:', error);
     },
-  }) as any;
+  } as any) as any;
 
   const {
     messages: useChatMessages,
