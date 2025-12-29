@@ -10,8 +10,13 @@ import { useAuth } from '@clerk/clerk-react';
 import { API_BASE_URL } from '../constants.js';
 
 export function useChatWithAuth(conversationId: string | undefined, setConversationId: (id: string) => void) {
-  const { getToken } = useAuth();
+  const { getToken, isSignedIn, userId } = useAuth();
   const [isStreaming, setIsStreaming] = useState(false);
+  
+  // Log auth state for debugging
+  if (!isSignedIn) {
+    console.warn('[useChatWithAuth] User is not signed in. Token requests will fail.');
+  }
 
   const fetchWithAuth = useCallback(async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
     // Try to get a fresh token - Clerk handles caching internally
@@ -34,6 +39,8 @@ export function useChatWithAuth(conversationId: string | undefined, setConversat
       hasToken: !!token,
       tokenLength: token.length,
       tokenPreview: token.substring(0, 20) + '...',
+      isSignedIn,
+      userId,
     });
 
     const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
@@ -67,8 +74,24 @@ export function useChatWithAuth(conversationId: string | undefined, setConversat
 
     // Handle 401 Unauthorized responses
     if (response.status === 401) {
-      console.error('[useChatWithAuth] 401 Unauthorized - Token may be expired or invalid');
       const errorText = await response.text().catch(() => 'Unauthorized');
+      console.error('[useChatWithAuth] 401 Unauthorized - Token may be expired or invalid', {
+        errorText,
+        tokenLength: token.length,
+        // Try to decode token to check expiration (if it's a JWT)
+        tokenPreview: token.substring(0, 50) + '...',
+      });
+      
+      // If token might be expired, try to get a fresh one and retry once
+      try {
+        const freshToken = await getToken({ template: 'neon' });
+        if (freshToken && freshToken !== token) {
+          console.log('[useChatWithAuth] Got fresh token, but not retrying automatically. User may need to refresh page.');
+        }
+      } catch (e) {
+        console.error('[useChatWithAuth] Failed to get fresh token:', e);
+      }
+      
       throw new Error(`Authentication failed: ${errorText}`);
     }
 
