@@ -84,7 +84,7 @@ interface ConversationSession {
 export default function ChatInterface() {
   const backend = useBackend();
   const { alertConfig } = useSettings();
-  const { getToken } = useAuth();
+  const { getToken, isSignedIn } = useAuth();
   const [showSuggestions, setShowSuggestions] = useState(true);
   const [showAttachMenu, setShowAttachMenu] = useState(false);
   const [conversationId, setConversationId] = useState<string | undefined>();
@@ -196,6 +196,10 @@ export default function ChatInterface() {
   }, [messages]);
 
   const loadConversationHistory = async () => {
+    if (!isSignedIn) {
+      setConversations([]);
+      return;
+    }
     setLoadingHistory(true);
     try {
       const response = await backend.ai.listConversations();
@@ -296,8 +300,12 @@ export default function ChatInterface() {
   };
 
   useEffect(() => {
-    loadConversationHistory();
-  }, []);
+    if (isSignedIn) {
+      loadConversationHistory();
+    } else {
+      setConversations([]);
+    }
+  }, [isSignedIn]);
 
   const handleSend = async (customMessage?: string) => {
     const messageText = customMessage || input.trim();

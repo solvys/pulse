@@ -258,9 +258,10 @@ export class AIService {
 
   async listConversations(): Promise<any[]> {
     try {
-      return this.client.get<{ conversations: any[] }>('/api/ai/conversations').then(r => r.conversations || []);
+      const response = await this.client.get<{ conversations: any[] }>('/api/ai/conversations');
+      return response.conversations || [];
     } catch (error) {
-      console.warn('listConversations endpoint not ready');
+      console.warn('listConversations endpoint error:', error);
       return [];
     }
   }
