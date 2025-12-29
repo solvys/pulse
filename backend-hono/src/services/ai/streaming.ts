@@ -3,7 +3,7 @@
  * Streaming text generation with fallback support
  */
 
-import { streamText, convertToCoreMessages } from 'ai';
+import { streamText, convertToModelMessages } from 'ai';
 import { getModel } from './model-config.js';
 import { getTools } from './tools.js';
 import { buildSystemPrompt } from './firmware.js';
@@ -50,7 +50,7 @@ export async function createStreamingChatResponse(
     content: msg.content || (msg.parts?.find(p => p.type === 'text')?.text || ''),
   }));
 
-  const modelMessages = convertToCoreMessages(messagesForConversion as any);
+  const modelMessages = await convertToModelMessages(messagesForConversion as any);
 
   const messages = modelMessages.some((msg: any) => msg.role === 'system')
     ? modelMessages
@@ -65,7 +65,7 @@ export async function createStreamingChatResponse(
         model: model as any,
         messages,
         temperature: 0.7,
-        maxTokens: 2000,
+        maxTokens: 2000 as any, // AI SDK v6 compatibility
         tools: enableTools ? getTools() : undefined,
         onFinish: async ({ text }) => {
           if (onFinish) {
@@ -74,8 +74,8 @@ export async function createStreamingChatResponse(
         },
       });
 
-      // Return data stream response (compatible with useChat)
-      return result.toDataStreamResponse();
+      // Return UI message stream response (compatible with useChat)
+      return result.toUIMessageStreamResponse();
     } catch (error: any) {
       console.error(`AI streaming error with ${fallbackModel}:`, error);
       lastError = error instanceof Error ? error : new Error(String(error));
@@ -110,7 +110,7 @@ export async function* streamAIResponse(
       model: model as any,
       messages,
       temperature: 0.7,
-      maxTokens: 2000,
+      maxTokens: 2000 as any,
     });
     const { textStream } = streamResult;
 

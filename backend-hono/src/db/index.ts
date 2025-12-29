@@ -8,6 +8,9 @@ let sqlClient: any = null;
 let connectionError: Error | null = null;
 
 try {
+  if (!env.NEON_DATABASE_URL) {
+    throw new Error('NEON_DATABASE_URL is not set');
+  }
   sqlClient = neon(env.NEON_DATABASE_URL);
 } catch (error) {
   console.error('Failed to create database client:', error);

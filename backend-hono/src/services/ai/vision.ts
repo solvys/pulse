@@ -36,7 +36,7 @@ export async function analyzeImage(
         },
       ],
       temperature: 0.7,
-      maxTokens: 1000,
+      maxTokens: 1000 as any,
     });
 
     return text;
