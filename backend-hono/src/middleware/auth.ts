@@ -154,11 +154,29 @@ export const authMiddleware = createMiddleware(async (c, next) => {
 
     // In @clerk/backend v1.x, verifyToken returns the JWT claims directly
     // For template tokens, verifyToken should still work with the same secret key
+    // Try to extract issuer from token payload if available
+    let issuer: string | undefined;
+    try {
+      const decodedPayload = JSON.parse(Buffer.from(tokenParts[1], 'base64url').toString());
+      issuer = decodedPayload.iss;
+      console.log(`[AUTH] Extracted issuer from token: ${issuer}`);
+    } catch (e) {
+      // Ignore - we'll verify without issuer
+    }
+
     let payload;
     try {
-      payload = await verifyToken(token, {
+      // Build verify options
+      const verifyOptions: any = {
         secretKey: env.CLERK_SECRET_KEY,
-      });
+      };
+      
+      // Add issuer if we extracted it (helps with template tokens)
+      if (issuer) {
+        verifyOptions.issuer = issuer;
+      }
+
+      payload = await verifyToken(token, verifyOptions);
     } catch (verifyError) {
       const errorMessage = verifyError instanceof Error ? verifyError.message : 'Unknown error';
       console.error('[AUTH] verifyToken threw an error:', {
@@ -167,6 +185,9 @@ export const authMiddleware = createMiddleware(async (c, next) => {
         tokenLength: token.length,
         tokenParts: tokenParts.length,
         secretKeyPrefix: env.CLERK_SECRET_KEY?.substring(0, 15),
+        issuer,
+        tokenHeader: tokenParts[0],
+        tokenPayloadPreview: tokenParts[1]?.substring(0, 100),
       });
       throw verifyError; // Re-throw to be caught by outer catch block
     }
