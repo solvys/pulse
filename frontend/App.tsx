@@ -10,7 +10,7 @@ import { NotificationContainer } from './components/NotificationToast';
 
 // Development mode: bypass Clerk authentication ONLY when explicitly enabled
 const DEV_MODE = import.meta.env.DEV || import.meta.env.MODE === 'development';
-const BYPASS_AUTH = DEV_MODE && import.meta.env.VITE_BYPASS_AUTH === 'true';
+const BYPASS_AUTH = DEV_MODE && (import.meta.env.VITE_BYPASS_AUTH === 'true' || !import.meta.env.VITE_CLERK_PUBLISHABLE_KEY);
 
 // Debug logging
 if (DEV_MODE) {
