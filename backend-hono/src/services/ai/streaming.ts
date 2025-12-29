@@ -65,7 +65,7 @@ export async function createStreamingChatResponse(
         model: model as any,
         messages,
         temperature: 0.7,
-        maxTokens: 2000 as any, // AI SDK v6 compatibility
+        // maxTokens removed - configured on model level in AI SDK v6
         tools: enableTools ? getTools() : undefined,
         onFinish: async ({ text }) => {
           if (onFinish) {
@@ -110,7 +110,7 @@ export async function* streamAIResponse(
       model: model as any,
       messages,
       temperature: 0.7,
-      maxTokens: 2000 as any,
+      // maxTokens removed - configured on model level in AI SDK v6
     });
     const { textStream } = streamResult;
 

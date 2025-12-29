@@ -20,7 +20,7 @@ export async function generateAIResponse(
       model: model as any,
       prompt: `${systemPrompt}\n\nUser: ${prompt}\n\nAssistant:`,
       temperature: 0.7,
-      maxTokens: 2000 as any,
+      // maxTokens removed - configured on model level in AI SDK v6
     });
 
     return text;
@@ -60,7 +60,7 @@ Provide a concise market analysis focusing on volatility, risk, and trading oppo
       model: model as any,
       prompt,
       temperature: 0.7,
-      maxTokens: 500,
+      // maxTokens removed - configured on model level in AI SDK v6
     });
 
     return text;
@@ -90,7 +90,7 @@ Provide insights on patterns, risks, and recommendations.`;
       model: model as any,
       prompt,
       temperature: 0.5,
-      maxTokens: 1500,
+      // maxTokens removed - configured on model level in AI SDK v6
     });
 
     return text;
