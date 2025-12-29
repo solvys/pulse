@@ -21,7 +21,7 @@ function useBackendWithClerk(): BackendClient {
     }
 
     const authenticatedClient = baseApiClient.withAuth(async () => {
-      const token = await getToken();
+      const token = await getToken({ template: 'neon' });
       return token;
     });
 

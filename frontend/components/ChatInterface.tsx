@@ -313,7 +313,7 @@ export default function ChatInterface() {
     setIsStreamingState(true);
 
     try {
-      const token = await getToken();
+      const token = await getToken({ template: 'neon' });
       await sendMessage({
         text: messageText
       }, {
@@ -338,7 +338,7 @@ export default function ChatInterface() {
   const handleCheckTape = async () => {
     setShowSuggestions(false);
     try {
-      const token = await getToken();
+      const token = await getToken({ template: 'neon' });
       await sendMessage({
         text: "Check the Tape"
       }, {
@@ -355,7 +355,7 @@ export default function ChatInterface() {
   const handleDailyRecap = async () => {
     setShowSuggestions(false);
     try {
-      const token = await getToken();
+      const token = await getToken({ template: 'neon' });
       await sendMessage({
         text: "Generate daily recap"
       }, {
