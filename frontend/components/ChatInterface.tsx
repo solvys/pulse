@@ -121,7 +121,7 @@ export default function ChatInterface() {
       setIsStreaming(false);
       console.error('Chat error:', error);
     },
-  }) as any;
+  } as any);
 
   const {
     messages: useChatMessages,
@@ -378,7 +378,7 @@ ${kpiSection}
       timestamp: new Date()
     };
 
-    setUseChatMessages(prev => [...prev, newMessage]);
+    setUseChatMessages((prev: any[]) => [...prev, newMessage]);
   };
 
   const formatTime = (date: Date) => {
