@@ -150,13 +150,15 @@ export async function handleChat(c: Context) {
       }
     );
 
-    // Add custom headers to the streaming response
-    // This approach avoids wrapping the streaming body in a new Response
-    streamingResponse.headers.set('X-Conversation-Id', convId.toString());
-    streamingResponse.headers.set('X-References', activeBlindSpots.length > 0 ? activeBlindSpots.map(bs => bs.name).join(',') : '');
-
-    return streamingResponse;
-  } catch (error) {
+return new Response(streamingResponse.body, {
+      status: streamingResponse.status,
+      statusText: streamingResponse.statusText,
+      headers: {
+        ...Object.fromEntries(streamingResponse.headers.entries()),
+        'X-Conversation-Id': convId.toString(),
+        'X-References': activeBlindSpots.length > 0 ? activeBlindSpots.map(bs => bs.name).join(',') : '',
+      },
+    });
     console.error('Chat error:', error);
     return c.json({ 
       error: 'Failed to process chat message',
