@@ -3,20 +3,37 @@
  * Custom hook for chat with authentication
  */
 
-import { useCallback, useState } from 'react';
+import { useCallback, useState, useRef } from 'react';
 import { useChat } from '@ai-sdk/react';
 import { DefaultChatTransport } from 'ai';
-import { useAuth } from '@clerk/clerk-react';
+import { useAuth, useClerk } from '@clerk/clerk-react';
 import { API_BASE_URL } from '../constants.js';
 
 export function useChatWithAuth(conversationId: string | undefined, setConversationId: (id: string) => void) {
   const { getToken, isSignedIn, userId } = useAuth();
+  const clerk = useClerk();
   const [isStreaming, setIsStreaming] = useState(false);
+  
+  // Track retry attempts to prevent infinite loops
+  const retryCountRef = useRef(0);
+  const MAX_RETRIES = 1;
   
   // Log auth state for debugging
   if (!isSignedIn) {
     console.warn('[useChatWithAuth] User is not signed in. Token requests will fail.');
   }
+
+  // Helper function to redirect to sign-in
+  const redirectToSignIn = useCallback(() => {
+    console.warn('[useChatWithAuth] Redirecting to sign-in page due to authentication failure.');
+    // Use Clerk's redirectToSignIn if available, otherwise reload the page
+    if (clerk.redirectToSignIn) {
+      clerk.redirectToSignIn();
+    } else {
+      // Fallback: reload the page which will show the SignedOut component
+      window.location.reload();
+    }
+  }, [clerk]);
 
   const fetchWithAuth = useCallback(async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
     // Try to get a fresh token - Clerk handles caching internally
@@ -78,22 +95,78 @@ export function useChatWithAuth(conversationId: string | undefined, setConversat
       console.error('[useChatWithAuth] 401 Unauthorized - Token may be expired or invalid', {
         errorText,
         tokenLength: token.length,
-        // Try to decode token to check expiration (if it's a JWT)
         tokenPreview: token.substring(0, 50) + '...',
+        retryCount: retryCountRef.current,
       });
       
-      // If token might be expired, try to get a fresh one and retry once
-      try {
-        const freshToken = await getToken({ template: 'neon' });
-        if (freshToken && freshToken !== token) {
-          console.log('[useChatWithAuth] Got fresh token, but not retrying automatically. User may need to refresh page.');
+      // Only attempt retry if we haven't exceeded max retries
+      if (retryCountRef.current < MAX_RETRIES) {
+        retryCountRef.current += 1;
+        
+        try {
+          // Try to get a fresh token with skipCache to force refresh
+          const freshToken = await getToken({ template: 'neon', skipCache: true });
+          
+          if (freshToken && freshToken !== token) {
+            console.log('[useChatWithAuth] Got fresh token. Retrying request with new token.');
+            
+            // Retry the original request with the fresh token
+            const retryHeaders: Record<string, string> = {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${freshToken}`,
+              ...(init?.headers as Record<string, string> || {}),
+            };
+            
+            const retryResponse = await fetch(fullUrl, {
+              ...init,
+              headers: retryHeaders as HeadersInit,
+              body,
+            });
+            
+            // Reset retry count on success
+            if (retryResponse.status !== 401) {
+              retryCountRef.current = 0;
+              
+              const convId = retryResponse.headers.get('X-Conversation-Id');
+              if (convId) {
+                setConversationId(convId);
+              }
+              
+              return retryResponse;
+            } else {
+              // Still 401 after retry - token refresh didn't help
+              console.error('[useChatWithAuth] Retry with fresh token still returned 401. Redirecting to sign-in.');
+              redirectToSignIn();
+              throw new Error(`Authentication failed: ${errorText}`);
+            }
+          } else if (!freshToken) {
+            // Failed to get fresh token - user needs to sign in again
+            console.error('[useChatWithAuth] Failed to get fresh token, redirecting to login.');
+            redirectToSignIn();
+            throw new Error(`Authentication failed: Unable to refresh token. Please sign in again.`);
+          } else {
+            // Got same token - likely expired or invalid
+            console.warn('[useChatWithAuth] Got fresh token, but it\'s the same as the old one. Token may be expired. Redirecting to sign-in.');
+            redirectToSignIn();
+            throw new Error(`Authentication failed: Token expired. Please sign in again.`);
+          }
+        } catch (refreshError) {
+          // If refreshing token fails, user likely needs to log in again
+          console.error('[useChatWithAuth] Failed to get fresh token:', refreshError);
+          redirectToSignIn();
+          throw new Error(`Authentication failed: Unable to refresh token. Please sign in again.`);
         }
-      } catch (e) {
-        console.error('[useChatWithAuth] Failed to get fresh token:', e);
+      } else {
+        // Max retries exceeded - redirect to sign-in
+        console.error('[useChatWithAuth] Max retries exceeded. Redirecting to sign-in.');
+        retryCountRef.current = 0; // Reset for next attempt
+        redirectToSignIn();
+        throw new Error(`Authentication failed: ${errorText}`);
       }
-      
-      throw new Error(`Authentication failed: ${errorText}`);
     }
+    
+    // Reset retry count on successful response
+    retryCountRef.current = 0;
 
     const convId = response.headers.get('X-Conversation-Id');
     if (convId) {
@@ -101,7 +174,7 @@ export function useChatWithAuth(conversationId: string | undefined, setConversat
     }
 
     return response;
-  }, [getToken, conversationId, setConversationId]);
+  }, [getToken, conversationId, setConversationId, redirectToSignIn]);
 
   const {
     messages: useChatMessages,
