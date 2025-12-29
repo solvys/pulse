@@ -104,15 +104,6 @@ export default function ChatInterface() {
 
   const useChatOptions = useMemo(() => ({
     api: `${API_BASE_URL}/api/ai/chat`,
-    headers: async () => {
-      const token = await getToken();
-      return {
-        'Authorization': `Bearer ${token || ''}`
-      };
-    },
-    body: {
-      conversationId
-    },
     onFinish: (message: any) => {
       setIsStreaming(false);
       console.log('Message finished:', message);
@@ -121,17 +112,7 @@ export default function ChatInterface() {
       setIsStreaming(false);
       console.error('Chat error:', error);
     },
-  }), [conversationId, getToken]);
-
-  const chatHelpers = useChat(useChatOptions as any) as any;
-
-  useEffect(() => {
-    console.log('ChatHelpers Debug:', {
-      hasAppend: typeof chatHelpers?.append === 'function',
-      hasMessages: Array.isArray(chatHelpers?.messages),
-      status: chatHelpers?.status
-    });
-  }, [chatHelpers]);
+  }), [conversationId]);
 
   const {
     messages: useChatMessages,
@@ -141,7 +122,7 @@ export default function ChatInterface() {
     input: chatInput,
     handleInputChange,
     handleSubmit
-  } = chatHelpers;
+  } = useChat(useChatOptions) as any;
 
   const isLoading = isStreaming || status === 'streaming' || status === 'submitted';
 
@@ -334,8 +315,24 @@ export default function ChatInterface() {
     setThinkingText(THINKING_TERMS[0]);
     setIsStreaming(true);
 
-    // Send message using append
-    await append({ role: 'user', content: messageText });
+    try {
+      const token = await getToken();
+      await append({
+        role: 'user',
+        content: messageText
+      }, {
+        headers: {
+          'Authorization': `Bearer ${token || ''}`
+        },
+        body: {
+          conversationId
+        }
+      });
+    } catch (error) {
+      console.error('Failed to send message:', error);
+      setIsStreaming(false);
+      alert('Failed to send message. Please try again.');
+    }
 
     if (!customMessage) {
       setInput("");
@@ -344,12 +341,38 @@ export default function ChatInterface() {
 
   const handleCheckTape = async () => {
     setShowSuggestions(false);
-    await append({ role: 'user', content: "Check the Tape" });
+    try {
+      const token = await getToken();
+      await append({
+        role: 'user',
+        content: "Check the Tape"
+      }, {
+        headers: {
+          'Authorization': `Bearer ${token || ''}`
+        },
+        body: { conversationId }
+      });
+    } catch (error) {
+      console.error('Failed to send check tape command:', error);
+    }
   };
 
   const handleDailyRecap = async () => {
     setShowSuggestions(false);
-    await append({ role: 'user', content: "Generate daily recap" });
+    try {
+      const token = await getToken();
+      await append({
+        role: 'user',
+        content: "Generate daily recap"
+      }, {
+        headers: {
+          'Authorization': `Bearer ${token || ''}`
+        },
+        body: { conversationId }
+      });
+    } catch (error) {
+      console.error('Failed to send daily recap command:', error);
+    }
   };
 
   const handleQuickPulseComplete = async (result: any) => {
