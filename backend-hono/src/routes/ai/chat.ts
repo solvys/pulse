@@ -3,18 +3,12 @@ import { Hono } from 'hono';
 import { aiService } from '../../services/ai-service-v2.js';
 import { sql } from '../../db/index.js';
 
-type Variables = {
-    user: {
-        id: string;
-    };
-};
-
-export const chatRoute = new Hono<{ Variables: Variables }>();
+export const chatRoute = new Hono();
 
 chatRoute.post('/', async (c) => {
     try {
         const { messages, conversationId } = await c.req.json();
-        const userId = c.get('user')?.id || 'anonymous'; // Ensure authMiddleware populates this
+        const userId = c.get('userId') || 'anonymous'; // Corrected context variable
 
         // 1. Fetch User Context (Last Journal Entry + ER State)
         const [journalRows, erRows] = await Promise.all([

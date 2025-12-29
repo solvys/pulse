@@ -2,18 +2,12 @@
 import { Hono } from 'hono';
 import { sql } from '../../db/index.js';
 
-type Variables = {
-    user: {
-        id: string;
-    };
-};
-
-export const conversationsRoute = new Hono<{ Variables: Variables }>();
+export const conversationsRoute = new Hono();
 
 // List conversations
 conversationsRoute.get('/', async (c) => {
     try {
-        const userId = c.get('user')?.id;
+        const userId = c.get('userId');
         if (!userId) return c.json({ error: 'Unauthorized' }, 401);
 
         const rows = await sql`
@@ -41,7 +35,7 @@ conversationsRoute.get('/', async (c) => {
 // Get single conversation
 conversationsRoute.get('/:id', async (c) => {
     try {
-        const userId = c.get('user')?.id;
+        const userId = c.get('userId');
         const conversationId = c.req.param('id');
         if (!userId) return c.json({ error: 'Unauthorized' }, 401);
 
