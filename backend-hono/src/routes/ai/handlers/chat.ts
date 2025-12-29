@@ -121,7 +121,7 @@ export async function handleChat(c: Context) {
 
     const context = [...blindSpotContext, ...newsContext];
 
-    const formattedUIMessages: UIMessage[] = uiMessages.map((msg: UIMessage) => ({
+    const formattedUIMessages: UIMessage[] = uiMessages.map((msg) => ({
       id: msg.id || `msg-${Date.now()}-${Math.random()}`,
       role: msg.role,
       content: msg.content || (msg.parts?.find((p: any) => p.type === 'text')?.text || ''),
