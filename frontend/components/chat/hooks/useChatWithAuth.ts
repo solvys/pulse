@@ -14,13 +14,27 @@ export function useChatWithAuth(conversationId: string | undefined, setConversat
   const [isStreaming, setIsStreaming] = useState(false);
 
   const fetchWithAuth = useCallback(async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
-    const token = await getToken({ template: 'neon' });
+    // Try to get a fresh token - Clerk handles caching internally
+    let token = await getToken({ template: 'neon' });
+    
+    // If token is null, try getting it without template as fallback
+    if (!token) {
+      console.warn('[useChatWithAuth] No token with neon template, trying default token...');
+      token = await getToken();
+    }
     
     // Ensure token is available before making the request
     if (!token) {
       console.error('[useChatWithAuth] No authentication token available. User may need to sign in.');
       throw new Error('Authentication required. Please sign in to continue.');
     }
+    
+    // Log token info for debugging (first 20 chars only for security)
+    console.log('[useChatWithAuth] Token obtained:', {
+      hasToken: !!token,
+      tokenLength: token.length,
+      tokenPreview: token.substring(0, 20) + '...',
+    });
 
     const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
 
