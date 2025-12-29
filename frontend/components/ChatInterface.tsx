@@ -116,12 +116,9 @@ export default function ChatInterface() {
 
   const {
     messages: useChatMessages,
-    append,
+    sendMessage,
     status,
     setMessages: setUseChatMessages,
-    input: chatInput,
-    handleInputChange,
-    handleSubmit
   } = useChat(useChatOptions) as any;
 
   const isLoading = isStreaming || status === 'streaming' || status === 'submitted';
@@ -317,9 +314,8 @@ export default function ChatInterface() {
 
     try {
       const token = await getToken();
-      await append({
-        role: 'user',
-        content: messageText
+      await sendMessage({
+        text: messageText
       }, {
         headers: {
           'Authorization': `Bearer ${token || ''}`
@@ -343,9 +339,8 @@ export default function ChatInterface() {
     setShowSuggestions(false);
     try {
       const token = await getToken();
-      await append({
-        role: 'user',
-        content: "Check the Tape"
+      await sendMessage({
+        text: "Check the Tape"
       }, {
         headers: {
           'Authorization': `Bearer ${token || ''}`
@@ -361,9 +356,8 @@ export default function ChatInterface() {
     setShowSuggestions(false);
     try {
       const token = await getToken();
-      await append({
-        role: 'user',
-        content: "Generate daily recap"
+      await sendMessage({
+        text: "Generate daily recap"
       }, {
         headers: {
           'Authorization': `Bearer ${token || ''}`
