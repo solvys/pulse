@@ -26,4 +26,8 @@ export default defineConfig({
     cors: true,
     port: 5173,
   },
+  define: {
+    // Inject build timestamp so each build has a unique version
+    'import.meta.env.BUILD_TIME': JSON.stringify(new Date().toISOString()),
+  },
 })

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { ClerkProvider, SignIn, SignedIn, SignedOut } from '@clerk/clerk-react';
 import { AuthProvider } from './contexts/AuthContext';
 import { SettingsProvider } from './contexts/SettingsContext';
@@ -6,6 +6,7 @@ import { ThreadProvider } from './contexts/ThreadContext';
 import { MainLayout } from './components/layout/MainLayout';
 import { SettingsPanel } from './components/SettingsPanel';
 import { NotificationContainer } from './components/NotificationToast';
+import { useVersionCheck } from './hooks/useVersionCheck';
 // ERProvider removed - using component-based ER monitoring for stability
 
 // Development mode: bypass Clerk authentication ONLY when explicitly enabled
@@ -120,7 +121,15 @@ export default function App() {
 
   return (
     <ClerkProvider publishableKey={clerkKey}>
-      <AppInner />
+      <VersionCheckWrapper>
+        <AppInner />
+      </VersionCheckWrapper>
     </ClerkProvider>
   );
+}
+
+// Wrapper component to use version check hook inside ClerkProvider context
+function VersionCheckWrapper({ children }: { children: React.ReactNode }) {
+  useVersionCheck();
+  return <>{children}</>;
 }

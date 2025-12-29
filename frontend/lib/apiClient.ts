@@ -6,6 +6,7 @@
  */
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080';
+import { signOutUser } from './authHelper';
 
 // Global auth failure state - stops all polling when auth fails
 let authFailed = false;
@@ -100,7 +101,12 @@ class ApiClient {
           // Set global auth failure flag to stop future requests
           authFailed = true;
           authFailedTimestamp = Date.now();
-          console.warn('[API] Auth failed - pausing API requests for 30 seconds');
+          console.warn('[API] Auth failed - signing out to allow re-authentication');
+          
+          // Sign out user to force re-authentication
+          signOutUser().catch((err) => {
+            console.error('[API] Error signing out on 401:', err);
+          });
         } else if (response.status === 404) {
           error.code = 'not_found';
         }
