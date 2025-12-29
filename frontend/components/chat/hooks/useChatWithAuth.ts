@@ -15,18 +15,22 @@ export function useChatWithAuth(conversationId: string | undefined, setConversat
 
   const fetchWithAuth = useCallback(async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
     const token = await getToken();
+    
+    // Ensure token is available before making the request
+    if (!token) {
+      console.error('[useChatWithAuth] No authentication token available. User may need to sign in.');
+      throw new Error('Authentication required. Please sign in to continue.');
+    }
+
     const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
 
     const fullUrl = url.startsWith('http') ? url : `${API_BASE_URL}${url}`;
 
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`, // Always set Authorization header since we've verified token exists
       ...(init?.headers as Record<string, string> || {}),
     };
-
-    if (token) {
-      headers['Authorization'] = `Bearer ${token}`;
-    }
 
     let body = init?.body;
     if (body && conversationId) {
@@ -46,6 +50,13 @@ export function useChatWithAuth(conversationId: string | undefined, setConversat
       headers: headers as HeadersInit,
       body,
     });
+
+    // Handle 401 Unauthorized responses
+    if (response.status === 401) {
+      console.error('[useChatWithAuth] 401 Unauthorized - Token may be expired or invalid');
+      const errorText = await response.text().catch(() => 'Unauthorized');
+      throw new Error(`Authentication failed: ${errorText}`);
+    }
 
     const convId = response.headers.get('X-Conversation-Id');
     if (convId) {
