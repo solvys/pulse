@@ -1,5 +1,5 @@
 
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { ArrowRight, Paperclip, Image, FileText, Link2, AlertTriangle, TrendingUp, History, X, Pin, Archive, Edit2, MoreVertical } from "lucide-react";
 import { useChat } from "@ai-sdk/react";
 import { useAuth } from "@clerk/clerk-react";
@@ -102,7 +102,7 @@ export default function ChatInterface() {
   const [isStreaming, setIsStreaming] = useState(false);
   const [showQuickPulseModal, setShowQuickPulseModal] = useState(false);
 
-  const chatHelpers = useChat({
+  const useChatOptions = useMemo(() => ({
     api: `${API_BASE_URL}/api/ai/chat`,
     headers: async () => {
       const token = await getToken();
@@ -121,7 +121,17 @@ export default function ChatInterface() {
       setIsStreaming(false);
       console.error('Chat error:', error);
     },
-  } as any) as any;
+  }), [conversationId, getToken]);
+
+  const chatHelpers = useChat(useChatOptions as any) as any;
+
+  useEffect(() => {
+    console.log('ChatHelpers Debug:', {
+      hasAppend: typeof chatHelpers?.append === 'function',
+      hasMessages: Array.isArray(chatHelpers?.messages),
+      status: chatHelpers?.status
+    });
+  }, [chatHelpers]);
 
   const {
     messages: useChatMessages,
@@ -136,8 +146,7 @@ export default function ChatInterface() {
   const isLoading = isStreaming || status === 'streaming' || status === 'submitted';
 
   // Convert useChat messages to our Message format for display
-  // Convert useChat messages to our Message format for display
-  const messages: Message[] = useChatMessages
+  const messages: Message[] = (useChatMessages || [])
     .filter((msg: any) => msg.role !== 'system')
     .map((msg: any) => {
       // Handle potential parts array if present (multi-modal) or fallback to content string
