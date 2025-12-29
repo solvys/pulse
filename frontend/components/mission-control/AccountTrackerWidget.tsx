@@ -1,6 +1,7 @@
 import { useSettings } from '../../contexts/SettingsContext';
 import { useState, useEffect } from 'react';
 import { useBackend } from '../../lib/backend';
+import { useAuth } from '../../contexts/AuthContext';
 import { TestTradeButton } from './TestTradeButton';
 import type { ProjectXAccount } from '../../../types/api';
 type BrokerAccount = ProjectXAccount & { provider?: string; isPaper?: boolean };
@@ -12,6 +13,7 @@ interface AccountTrackerWidgetProps {
 
 export function AccountTrackerWidget({ currentPnL: propPnL }: AccountTrackerWidgetProps) {
   const backend = useBackend();
+  const { isAuthenticated } = useAuth();
   const { riskSettings, developerSettings } = useSettings();
   const { dailyProfitTarget, dailyLossLimit } = riskSettings;
   const [balance, setBalance] = useState<number>(0);
@@ -27,6 +29,7 @@ export function AccountTrackerWidget({ currentPnL: propPnL }: AccountTrackerWidg
   const [uplinkMessage, setUplinkMessage] = useState<string>('');
 
   useEffect(() => {
+    if (!isAuthenticated) return;
     const fetchProjectXAccounts = async () => {
       try {
         const result = await backend.projectx.listAccounts();
@@ -41,10 +44,14 @@ export function AccountTrackerWidget({ currentPnL: propPnL }: AccountTrackerWidg
       }
     };
     fetchProjectXAccounts();
-  }, []);
+  }, [backend, isAuthenticated]);
 
   useEffect(() => {
-    const fetchAccount = async () => {
+    if (!isAuthenticated) return;
+
+    let interval: NodeJS.Timeout;
+
+    const fetchAccount = async (): Promise<boolean> => {
       try {
         const account = await backend.account.get();
         setBalance(account.balance);
@@ -52,14 +59,32 @@ export function AccountTrackerWidget({ currentPnL: propPnL }: AccountTrackerWidg
         setLossLimit(account.dailyLossLimit || dailyLossLimit);
         // Always use dailyPnl from backend, not prop (prop is for backward compatibility)
         setCurrentPnL(account.dailyPnl);
-      } catch (err) {
+        return true;
+      } catch (err: any) {
         console.error('Failed to fetch account:', err);
+        if (err?.status === 401 || err?.code === 'auth_skipped') {
+          return false;
+        }
+        return true;
       }
     };
-    fetchAccount();
-    const interval = setInterval(fetchAccount, 5000);
-    return () => clearInterval(interval);
-  }, [backend, dailyProfitTarget, dailyLossLimit]);
+
+    const runPolling = async () => {
+      const shouldContinue = await fetchAccount();
+      if (shouldContinue) {
+        interval = setInterval(async () => {
+          const ok = await fetchAccount();
+          if (!ok && interval) clearInterval(interval);
+        }, 5000);
+      }
+    };
+
+    runPolling();
+
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [backend, isAuthenticated, dailyProfitTarget, dailyLossLimit]);
 
   const handleUplink = async () => {
     setUplinking(true);
@@ -69,13 +94,13 @@ export function AccountTrackerWidget({ currentPnL: propPnL }: AccountTrackerWidg
       if (result.success) {
         setUplinked(true);
         setUplinkMessage(result.message);
-        
+
         const accountsResult = await backend.projectx.listAccounts();
         setProjectxAccounts(accountsResult.accounts as BrokerAccount[]);
         if (accountsResult.accounts.length > 0 && !selectedAccount) {
           setSelectedAccount(accountsResult.accounts[0].accountId);
         }
-        
+
         const account = await backend.account.get();
         setBalance(account.balance);
         setCurrentPnL(account.dailyPnl);
@@ -122,7 +147,7 @@ export function AccountTrackerWidget({ currentPnL: propPnL }: AccountTrackerWidg
           )}
         </div>
       </div>
-      
+
       {/* Account chooser dropdown in its own row */}
       <div className="mb-1.5">
         <div className="relative">
@@ -143,9 +168,8 @@ export function AccountTrackerWidget({ currentPnL: propPnL }: AccountTrackerWidg
                         setSelectedAccount(account.accountId);
                         setShowAccountDropdown(false);
                       }}
-                      className={`w-full text-left px-3 py-2 text-xs hover:bg-[#FFC038]/10 transition-colors ${
-                        selectedAccount === account.accountId ? 'text-[#FFC038]' : 'text-gray-400'
-                      }`}
+                      className={`w-full text-left px-3 py-2 text-xs hover:bg-[#FFC038]/10 transition-colors ${selectedAccount === account.accountId ? 'text-[#FFC038]' : 'text-gray-400'
+                        }`}
                     >
                       <div className="font-medium">{account.accountName}</div>
                       <div className="text-[10px] text-gray-500 mt-0.5">
@@ -163,29 +187,27 @@ export function AccountTrackerWidget({ currentPnL: propPnL }: AccountTrackerWidg
           )}
         </div>
       </div>
-      
+
       <div className="mb-2">
         <button
           onClick={handleUplink}
           disabled={uplinking || uplinked}
-          className={`w-full px-2 py-1.5 rounded font-medium text-[11px] transition-all flex items-center justify-center gap-1.5 ${
-            uplinked
-              ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
-              : 'bg-[#FFC038] hover:bg-[#FFC038]/90 text-black border border-[#FFC038]'
-          } disabled:opacity-50 disabled:cursor-not-allowed`}
+          className={`w-full px-2 py-1.5 rounded font-medium text-[11px] transition-all flex items-center justify-center gap-1.5 ${uplinked
+            ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+            : 'bg-[#FFC038] hover:bg-[#FFC038]/90 text-black border border-[#FFC038]'
+            } disabled:opacity-50 disabled:cursor-not-allowed`}
         >
           <Radio className={`w-3 h-3 ${uplinked ? 'animate-pulse' : ''}`} />
           {uplinking ? 'Establishing Uplink...' : uplinked ? 'Uplink Active' : 'Uplink'}
         </button>
         {uplinkMessage && (
-          <p className={`text-[10px] mt-1 text-center ${
-            uplinked ? 'text-emerald-400' : 'text-red-400'
-          }`}>
+          <p className={`text-[10px] mt-1 text-center ${uplinked ? 'text-emerald-400' : 'text-red-400'
+            }`}>
             {uplinkMessage}
           </p>
         )}
       </div>
-      
+
       <div className="mb-2 flex justify-between items-baseline">
         <div>
           <p className="text-[10px] text-gray-500">Balance</p>
@@ -198,17 +220,17 @@ export function AccountTrackerWidget({ currentPnL: propPnL }: AccountTrackerWidg
           </span>
         </div>
       </div>
-      
+
       <div className="relative">
         <div className="flex justify-between text-[10px] text-gray-500 mb-1">
           <span className="text-red-500">-${lossLimit}</span>
           <span className="text-gray-400">$0</span>
           <span className="text-emerald-400">+${dailyTarget}</span>
         </div>
-        
+
         <div className="relative h-3 bg-zinc-900 rounded-full overflow-hidden">
           <div className="absolute left-1/2 top-0 bottom-0 w-0.5 bg-gray-600 z-0" />
-          
+
           <div
             className="absolute top-0 bottom-0 w-0.5 rounded-full z-10 transition-all duration-500"
             style={{ left: `${leftPercentage}%` }}
@@ -216,12 +238,12 @@ export function AccountTrackerWidget({ currentPnL: propPnL }: AccountTrackerWidg
             <div className={`w-full h-full ${getPendulumColor()} rounded-full shadow-lg`} />
             <div className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-1.5 h-1.5 ${getPendulumColor()} rounded-full border border-[#0a0a00]`} />
           </div>
-          
+
           <div className="absolute left-0 top-0 bottom-0 w-1/2 bg-gradient-to-r from-red-500/10 to-transparent" />
           <div className="absolute right-0 top-0 bottom-0 w-1/2 bg-gradient-to-l from-emerald-400/10 to-transparent" />
         </div>
       </div>
-      
+
       <div className="mt-2 pt-2 border-t border-zinc-800 flex justify-between items-center">
         <div>
           <p className="text-[10px] text-gray-500">Loss Limit</p>

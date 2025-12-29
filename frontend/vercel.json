@@ -6,6 +6,14 @@
   "framework": "vite",
   "rewrites": [
     {
+      "source": "/api/chat",
+      "destination": "https://pulse-api-withered-dust-1394.fly.dev/api/ai/chat"
+    },
+    {
+      "source": "/api/:path*",
+      "destination": "https://pulse-api-withered-dust-1394.fly.dev/api/:path*"
+    },
+    {
       "source": "/(.*)",
       "destination": "/index.html"
     }

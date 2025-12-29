@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useBackend } from '../../lib/backend';
+import { useAuth } from '../../contexts/AuthContext';
 import type { ProjectXAccount } from '../../../types/api';
 type BrokerAccount = ProjectXAccount & { provider?: string; isPaper?: boolean };
 
@@ -13,11 +14,20 @@ interface CompactPnLDisplayProps {
  */
 export function CompactPnLDisplay({ showAccount = true }: CompactPnLDisplayProps) {
   const backend = useBackend();
+  const { isAuthenticated } = useAuth();
   const [currentPnL, setCurrentPnL] = useState<number>(0);
   const [selectedAccount, setSelectedAccount] = useState<BrokerAccount | null>(null);
 
   useEffect(() => {
-    const fetchData = async () => {
+    if (!isAuthenticated) {
+      setCurrentPnL(0);
+      setSelectedAccount(null);
+      return;
+    }
+
+    let interval: NodeJS.Timeout;
+
+    const fetchData = async (): Promise<boolean> => {
       try {
         // Fetch account P&L
         const account = await backend.account.get();
@@ -31,15 +41,32 @@ export function CompactPnLDisplay({ showAccount = true }: CompactPnLDisplayProps
             setSelectedAccount(result.accounts[0]);
           }
         }
-      } catch (err) {
+        return true;
+      } catch (err: any) {
         console.error('Failed to fetch account data:', err);
+        if (err?.status === 401 || err?.code === 'auth_skipped') {
+          return false;
+        }
+        return true;
       }
     };
 
-    fetchData();
-    const interval = setInterval(fetchData, 5000);
-    return () => clearInterval(interval);
-  }, [backend, showAccount]);
+    const runPolling = async () => {
+      const ok = await fetchData();
+      if (ok) {
+        interval = setInterval(async () => {
+          const ok = await fetchData();
+          if (!ok && interval) clearInterval(interval);
+        }, 5000);
+      }
+    };
+
+    runPolling();
+
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [backend, isAuthenticated, showAccount]);
 
   const pnlColor = currentPnL >= 0 ? 'text-emerald-400' : 'text-red-500';
   const pnlSign = currentPnL >= 0 ? '+' : '';

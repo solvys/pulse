@@ -11,6 +11,7 @@ import { notificationsRoutes } from './notifications.js';
 import { eventsRoutes } from './events.js';
 import { polymarketRoutes } from './polymarket.js';
 import { aiRoutes } from './ai/index.js';
+import { chatRoute } from './ai/chat.js';
 import { adminRoutes } from './admin.js';
 
 export function registerRoutes(app: Hono, includePublicRoutes = true) {
@@ -28,5 +29,6 @@ export function registerRoutes(app: Hono, includePublicRoutes = true) {
   app.route('/api/events', eventsRoutes);
   app.route('/api/polymarket', polymarketRoutes);
   app.route('/api/ai', aiRoutes);
+  app.route('/api/chat', chatRoute); // Shim for default AI SDK calls
   app.route('/api/admin', adminRoutes);
 }

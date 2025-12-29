@@ -1,7 +1,7 @@
 import { createContext, useContext, useState, ReactNode, useEffect } from 'react';
 import type { HealingBowlSound } from '../utils/healingBowlSounds';
 
-interface APIKeys {
+export interface APIKeys {
   openai?: string;
   tradingAPI?: string;
   newsAPI?: string;
@@ -45,7 +45,7 @@ interface DeveloperSettings {
 
 interface SettingsContextType {
   apiKeys: APIKeys;
-  setAPIKeys: (keys: APIKeys) => void;
+  setAPIKeys: (keys: APIKeys | ((prev: APIKeys) => APIKeys)) => void;
   tradingModels: TradingModelToggles;
   setTradingModels: (models: TradingModelToggles) => void;
   alertConfig: AlertConfig;
@@ -71,7 +71,7 @@ function loadFromStorage<T>(key: string, defaultValue: T): T {
       const parsed = JSON.parse(stored);
       return parsed[key] !== undefined ? parsed[key] : defaultValue;
     }
-  } catch {}
+  } catch { }
   return defaultValue;
 }
 
@@ -79,7 +79,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
   const [apiKeys, setAPIKeys] = useState<APIKeys>(() =>
     loadFromStorage('apiKeys', {})
   );
-  const [tradingModels, setTradingModels] = useState<TradingModelToggles>(() => 
+  const [tradingModels, setTradingModels] = useState<TradingModelToggles>(() =>
     loadFromStorage('tradingModels', {
       momentumModel: true,
       meanReversionModel: false,
@@ -99,16 +99,16 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
       healingBowlSound: 'calm-1' as HealingBowlSound,
     })
   );
-  const [mockDataEnabled, setMockDataEnabled] = useState(() => 
+  const [mockDataEnabled, setMockDataEnabled] = useState(() =>
     loadFromStorage('mockDataEnabled', true)
   );
-  const [selectedSymbol, setSelectedSymbol] = useState<TradingSymbol>(() => 
+  const [selectedSymbol, setSelectedSymbol] = useState<TradingSymbol>(() =>
     loadFromStorage('selectedSymbol', {
       symbol: '/MNQ',
       contractName: '/MNQZ25',
     })
   );
-  const [riskSettings, setRiskSettings] = useState<RiskSettings>(() => 
+  const [riskSettings, setRiskSettings] = useState<RiskSettings>(() =>
     loadFromStorage('riskSettings', {
       dailyProfitTarget: 1500,
       dailyLossLimit: 750,
@@ -116,7 +116,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
       overTradingDuration: 15,
     })
   );
-  const [developerSettings, setDeveloperSettings] = useState<DeveloperSettings>(() => 
+  const [developerSettings, setDeveloperSettings] = useState<DeveloperSettings>(() =>
     loadFromStorage('developerSettings', {
       showTestTradeButton: false,
     })

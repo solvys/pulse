@@ -50,7 +50,8 @@ const protectedRoutes = [
   '/api/econ',
   '/api/notifications',
   '/api/events',
-  '/api/ai'
+  '/api/ai',
+  '/api/chat'
 ];
 
 protectedRoutes.forEach(route => {

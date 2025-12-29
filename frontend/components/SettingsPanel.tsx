@@ -1,5 +1,5 @@
 import { X, Settings, Bell, Shield, CreditCard, Cpu, Code, Radio, Volume2, Terminal } from 'lucide-react';
-import { useSettings } from '../contexts/SettingsContext';
+import { useSettings, type APIKeys } from '../contexts/SettingsContext';
 import { useAuth } from '../contexts/AuthContext';
 import Toggle from './Toggle';
 import { Button } from './ui/Button';
@@ -15,7 +15,7 @@ interface SettingsPanelProps {
 type SettingsTab = 'general' | 'notifications' | 'trading' | 'api' | 'developer';
 
 export function SettingsPanel({ onClose }: SettingsPanelProps) {
-  const { tier, setTier } = useAuth();
+  const { tier, setTier, isAuthenticated } = useAuth();
   const {
     apiKeys,
     setAPIKeys,
@@ -51,30 +51,30 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
   };
 
   const availableSymbols = [
-    { 
-      symbol: 'MNQ', 
-      contractName: 'MNQ Z25', 
-      description: 'E-mini Micro Nasdaq Futures' 
+    {
+      symbol: 'MNQ',
+      contractName: 'MNQ Z25',
+      description: 'E-mini Micro Nasdaq Futures'
     },
-    { 
-      symbol: 'ES', 
-      contractName: 'ES Z25', 
-      description: 'E-mini S&P 500 Futures' 
+    {
+      symbol: 'ES',
+      contractName: 'ES Z25',
+      description: 'E-mini S&P 500 Futures'
     },
-    { 
-      symbol: 'NQ', 
-      contractName: 'NQ Z25', 
-      description: 'E-mini Nasdaq-100 Futures' 
+    {
+      symbol: 'NQ',
+      contractName: 'NQ Z25',
+      description: 'E-mini Nasdaq-100 Futures'
     },
-    { 
-      symbol: 'YM', 
-      contractName: 'YM Z25', 
-      description: 'E-mini Dow Jones Futures' 
+    {
+      symbol: 'YM',
+      contractName: 'YM Z25',
+      description: 'E-mini Dow Jones Futures'
     },
-    { 
-      symbol: 'RTY', 
-      contractName: 'RTY Z25', 
-      description: 'E-mini Russell 2000 Futures' 
+    {
+      symbol: 'RTY',
+      contractName: 'RTY Z25',
+      description: 'E-mini Russell 2000 Futures'
     },
   ];
 
@@ -120,38 +120,33 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
     }
   };
 
-  // Load existing account settings from backend when component mounts
+  // Load account settings and credentials when component mounts
   useEffect(() => {
-    async function loadAccountSettings() {
+    if (!isAuthenticated) return;
+
+    async function fetchData() {
       try {
         const account = await backend.account.get();
+
+        // Load contracts settings
         if (account.contractsPerTrade) {
           setContractsPerTrade(account.contractsPerTrade);
         }
-      } catch (error) {
-        console.error('Failed to load account settings:', error);
-      }
-    }
-    loadAccountSettings();
-  }, [backend]);
 
-  // Load existing ProjectX credentials from backend when component mounts
-  useEffect(() => {
-    async function loadCredentials() {
-      try {
-        const account = await backend.account.get();
+        // Load credentials if present
         if (account.projectxUsername) {
-          setAPIKeys({
-            ...apiKeys,
-            topstepxUsername: account.projectxUsername,
-          });
+          setAPIKeys((prev: APIKeys) => ({
+            ...prev,
+            topstepxUsername: account.projectxUsername || '',
+          }));
         }
       } catch (error) {
-        console.error('Failed to load ProjectX credentials:', error);
+        console.error('Failed to load settings data:', error);
       }
     }
-    loadCredentials();
-  }, []);
+
+    fetchData();
+  }, [backend, isAuthenticated, setAPIKeys]);
 
   const tabs = [
     { id: 'general' as const, label: 'General', icon: Settings },
@@ -173,8 +168,8 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
                   key={tab.id}
                   onClick={() => handleTabChange(tab.id)}
                   className={`w-full flex items-center gap-3 px-3 py-2 rounded transition-lush ${activeTab === tab.id
-                      ? 'bg-[#FFC038]/20 text-[#FFC038]'
-                      : 'text-gray-400 hover:bg-[#FFC038]/10 hover:text-gray-300'
+                    ? 'bg-[#FFC038]/20 text-[#FFC038]'
+                    : 'text-gray-400 hover:bg-[#FFC038]/10 hover:text-gray-300'
                     }`}
                 >
                   <Icon className="w-4 h-4" />
@@ -240,8 +235,8 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
                       <div
                         key={sound.id}
                         className={`flex items-center justify-between p-3 rounded-lg border transition-all cursor-pointer ${alertConfig.healingBowlSound === sound.id
-                            ? 'bg-[#FFC038]/20 border-[#FFC038]/40'
-                            : 'bg-[#0a0a00] border-zinc-800 hover:border-zinc-700'
+                          ? 'bg-[#FFC038]/20 border-[#FFC038]/40'
+                          : 'bg-[#0a0a00] border-zinc-800 hover:border-zinc-700'
                           }`}
                         onClick={() => setAlertConfig({ ...alertConfig, healingBowlSound: sound.id })}
                       >
@@ -250,8 +245,8 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
                             <span className="text-sm font-medium text-white">{sound.name}</span>
                             <span
                               className={`text-[9px] uppercase tracking-wider px-2 py-0.5 rounded-full ${sound.type === 'calm'
-                                  ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
-                                  : 'bg-orange-500/20 text-orange-400 border border-orange-500/30'
+                                ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
+                                : 'bg-orange-500/20 text-orange-400 border border-orange-500/30'
                                 }`}
                             >
                               {sound.type}
@@ -367,7 +362,7 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
 
                 <section className="pt-6 border-t border-zinc-800">
                   <h2 className="text-lg font-semibold text-[#FFC038] mb-4">Autopilot</h2>
-                  
+
                   <div className="space-y-6">
                     <div>
                       <h4 className="text-sm font-semibold text-[#FFC038] mb-3">Price Action Strategies</h4>
@@ -462,8 +457,8 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
                           </button>
                           {showSymbolDropdown && (
                             <>
-                              <div 
-                                className="fixed inset-0 z-10" 
+                              <div
+                                className="fixed inset-0 z-10"
                                 onClick={() => setShowSymbolDropdown(false)}
                               />
                               <div className="absolute left-0 right-0 top-full mt-1 bg-[#0a0a00] border border-[#FFC038]/30 rounded-lg shadow-xl z-20 max-h-64 overflow-y-auto">
@@ -479,9 +474,8 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
                                         });
                                         setShowSymbolDropdown(false);
                                       }}
-                                      className={`w-full text-left px-4 py-3 hover:bg-[#FFC038]/10 transition-colors border-b border-zinc-800 last:border-b-0 ${
-                                        isSelected ? 'bg-[#FFC038]/20' : ''
-                                      }`}
+                                      className={`w-full text-left px-4 py-3 hover:bg-[#FFC038]/10 transition-colors border-b border-zinc-800 last:border-b-0 ${isSelected ? 'bg-[#FFC038]/20' : ''
+                                        }`}
                                     >
                                       <div className="text-sm font-bold text-white">{sym.symbol}</div>
                                       <div className="text-xs text-gray-400">{sym.contractName}</div>
@@ -662,8 +656,8 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
           <div className="sticky bottom-0 bg-[#0a0a00] border-t border-[#FFC038]/20 p-4">
             {saveMessage && (
               <div className={`mb-3 px-4 py-2 rounded text-sm ${saveMessage.includes('success')
-                  ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
-                  : 'bg-red-500/20 text-red-400 border border-red-500/30'
+                ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                : 'bg-red-500/20 text-red-400 border border-red-500/30'
                 }`}>
                 {saveMessage}
               </div>

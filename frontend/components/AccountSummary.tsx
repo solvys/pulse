@@ -1,23 +1,49 @@
 import { useEffect, useState } from "react";
 import { useBackend } from "../lib/backend";
+import { useAuth } from "../contexts/AuthContext";
 import type { Account } from "../types/api";
 
 export default function AccountSummary() {
   const backend = useBackend();
+  const { isAuthenticated } = useAuth();
   const [account, setAccount] = useState<Account | null>(null);
 
   useEffect(() => {
-    loadAccount();
-    const interval = setInterval(loadAccount, 5000);
-    return () => clearInterval(interval);
-  }, []);
+    if (!isAuthenticated) {
+      setAccount(null);
+      return;
+    }
 
-  const loadAccount = async () => {
+    let interval: NodeJS.Timeout;
+
+    const runLoadAccount = async () => {
+      const shouldContinue = await loadAccount();
+      if (shouldContinue) {
+        interval = setInterval(loadAccount, 5000);
+      }
+    };
+
+    runLoadAccount();
+
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [backend, isAuthenticated]);
+
+  const loadAccount = async (): Promise<boolean> => {
+    if (!isAuthenticated) return false;
     try {
       const data = await backend.account.get();
       setAccount(data);
-    } catch (error) {
+      return true;
+    } catch (error: any) {
       console.error('Failed to load account:', error);
+      // If unauthorized, stop polling
+      if (error?.status === 401 || error?.code === 'auth_skipped') {
+        console.warn('Account polling stopped due to auth failure');
+        return false;
+      }
+      return true; // Continue polling for other errors
     }
   };
 
@@ -36,30 +62,30 @@ export default function AccountSummary() {
 
   const pnlPercentage = ((account.dailyPnl ?? 0) / account.balance) * 100;
   const isPositive = (account.dailyPnl ?? 0) >= 0;
-  
+
   const barWidth = Math.min(Math.abs(pnlPercentage) * 2, 100);
-  
+
   return (
     <div className="bg-[#140a00] rounded-lg p-4 space-y-3">
       <h3 className="text-xs font-medium text-zinc-400 uppercase tracking-wider">Account Summary</h3>
-      
+
       <div className="space-y-2">
         <div className="flex justify-between items-baseline">
           <span className="text-[10px] text-zinc-500">Balance</span>
           <span className="text-sm font-mono text-white">${account.balance.toLocaleString()}</span>
         </div>
-        
+
         <div className="flex justify-between items-baseline">
           <span className="text-[10px] text-zinc-500">Equity</span>
           <span className="text-sm font-mono text-white">${(account.equity ?? account.balance).toLocaleString()}</span>
         </div>
-        
+
         <div className="flex justify-between items-baseline">
           <span className="text-[10px] text-zinc-500">Margin Used</span>
           <span className="text-sm font-mono text-zinc-400">${(account.marginUsed ?? 0).toLocaleString()}</span>
         </div>
       </div>
-      
+
       <div className="pt-3 border-t border-zinc-900">
         <div className="flex justify-between items-baseline mb-2">
           <span className="text-[10px] text-zinc-500">Daily P&L</span>
@@ -72,7 +98,7 @@ export default function AccountSummary() {
             </div>
           </div>
         </div>
-        
+
         <div className="h-1 bg-zinc-900 rounded-full overflow-hidden">
           <div
             className={`h-full transition-all ${isPositive ? "bg-[#00FF85]" : "bg-[#FF4040]"}`}
