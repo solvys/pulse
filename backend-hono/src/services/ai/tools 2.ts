@@ -7,7 +7,7 @@ export const getTools = () => ({
         inputSchema: z.object({
             symbol: z.string().describe('The symbol to show chart for (e.g. NQ1!, ES1!)'),
         }),
-        execute: async ({ symbol }: { symbol: string }) => {
+        execute: async ({ symbol }) => {
             return { widget: 'chart', data: { symbol } };
         },
     }),

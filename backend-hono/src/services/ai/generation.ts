@@ -20,7 +20,7 @@ export async function generateAIResponse(
       model: model as any,
       prompt: `${systemPrompt}\n\nUser: ${prompt}\n\nAssistant:`,
       temperature: 0.7,
-      maxTokens: 2000,
+      maxTokens: 2000 as any,
     });
 
     return text;
