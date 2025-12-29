@@ -3,7 +3,7 @@
  * v2.28.6 Refactor
  */
 import { useState, useRef, useEffect, useCallback, useMemo } from "react";
-import { ArrowRight, Paperclip, Image, FileText, Link2, AlertTriangle, TrendingUp, History, X, Pin, Archive, Edit2, MoreVertical } from "lucide-react";
+import { ArrowRight, Paperclip, Image, FileText, Link2, AlertTriangle, TrendingUp, History, X, Pin, Archive, Edit2, MoreVertical, Square } from "lucide-react";
 import { useChatWithAuth } from "./chat/hooks/useChatWithAuth";
 import { useAuth } from "@clerk/clerk-react";
 import { useBackend } from "../lib/backend";
@@ -99,6 +99,9 @@ export default function ChatInterface() {
 
   // Local input state for textarea
   const [input, setInput] = useState("");
+  
+  // Store the last sent message so we can restore it if stopped
+  const [lastSentMessage, setLastSentMessage] = useState<string>("");
 
   // Track loading state manually
   const [isStreaming, setIsStreamingState] = useState(false);
@@ -111,6 +114,7 @@ export default function ChatInterface() {
     status,
     setMessages: setUseChatMessages,
     setIsStreaming,
+    stop,
   } = useChatWithAuth(conversationId, setConversationId);
 
   const isLoading = isStreaming || status === 'streaming' || status === 'submitted';
@@ -308,6 +312,8 @@ export default function ChatInterface() {
       }
     }
 
+    // Store the message before sending so we can restore it if stopped
+    setLastSentMessage(messageText);
     setShowSuggestions(false);
     setThinkingText(THINKING_TERMS[0]);
     setIsStreamingState(true);
@@ -332,6 +338,37 @@ export default function ChatInterface() {
 
     if (!customMessage) {
       setInput("");
+    }
+  };
+
+  // Clear lastSentMessage when streaming finishes successfully
+  useEffect(() => {
+    if (!isLoading && lastSentMessage) {
+      // Only clear if we're not in an error state
+      setLastSentMessage("");
+    }
+  }, [isLoading, lastSentMessage]);
+
+  const handleStop = () => {
+    // Stop the streaming
+    stop();
+    setIsStreamingState(false);
+    setIsStreaming(false);
+    
+    // Remove any partial assistant message that was being streamed
+    setUseChatMessages((prev: any[]) => {
+      // Remove the last message if it's an incomplete assistant message
+      const lastMessage = prev[prev.length - 1];
+      if (lastMessage && lastMessage.role === 'assistant' && status === 'streaming') {
+        return prev.slice(0, -1);
+      }
+      return prev;
+    });
+    
+    // Restore the last sent message to the input box
+    if (lastSentMessage) {
+      setInput(lastSentMessage);
+      setLastSentMessage("");
     }
   };
 
@@ -735,28 +772,49 @@ ${kpiSection}
               target.style.height = `${Math.min(target.scrollHeight, 200)}px`;
             }}
             onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey && !isLoading) {
-                e.preventDefault();
-                handleSend();
+              if (e.key === "Enter" && !e.shiftKey) {
+                if (isLoading) {
+                  // If streaming, stop on Enter
+                  e.preventDefault();
+                  handleStop();
+                } else if (input.trim()) {
+                  // If not streaming and has input, send
+                  e.preventDefault();
+                  handleSend();
+                }
               }
             }}
             placeholder="Analyze your performance, the news, or the markets…."
-            disabled={isLoading}
+            disabled={false}
             rows={1}
-            className="flex-1 bg-white/5 backdrop-blur-sm border border-white/10 rounded-[18px] px-4 py-3 text-sm text-white placeholder-zinc-400 focus:outline-none focus:border-[#FFC038]/40 focus:shadow-[0_0_12px_rgba(255,192,56,0.1)] disabled:opacity-50 transition-all resize-none overflow-y-auto min-h-[42px] max-h-[200px] leading-relaxed"
+            className="flex-1 bg-white/5 backdrop-blur-sm border border-white/10 rounded-[18px] px-4 py-3 text-sm text-white placeholder-zinc-400 focus:outline-none focus:border-[#FFC038]/40 focus:shadow-[0_0_12px_rgba(255,192,56,0.1)] transition-all resize-none overflow-y-auto min-h-[42px] max-h-[200px] leading-relaxed"
           />
 
-          <button
-            onClick={(e) => {
-              e.preventDefault();
-              handleSend();
-            }}
-            disabled={!input.trim() || isLoading}
-            className="flex items-center justify-center w-[42px] h-[42px] flex-shrink-0 rounded-full bg-[#FFC038] hover:bg-[#FFD060] disabled:bg-zinc-900 disabled:text-zinc-700 disabled:border disabled:border-zinc-800 transition-all self-end"
-            type="button"
-          >
-            <ArrowRight className="w-5 h-5" />
-          </button>
+          {isLoading ? (
+            <button
+              onClick={(e) => {
+                e.preventDefault();
+                handleStop();
+              }}
+              className="flex items-center justify-center w-[42px] h-[42px] flex-shrink-0 rounded-full bg-red-500/20 hover:bg-red-500/30 border border-red-500/40 text-red-400 hover:text-red-300 transition-all self-end"
+              type="button"
+              title="Stop generating"
+            >
+              <Square className="w-4 h-4 fill-current" />
+            </button>
+          ) : (
+            <button
+              onClick={(e) => {
+                e.preventDefault();
+                handleSend();
+              }}
+              disabled={!input.trim() || isLoading}
+              className="flex items-center justify-center w-[42px] h-[42px] flex-shrink-0 rounded-full bg-[#FFC038] hover:bg-[#FFD060] disabled:bg-zinc-900 disabled:text-zinc-700 disabled:border disabled:border-zinc-800 transition-all self-end"
+              type="button"
+            >
+              <ArrowRight className="w-5 h-5" />
+            </button>
+          )}
         </div>
       </div>
 

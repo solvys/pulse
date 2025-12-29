@@ -108,6 +108,7 @@ export function useChatWithAuth(conversationId: string | undefined, setConversat
     sendMessage,
     status,
     setMessages: setUseChatMessages,
+    stop,
   } = useChat({
     transport: new DefaultChatTransport({
       api: `${API_BASE_URL}/api/ai/chat`,
@@ -150,5 +151,6 @@ export function useChatWithAuth(conversationId: string | undefined, setConversat
     setMessages: setUseChatMessages,
     isLoading,
     setIsStreaming,
+    stop,
   };
 }
