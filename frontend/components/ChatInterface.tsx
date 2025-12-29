@@ -392,9 +392,9 @@ ${kpiSection}
     // Append as an assistant message
     // Note: In a real app, you might want to send a 'user' message first saying "Here is a chart..." 
     // but for now we just show the result.
-    // Actually, let's append a hidden user message or just the result. 
-    // Since append() sends to the API, we might not want to re-trigger the AI.
-    // useChat's append sends a message. setMessages updates local state.
+    // Actually, let's send a hidden user message or just the result. 
+    // Since sendMessage() sends to the API, we might not want to re-trigger the AI.
+    // useChat's sendMessage sends a message. setMessages updates local state.
 
     // We want to just display it.
     const newMessage: Message = {
