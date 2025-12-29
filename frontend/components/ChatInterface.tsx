@@ -1,4 +1,7 @@
-
+/**
+ * ChatInterface Component
+ * v2.28.6 Refactor
+ */
 import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { ArrowRight, Paperclip, Image, FileText, Link2, AlertTriangle, TrendingUp, History, X, Pin, Archive, Edit2, MoreVertical } from "lucide-react";
 import { useChat } from "@ai-sdk/react";
