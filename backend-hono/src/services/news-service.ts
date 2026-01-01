@@ -527,7 +527,8 @@ export async function fetchAndStoreNews(limit: number = 15): Promise<{ fetched: 
                     priceBrainClassification: 'Cyclical',
                     impliedPoints: null,
                     instrument: null,
-                    authorHandle: n.site
+                    authorHandle: n.site,
+                    category: 'Macro' as NewsCategory
                 }));
                 articles.push(...fmpArticles);
             } catch (e) {
