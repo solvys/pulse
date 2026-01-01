@@ -29,8 +29,6 @@
     "**/*.tsx"
   ],
   "exclude": [
-    "node_modules",
-    "../backend",
-    "../backend-hono"
+    "node_modules"
   ]
 }

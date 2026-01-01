@@ -6,13 +6,13 @@
 
 ```
 pulse/
-├── backend-hono/      # Hono backend API (Fly.io deployment)
 ├── frontend/          # Vite + React frontend (Vercel deployment)
-├── backend/           # Legacy Encore backend (deprecated)
 ├── docs/              # Project documentation
 ├── knowledge-base/    # Trading knowledge and strategies
 └── scripts/           # Utility scripts
 ```
+
+**Note**: Backend code has been removed and is being rebuilt from scratch. See `docs/DEBUGGING-BACKEND-ROADBLOCKS.md` for details.
 
 ## 🚀 Quick Start
 
@@ -24,13 +24,6 @@ pulse/
 - Vercel CLI (for frontend deployment)
 
 ### Local Development
-
-**Backend:**
-```bash
-cd backend-hono
-npm install
-npm run dev
-```
 
 **Frontend:**
 ```bash
@@ -53,11 +46,10 @@ All documentation is organized in the `docs/` directory:
 
 ## 🔧 Key Technologies
 
-- **Backend:** Hono, Neon PostgreSQL, Fly.io
 - **Frontend:** Vite + React 19, TypeScript, Tailwind CSS
 - **Auth:** Clerk
-- **Database:** Neon PostgreSQL
-- **Deployment:** Fly.io (backend), Vercel (frontend)
+- **Database:** Neon PostgreSQL (backend being rebuilt)
+- **Deployment:** Vercel (frontend), Backend TBD
 
 ## 📖 Architecture
 
@@ -74,12 +66,6 @@ Required variables:
 - `PROJECTX_USERNAME` / `PROJECTX_API_KEY` - TopStepX integration
 
 ## 🚢 Deployment
-
-**Backend (Fly.io):**
-```bash
-cd backend-hono
-fly deploy
-```
 
 **Frontend (Vercel):**
 ```bash

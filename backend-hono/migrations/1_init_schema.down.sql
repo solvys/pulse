@@ -1,9 +1,0 @@
-DROP TABLE IF EXISTS system_events;
-DROP TABLE IF EXISTS news_articles;
-DROP TABLE IF EXISTS market_indicators;
-DROP TABLE IF EXISTS market_bars;
-DROP TABLE IF EXISTS trades;
-DROP TABLE IF EXISTS orders;
-DROP TABLE IF EXISTS contracts;
-DROP TABLE IF EXISTS broker_accounts;
-DROP TABLE IF EXISTS projectx_credentials;

@@ -7,10 +7,12 @@ This directory contains all project documentation organized by category.
 ### `/phases/` - Migration Phases
 Complete documentation for each migration phase:
 - `PHASE-I-FRONTEND.md` - Frontend migration to Vite/Vercel
-- `PHASE-II-BACKEND.md` - Backend migration from Encore to Hono/Neon
-- `PHASE-III-BACKEND-DEPLOY.md` - Backend deployment to Fly.io
+- `PHASE-II-BACKEND.md` - Backend migration from Encore to Hono/Neon (historical)
+- `PHASE-III-BACKEND-DEPLOY.md` - Backend deployment to Fly.io (historical)
 - `PHASE-III-HANDOFF.md` - Frontend integration handoff
 - `PHASE-IV-QA-DESKTOP.md` - Desktop app QA and testing
+
+**Note**: Backend code has been removed and is being rebuilt. See `DEBUGGING-BACKEND-ROADBLOCKS.md` for restart rationale.
 
 ### `/deployment/` - Deployment Guides
 Deployment instructions and guides:
@@ -24,9 +26,13 @@ Third-party integrations and setup:
 
 ### `/architecture/` - Architecture & Design
 System architecture and design decisions:
-- `ARCHITECTURE.md` - System architecture overview
+- `ARCHITECTURE-V2.md` - Current system architecture (preserved for reference)
+- `ARCHITECTURE.md` - Original architecture overview
 - `PULSE-LAYOUT-PLAN.md` - UI/UX layout planning
 - `ARCHITECTURE-DECISIONS.md` - Key architectural decisions (monorepo, etc.)
+
+### `/` - Root Documentation
+- `DEBUGGING-BACKEND-ROADBLOCKS.md` - **IMPORTANT**: Explains backend restart decision and lessons learned
 
 ### `/setup/` - Setup & Configuration
 Initial setup and configuration guides:
