@@ -1,6 +1,7 @@
 import { createMiddleware } from 'hono/factory';
 import { verifyToken } from '@clerk/backend';
 import { env } from '../env.js';
+import { logger } from './logger.js';
 
 declare module 'hono' {
   interface ContextVariableMap {
@@ -11,22 +12,7 @@ declare module 'hono' {
 export const authMiddleware = createMiddleware(async (c, next) => {
   // Skip auth for development mode if BYPASS_AUTH is enabled
   if (env.NODE_ENV === 'development' && process.env.BYPASS_AUTH === 'true') {
-    // #region agent log - hypothesis A
-    fetch('http://127.0.0.1:7244/ingest/fbebf980-5e49-4327-9406-872372234680', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        location: 'auth.ts:bypass-dev',
-        message: 'Development auth bypass enabled',
-        data: { method: c.req.method, path: c.req.path },
-        timestamp: Date.now(),
-        sessionId: 'debug-session',
-        runId: 'initial',
-        hypothesisId: 'A'
-      })
-    }).catch(() => {});
-    // #endregion
-
+    logger.debug({ method: c.req.method, path: c.req.path }, 'Development auth bypass enabled');
     // Set a mock user ID for development
     c.set('userId', 'dev-user-12345');
     await next();
@@ -35,60 +21,31 @@ export const authMiddleware = createMiddleware(async (c, next) => {
 
   // Skip auth for OPTIONS requests (CORS preflight)
   if (c.req.method === 'OPTIONS') {
-    // #region agent log - hypothesis A
-    fetch('http://127.0.0.1:7244/ingest/fbebf980-5e49-4327-9406-872372234680', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        location: 'auth.ts:options',
-        message: 'OPTIONS request - skipping auth',
-        data: { method: c.req.method, path: c.req.path },
-        timestamp: Date.now(),
-        sessionId: 'debug-session',
-        runId: 'initial',
-        hypothesisId: 'A'
-      })
-    }).catch(() => { });
-    // #endregion
+    logger.debug({ method: c.req.method, path: c.req.path }, 'OPTIONS request - skipping auth');
     await next();
     return;
   }
 
   const authHeader = c.req.header('Authorization');
 
-  // #region agent log - hypothesis C
-  fetch('http://127.0.0.1:7244/ingest/fbebf980-5e49-4327-9406-872372234680', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      location: 'auth.ts:header',
-      message: 'Auth header check',
-      data: { hasHeader: !!authHeader, startsWithBearer: authHeader ? authHeader.startsWith('Bearer ') : false },
-      timestamp: Date.now(),
-      sessionId: 'debug-session',
-      runId: 'initial',
-      hypothesisId: 'C'
-    })
-  }).catch(() => { });
-  // #endregion
+  logger.debug({ 
+    hasHeader: !!authHeader, 
+    startsWithBearer: authHeader ? authHeader.startsWith('Bearer ') : false,
+    path: c.req.path 
+  }, 'Auth header check');
 
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    // #region agent log - hypothesis C
-    fetch('http://127.0.0.1:7244/ingest/fbebf980-5e49-4327-9406-872372234680', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        location: 'auth.ts:no-auth',
-        message: 'No auth header - returning 401',
-        data: { method: c.req.method, path: c.req.path },
-        timestamp: Date.now(),
-        sessionId: 'debug-session',
-        runId: 'initial',
-        hypothesisId: 'C'
-      })
-    }).catch(() => { });
-    // #endregion
-    return c.json({ error: 'Unauthorized: Missing or invalid token' }, 401);
+    logger.warn({ 
+      method: c.req.method, 
+      path: c.req.path,
+      hasHeader: !!authHeader,
+      headerPreview: authHeader ? authHeader.substring(0, 20) : 'none'
+    }, 'Missing or invalid Authorization header');
+    return c.json({ 
+      error: 'Unauthorized: Missing or invalid token',
+      code: 'missing_token',
+      message: 'Authorization header must be in format: Bearer <token>'
+    }, 401);
   }
 
   let token = authHeader.replace('Bearer ', '').trim();
@@ -114,42 +71,56 @@ export const authMiddleware = createMiddleware(async (c, next) => {
     // #endregion
 
     if (!env.CLERK_SECRET_KEY) {
-      console.error('[AUTH] CLERK_SECRET_KEY is not set in environment variables');
-      return c.json({ error: 'Unauthorized: Server configuration error' }, 401);
+      logger.error({ path: c.req.path }, 'CLERK_SECRET_KEY is not set in environment variables');
+      return c.json({ 
+        error: 'Unauthorized: Server configuration error',
+        code: 'server_config_error',
+        message: 'Authentication service is not properly configured'
+      }, 401);
     }
 
-    console.log(`[AUTH] Verifying token for ${c.req.path}, CLERK_SECRET_KEY prefix: ${env.CLERK_SECRET_KEY?.substring(0, 15)}...`);
-    console.log(`[AUTH] Token preview (first 50 chars): ${token.substring(0, 50)}...`);
+    logger.debug({ 
+      path: c.req.path,
+      secretKeyPrefix: env.CLERK_SECRET_KEY?.substring(0, 15),
+      tokenLength: token.length,
+      tokenPreview: token.substring(0, 20)
+    }, 'Verifying token');
 
     // Validate token format before verification
     const tokenParts = token.split('.');
     if (tokenParts.length !== 3) {
-      console.error('[AUTH] Invalid JWT format - token does not have 3 parts:', {
+      logger.error({ 
         partsCount: tokenParts.length,
         tokenLength: token.length,
-        tokenPreview: token.substring(0, 100),
-      });
-      return c.json({ error: 'Unauthorized: Invalid token format. JWT consists of three parts separated by dots.' }, 401);
+        path: c.req.path
+      }, 'Invalid JWT format - token does not have 3 parts');
+      return c.json({ 
+        error: 'Unauthorized: Invalid token format',
+        code: 'invalid_token_format',
+        message: 'JWT token must consist of three parts separated by dots (header.payload.signature)'
+      }, 401);
     }
 
-    // Try to decode token header/payload without verification to see what's in it
+    // Try to decode token header/payload without verification for debugging
     try {
       const header = JSON.parse(Buffer.from(tokenParts[0], 'base64url').toString());
       const payload = JSON.parse(Buffer.from(tokenParts[1], 'base64url').toString());
-      console.log(`[AUTH] Token header:`, header);
-      console.log(`[AUTH] Token payload (unverified):`, {
-        sub: payload.sub,
-        exp: payload.exp,
-        iat: payload.iat,
-        iss: payload.iss,
-        aud: payload.aud,
-        expDate: payload.exp ? new Date(payload.exp * 1000).toISOString() : null,
-        now: new Date().toISOString(),
-        isExpired: payload.exp ? Date.now() > payload.exp * 1000 : null,
-        template: payload.template || 'none', // Check if template is in payload
-      });
+      logger.debug({ 
+        path: c.req.path,
+        header,
+        payload: {
+          sub: payload.sub,
+          exp: payload.exp,
+          iat: payload.iat,
+          iss: payload.iss,
+          aud: payload.aud,
+          expDate: payload.exp ? new Date(payload.exp * 1000).toISOString() : null,
+          now: new Date().toISOString(),
+          isExpired: payload.exp ? Date.now() > payload.exp * 1000 : null,
+        }
+      }, 'Token decoded (unverified)');
     } catch (decodeError) {
-      console.warn('[AUTH] Could not decode token (this is okay, verification will handle it):', decodeError);
+      logger.warn({ error: decodeError, path: c.req.path }, 'Could not decode token (verification will handle it)');
     }
 
     // In @clerk/backend v1.x, verifyToken returns the JWT claims directly
@@ -159,9 +130,10 @@ export const authMiddleware = createMiddleware(async (c, next) => {
     try {
       const decodedPayload = JSON.parse(Buffer.from(tokenParts[1], 'base64url').toString());
       issuer = decodedPayload.iss;
-      console.log(`[AUTH] Extracted issuer from token: ${issuer}`);
+      logger.debug({ issuer, path: c.req.path }, 'Extracted issuer from token');
     } catch (e) {
       // Ignore - we'll verify without issuer
+      logger.debug({ path: c.req.path }, 'Could not extract issuer from token');
     }
 
     let payload;
@@ -177,82 +149,57 @@ export const authMiddleware = createMiddleware(async (c, next) => {
       }
 
       payload = await verifyToken(token, verifyOptions);
+      
+      logger.debug({ 
+        hasPayload: !!payload,
+        userId: (payload as any)?.sub,
+        path: c.req.path
+      }, 'Token verified successfully');
     } catch (verifyError) {
       const errorMessage = verifyError instanceof Error ? verifyError.message : 'Unknown error';
-      console.error('[AUTH] verifyToken threw an error:', {
+      const errorName = verifyError instanceof Error ? verifyError.name : undefined;
+      
+      logger.error({ 
         error: errorMessage,
-        errorName: verifyError instanceof Error ? verifyError.name : undefined,
+        errorName,
         tokenLength: token.length,
         tokenParts: tokenParts.length,
         secretKeyPrefix: env.CLERK_SECRET_KEY?.substring(0, 15),
         issuer,
-        tokenHeader: tokenParts[0],
-        tokenPayloadPreview: tokenParts[1]?.substring(0, 100),
-      });
+        path: c.req.path
+      }, 'Token verification failed');
+      
       throw verifyError; // Re-throw to be caught by outer catch block
     }
 
-    console.log(`[AUTH] verifyToken result:`, {
-      hasPayload: !!payload,
-      sub: (payload as any)?.sub,
-      payloadKeys: payload ? Object.keys(payload as any) : [],
-    });
-
     if (!payload || !payload.sub) {
-      // #region agent log - hypothesis C
-      fetch('http://127.0.0.1:7244/ingest/fbebf980-5e49-4327-9406-872372234680', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          location: 'auth.ts:invalid-token',
-          message: 'Token verification failed',
-          data: { hasPayload: !!payload, method: c.req.method, path: c.req.path },
-          timestamp: Date.now(),
-          sessionId: 'debug-session',
-          runId: 'initial',
-          hypothesisId: 'C'
-        })
-      }).catch(() => { });
-      // #endregion
-      return c.json({ error: 'Unauthorized: Invalid token' }, 401);
+      logger.warn({ 
+        hasPayload: !!payload,
+        method: c.req.method, 
+        path: c.req.path 
+      }, 'Token verification returned invalid payload');
+      return c.json({ 
+        error: 'Unauthorized: Invalid token',
+        code: 'invalid_token',
+        message: 'Token verification failed - token may be expired or invalid'
+      }, 401);
     }
 
     const userId = payload.sub;
     if (!userId) {
-      // #region agent log - hypothesis C
-      fetch('http://127.0.0.1:7244/ingest/fbebf980-5e49-4327-9406-872372234680', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          location: 'auth.ts:no-userid',
-          message: 'No userId in token payload',
-          data: { method: c.req.method, path: c.req.path },
-          timestamp: Date.now(),
-          sessionId: 'debug-session',
-          runId: 'initial',
-          hypothesisId: 'C'
-        })
-      }).catch(() => { });
-      // #endregion
-      return c.json({ error: 'Unauthorized: Invalid token payload' }, 401);
+      logger.warn({ 
+        method: c.req.method, 
+        path: c.req.path,
+        payloadKeys: payload ? Object.keys(payload as any) : []
+      }, 'No userId in token payload');
+      return c.json({ 
+        error: 'Unauthorized: Invalid token payload',
+        code: 'missing_user_id',
+        message: 'Token does not contain user identification'
+      }, 401);
     }
 
-    // #region agent log - hypothesis C
-    fetch('http://127.0.0.1:7244/ingest/fbebf980-5e49-4327-9406-872372234680', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        location: 'auth.ts:success',
-        message: 'Auth successful',
-        data: { userId, method: c.req.method, path: c.req.path },
-        timestamp: Date.now(),
-        sessionId: 'debug-session',
-        runId: 'initial',
-        hypothesisId: 'C'
-      })
-    }).catch(() => { });
-    // #endregion
-
+    logger.debug({ userId, path: c.req.path }, 'Authentication successful');
     c.set('userId', userId);
     await next();
     return;
@@ -265,58 +212,58 @@ export const authMiddleware = createMiddleware(async (c, next) => {
     const isExpiredError = errorMessage.includes('expired') || errorMessage.includes('ExpiredToken') || errorMessage.includes('jwt expired');
     const isInvalidError = errorMessage.includes('invalid') || errorMessage.includes('InvalidToken') || errorMessage.includes('jwt malformed');
     const isFormatError = errorMessage.includes('three parts') || errorMessage.includes('JWT format');
+    const isSignatureError = errorMessage.includes('signature') || errorMessage.includes('Signature');
     
-    console.error('[AUTH] Token verification error:', {
-      message: errorMessage,
-      name: errorName,
+    logger.error({ 
+      error: errorMessage,
+      errorName,
       stack: errorStack,
       path: c.req.path,
       method: c.req.method,
       hasSecretKey: !!env.CLERK_SECRET_KEY,
       secretKeyPrefix: env.CLERK_SECRET_KEY?.substring(0, 15),
-      tokenLength: token.length,
-      tokenParts: token.split('.').length,
-      tokenPreview: token.substring(0, 50) + '...',
+      tokenLength: token?.length || 0,
+      tokenParts: token ? token.split('.').length : 0,
       isExpiredError,
       isInvalidError,
       isFormatError,
-    });
-    
-    // #region agent log - hypothesis C
-    fetch('http://127.0.0.1:7244/ingest/fbebf980-5e49-4327-9406-872372234680', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        location: 'auth.ts:error',
-        message: 'Token verification exception',
-        data: { 
-          error: errorMessage,
-          errorName,
-          isExpiredError,
-          isInvalidError,
-          isFormatError,
-          method: c.req.method, 
-          path: c.req.path 
-        },
-        timestamp: Date.now(),
-        sessionId: 'debug-session',
-        runId: 'initial',
-        hypothesisId: 'C'
-      })
-    }).catch(() => { });
-    // #endregion
+      isSignatureError,
+    }, 'Token verification error');
     
     // Provide more specific error messages
     if (isFormatError) {
-      return c.json({ error: `Unauthorized: Invalid token format. ${errorMessage}` }, 401);
+      return c.json({ 
+        error: 'Unauthorized: Invalid token format',
+        code: 'invalid_token_format',
+        message: errorMessage
+      }, 401);
     }
     if (isExpiredError) {
-      return c.json({ error: 'Unauthorized: Token expired. Please refresh the page and sign in again.' }, 401);
+      return c.json({ 
+        error: 'Unauthorized: Token expired',
+        code: 'token_expired',
+        message: 'Please refresh the page and sign in again'
+      }, 401);
+    }
+    if (isSignatureError) {
+      return c.json({ 
+        error: 'Unauthorized: Token signature verification failed',
+        code: 'invalid_signature',
+        message: 'Token may be from a different Clerk instance or secret key mismatch'
+      }, 401);
     }
     if (isInvalidError) {
-      return c.json({ error: 'Unauthorized: Invalid token format or signature.' }, 401);
+      return c.json({ 
+        error: 'Unauthorized: Invalid token',
+        code: 'invalid_token',
+        message: 'Token format or signature is invalid'
+      }, 401);
     }
     
-    return c.json({ error: `Unauthorized: Token verification failed - ${errorMessage}` }, 401);
+    return c.json({ 
+      error: 'Unauthorized: Token verification failed',
+      code: 'verification_failed',
+      message: errorMessage
+    }, 401);
   }
 });

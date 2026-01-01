@@ -47,24 +47,30 @@ class XClient {
     }
 
     /**
-     * Search recent tweets from a specific account
+     * Search recent tweets from a specific account with retry logic
      * Endpoint: GET /2/tweets/search/recent
      */
-    async fetchAccountTweets(account: string, limit: number = 10): Promise<Tweet[]> {
+    async fetchAccountTweets(account: string, limit: number = 10, retryCount: number = 0): Promise<Tweet[]> {
         if (!env.X_BEARER_TOKEN) {
-            console.warn('X_BEARER_TOKEN missing, skipping X API fetch');
+            console.warn('[XClient] X_BEARER_TOKEN missing, skipping X API fetch');
             return [];
         }
 
         if (this.isRateLimited()) {
-            console.warn(`X API Rate Limited. Resets in ${this.getSecondsToReset()}s`);
+            const secondsToReset = this.getSecondsToReset();
+            console.warn(`[XClient] Rate Limited for ${account}. Resets in ${secondsToReset}s`);
             return [];
         }
 
         const query = `from:${account} -is:retweet`;
+        const maxRetries = 3;
+        const baseDelay = 1000; // 1 second base delay
 
         try {
-            const url = `https://api.twitter.com/2/tweets/search/recent?query=${encodeURIComponent(query)}&max_results=${Math.min(limit, 100)}&tweet.fields=created_at,public_metrics,author_id`;
+            // Updated to use api.x.com instead of deprecated api.twitter.com
+            const url = `https://api.x.com/2/tweets/search/recent?query=${encodeURIComponent(query)}&max_results=${Math.min(limit, 100)}&tweet.fields=created_at,public_metrics,author_id`;
+
+            console.log(`[XClient] Fetching tweets from ${account} (attempt ${retryCount + 1}/${maxRetries + 1})`);
 
             const response = await fetch(url, {
                 headers: {
@@ -77,27 +83,69 @@ class XClient {
             const remaining = response.headers.get('x-rate-limit-remaining');
             const reset = response.headers.get('x-rate-limit-reset');
 
-            if (remaining) this.rateLimitRemaining = parseInt(remaining, 10);
-            if (reset) {
-                // X API sends epoch seconds
-                this.rateLimitReset = parseInt(reset, 10) * 1000;
+            if (remaining !== null) {
+                this.rateLimitRemaining = parseInt(remaining, 10);
+                console.log(`[XClient] Rate limit remaining: ${this.rateLimitRemaining}`);
+            }
+            
+            if (reset !== null) {
+                // X API sends epoch seconds - convert to milliseconds
+                const resetSeconds = parseInt(reset, 10);
+                this.rateLimitReset = resetSeconds * 1000;
+                console.log(`[XClient] Rate limit resets at: ${new Date(this.rateLimitReset).toISOString()}`);
             }
 
+            // Handle 429 Too Many Requests with exponential backoff retry
             if (response.status === 429) {
-                console.warn(`X API 429 Too Many Requests. Reset at ${new Date(this.rateLimitReset).toISOString()}`);
-                return [];
+                const resetTime = reset ? parseInt(reset, 10) * 1000 : Date.now() + 900000; // Default 15 min if no header
+                this.rateLimitReset = resetTime;
+                
+                if (retryCount < maxRetries) {
+                    const delay = baseDelay * Math.pow(2, retryCount); // Exponential backoff
+                    console.warn(`[XClient] 429 Too Many Requests for ${account}. Retrying in ${delay}ms (attempt ${retryCount + 1}/${maxRetries})`);
+                    await new Promise(resolve => setTimeout(resolve, delay));
+                    return this.fetchAccountTweets(account, limit, retryCount + 1);
+                } else {
+                    console.error(`[XClient] 429 Too Many Requests for ${account}. Max retries reached. Reset at ${new Date(this.rateLimitReset).toISOString()}`);
+                    return [];
+                }
             }
 
+            // Handle other non-OK responses
             if (!response.ok) {
                 const errorText = await response.text();
-                throw new Error(`X API Error ${response.status}: ${errorText}`);
+                let errorData: any;
+                try {
+                    errorData = JSON.parse(errorText);
+                } catch {
+                    errorData = { message: errorText };
+                }
+                
+                console.error(`[XClient] X API Error ${response.status} for ${account}:`, {
+                    status: response.status,
+                    statusText: response.statusText,
+                    error: errorData,
+                });
+
+                // Retry on 5xx errors with exponential backoff
+                if (response.status >= 500 && retryCount < maxRetries) {
+                    const delay = baseDelay * Math.pow(2, retryCount);
+                    console.warn(`[XClient] Server error for ${account}. Retrying in ${delay}ms (attempt ${retryCount + 1}/${maxRetries})`);
+                    await new Promise(resolve => setTimeout(resolve, delay));
+                    return this.fetchAccountTweets(account, limit, retryCount + 1);
+                }
+
+                throw new Error(`X API Error ${response.status}: ${JSON.stringify(errorData)}`);
             }
 
             const data = await response.json() as any;
 
-            if (!data.data) return [];
+            if (!data.data) {
+                console.log(`[XClient] No data returned for ${account}`);
+                return [];
+            }
 
-            return data.data.map((t: any) => ({
+            const tweets = data.data.map((t: any) => ({
                 id: t.id,
                 text: this.cleanText(t.text),
                 author: account,
@@ -109,9 +157,30 @@ class XClient {
                 isRetweet: false,
             }));
 
+            console.log(`[XClient] Successfully fetched ${tweets.length} tweets from ${account}`);
+            return tweets;
+
         } catch (error) {
-            console.error(`Failed to fetch from Offical X API for ${account}:`, error);
-            return []; // Fail gracefully
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            const errorStack = error instanceof Error ? error.stack : undefined;
+            
+            console.error(`[XClient] Failed to fetch from X API for ${account}:`, {
+                account,
+                error: errorMessage,
+                stack: errorStack,
+                retryCount,
+            });
+
+            // Retry on network errors with exponential backoff
+            if (retryCount < maxRetries && (errorMessage.includes('fetch') || errorMessage.includes('network'))) {
+                const delay = baseDelay * Math.pow(2, retryCount);
+                console.warn(`[XClient] Network error for ${account}. Retrying in ${delay}ms (attempt ${retryCount + 1}/${maxRetries})`);
+                await new Promise(resolve => setTimeout(resolve, delay));
+                return this.fetchAccountTweets(account, limit, retryCount + 1);
+            }
+
+            // Return empty array on final failure (fail gracefully)
+            return [];
         }
     }
 

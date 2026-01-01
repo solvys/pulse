@@ -11,24 +11,73 @@ import { signOutUser } from './authHelper';
 // Global auth failure state - stops all polling when auth fails
 let authFailed = false;
 let authFailedTimestamp: number | null = null;
+let signOutInProgress = false; // Prevent multiple simultaneous sign-outs
 const AUTH_RETRY_DELAY_MS = 30000; // Wait 30s before retrying after auth failure
+const MAX_401_COUNT = 3; // Maximum consecutive 401s before giving up
+let consecutive401Count = 0;
+let last401Timestamp: number | null = null;
 
 // Export function to reset auth state (call on successful login)
 export function resetAuthState() {
   authFailed = false;
   authFailedTimestamp = null;
+  consecutive401Count = 0;
+  last401Timestamp = null;
+  signOutInProgress = false;
 }
 
 // Check if auth has failed and we should skip requests
 function shouldSkipRequest(): boolean {
   if (!authFailed) return false;
-  // Allow retry after AUTH_RETRY_DELAY_MS
+  
+  // Reset if enough time has passed
   if (authFailedTimestamp && Date.now() - authFailedTimestamp > AUTH_RETRY_DELAY_MS) {
     authFailed = false;
     authFailedTimestamp = null;
+    consecutive401Count = 0;
     return false;
   }
+  
   return true;
+}
+
+// Track 401 errors to prevent flooding
+function handle401Error(): void {
+  const now = Date.now();
+  
+  // Reset counter if it's been more than 1 minute since last 401
+  if (last401Timestamp && now - last401Timestamp > 60000) {
+    consecutive401Count = 0;
+  }
+  
+  consecutive401Count++;
+  last401Timestamp = now;
+  
+  // Set global auth failure flag to stop future requests
+  authFailed = true;
+  authFailedTimestamp = now;
+  
+  // Only sign out once, and only if we've seen multiple 401s
+  if (consecutive401Count >= MAX_401_COUNT && !signOutInProgress) {
+    signOutInProgress = true;
+    console.warn(`[API] Multiple auth failures (${consecutive401Count}). Signing out to allow re-authentication`);
+    
+    signOutUser()
+      .then(() => {
+        console.log('[API] Successfully signed out after auth failures');
+      })
+      .catch((err) => {
+        console.error('[API] Error signing out on 401:', err);
+      })
+      .finally(() => {
+        // Reset sign out flag after a delay to allow retry
+        setTimeout(() => {
+          signOutInProgress = false;
+        }, 5000);
+      });
+  } else if (consecutive401Count < MAX_401_COUNT) {
+    console.warn(`[API] Auth failed (${consecutive401Count}/${MAX_401_COUNT}). Will retry or sign out if continues.`);
+  }
 }
 
 export interface ApiError {
@@ -97,18 +146,19 @@ class ApiClient {
 
         // Handle specific status codes
         if (response.status === 401) {
-          error.code = 'unauthenticated';
-          // Set global auth failure flag to stop future requests
-          authFailed = true;
-          authFailedTimestamp = Date.now();
-          console.warn('[API] Auth failed - signing out to allow re-authentication');
-          
-          // Sign out user to force re-authentication
-          signOutUser().catch((err) => {
-            console.error('[API] Error signing out on 401:', err);
-          });
+          error.code = errorData.code || 'unauthenticated';
+          handle401Error();
         } else if (response.status === 404) {
           error.code = 'not_found';
+        } else if (response.status >= 500) {
+          error.code = 'server_error';
+          console.error(`[API] Server error ${response.status} for ${endpoint}:`, errorData);
+        }
+        
+        // Reset 401 counter on successful requests
+        if (response.status !== 401) {
+          consecutive401Count = 0;
+          last401Timestamp = null;
         }
 
         throw error;

@@ -9,6 +9,8 @@ import { sql } from '../db/index.js';
 import { xClient, Tweet, FINANCIAL_ACCOUNTS } from './x-client.js';
 import { fetchAllPolymarketOdds, checkSignificantChanges, PolymarketOdds } from './polymarket-service.js';
 import { fetchGeneralNews, FMPArticle } from './fmp-service.js';
+import { analyzeArticleWithPriceBrain, type ArticleInput } from './price-brain-service.js';
+import { logger } from '../middleware/logger.js';
 
 export interface NewsArticle {
     id: string;
@@ -157,9 +159,12 @@ export async function initializePolymarketFeed() {
 
 /**
  * Helper to store articles in the database
+ * Returns array of stored article URLs for Price Brain analysis
  */
-async function storeArticles(articles: Omit<NewsArticle, 'id'>[]): Promise<number> {
+async function storeArticles(articles: Omit<NewsArticle, 'id'>[]): Promise<{ stored: number; storedUrls: string[] }> {
     let stored = 0;
+    const storedUrls: string[] = [];
+    
     for (const article of articles) {
         try {
             await sql`
@@ -181,13 +186,38 @@ async function storeArticles(articles: Omit<NewsArticle, 'id'>[]): Promise<numbe
         updated_at = NOW()
     `;
             stored++;
+            storedUrls.push(article.url);
         } catch (err) {
             if (!(err instanceof Error) || !err.message.includes('duplicate')) {
-                console.warn('Failed to store article:', err);
+                logger.warn({ err, articleTitle: article.title }, 'Failed to store article');
             }
         }
     }
-    return stored;
+    return { stored, storedUrls };
+}
+
+/**
+ * Update article with Price Brain analysis results
+ */
+async function updateArticleWithPriceBrain(
+    url: string,
+    analysis: { sentiment: string; classification: string; impliedPoints: number | null; instrument: string | null }
+): Promise<void> {
+    try {
+        await sql`
+            UPDATE news_articles
+            SET 
+                price_brain_sentiment = ${analysis.sentiment},
+                price_brain_classification = ${analysis.classification},
+                implied_points = ${analysis.impliedPoints},
+                instrument = ${analysis.instrument},
+                updated_at = NOW()
+            WHERE url = ${url}
+        `;
+        logger.debug({ url, sentiment: analysis.sentiment }, 'Updated article with Price Brain analysis');
+    } catch (err) {
+        logger.error({ err, url }, 'Failed to update article with Price Brain analysis');
+    }
 }
 
 /**
@@ -277,10 +307,48 @@ export async function fetchAndStoreNews(limit: number = 15): Promise<{ fetched: 
             }
         }
 
-        const stored = await storeArticles(articles);
+        const { stored, storedUrls } = await storeArticles(articles);
+        
+        // Analyze Level 3-4 articles with Price Brain Layer
+        const highImpactArticles = articles.filter(a => (a.macroLevel || 0) >= 3);
+        
+        if (highImpactArticles.length > 0) {
+            logger.info({ count: highImpactArticles.length }, 'Analyzing high-impact articles with Price Brain');
+            
+            // Process Price Brain analysis for Level 3-4 articles
+            for (const article of highImpactArticles) {
+                try {
+                    const analysis = await analyzeArticleWithPriceBrain({
+                        title: article.title,
+                        content: article.content || article.summary || '',
+                        summary: article.summary,
+                        macroLevel: article.macroLevel || 0,
+                        symbols: article.symbols || [],
+                        source: article.source,
+                    });
+
+                    if (analysis) {
+                        // Update the article in database with Price Brain results
+                        await updateArticleWithPriceBrain(article.url, {
+                            sentiment: analysis.sentiment,
+                            classification: analysis.classification,
+                            impliedPoints: analysis.impliedPoints,
+                            instrument: analysis.instrument || null,
+                        });
+                    }
+                } catch (error) {
+                    logger.error({ 
+                        error, 
+                        articleTitle: article.title.substring(0, 50) 
+                    }, 'Price Brain analysis failed for article');
+                    // Continue processing other articles even if one fails
+                }
+            }
+        }
+
         return { fetched: articles.length, stored };
     } catch (error) {
-        console.error('Failed to fetch news:', error);
+        logger.error({ error }, 'Failed to fetch news');
         return { fetched: 0, stored: 0 };
     }
 }
