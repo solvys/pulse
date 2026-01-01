@@ -7,10 +7,12 @@
 
 import { sql } from '../db/index.js';
 import { xClient, Tweet, FINANCIAL_ACCOUNTS, HIGH_PRIORITY_ACCOUNTS } from './x-client.js';
-import { fetchAllPolymarketOdds, checkSignificantChanges, PolymarketOdds } from './polymarket-service.js';
+import { fetchAllPolymarketOdds, checkSignificantChanges, PolymarketOdds, MARKET_MACRO_LEVELS } from './polymarket-service.js';
 import { fetchGeneralNews, FMPArticle } from './fmp-service.js';
 import { analyzeArticleWithPriceBrain, type ArticleInput } from './price-brain-service.js';
 import { logger } from '../middleware/logger.js';
+
+export type NewsCategory = 'Odds Shifts' | 'Macro' | 'Commentary';
 
 export interface NewsArticle {
     id: string;
@@ -30,6 +32,7 @@ export interface NewsArticle {
     impliedPoints: number | null;
     instrument: string | null;
     authorHandle: string | null;
+    category: NewsCategory | null;
 }
 
 // Keywords for macro level classification (1=low, 2=medium, 3=high, 4=critical)
@@ -88,18 +91,72 @@ function extractSymbols(text: string): string[] {
     return symbols;
 }
 
-function tweetToArticle(tweet: Tweet): Omit<NewsArticle, 'id'> {
+/**
+ * Detect category for X API articles
+ */
+function detectCategory(text: string, authorHandle: string | null): NewsCategory {
+    const lowerText = text.toLowerCase();
+    const lowerAuthor = (authorHandle || '').toLowerCase();
+    
+    // Odds Shifts: Mentions of traders, bets, odds, polymarket, prediction markets
+    if (lowerText.includes('trader') && lowerText.includes('bet') ||
+        lowerText.includes('odds') && (lowerText.includes('shift') || lowerText.includes('move')) ||
+        lowerText.includes('polymarket') ||
+        lowerText.includes('prediction market')) {
+        return 'Odds Shifts';
+    }
+    
+    // Commentary: Mentions of officials, fed, powell, treasury, sec, cftc, etc.
+    if (lowerText.includes('fed chair') || lowerText.includes('powell') || lowerText.includes('jerome') ||
+        lowerText.includes('treasury') || lowerText.includes('yellen') ||
+        lowerText.includes('sec') || lowerText.includes('cftc') ||
+        lowerText.includes('official') || lowerText.includes('spokesperson') ||
+        lowerText.includes('statement') || lowerText.includes('comment')) {
+        return 'Commentary';
+    }
+    
+    // Macro: Economic data, GDP, CPI, NFP, inflation, rates, etc.
+    if (lowerText.includes('gdp') || lowerText.includes('cpi') || lowerText.includes('nfp') ||
+        lowerText.includes('inflation') || lowerText.includes('unemployment') ||
+        lowerText.includes('rate cut') || lowerText.includes('rate hike') ||
+        lowerText.includes('fomc') || lowerText.includes('economic data')) {
+        return 'Macro';
+    }
+    
+    // Default to Commentary for official accounts, Macro for others
+    if (lowerAuthor.includes('financialjuice') || lowerAuthor.includes('insiderwire') || 
+        lowerAuthor.includes('zaboradar') || lowerAuthor.includes('firstsquawk')) {
+        return 'Commentary';
+    }
+    
+    return 'Macro';
+}
+
+async function tweetToArticle(tweet: Tweet): Promise<Omit<NewsArticle, 'id'>> {
     const macroLevel = classifyMacroLevel(tweet.text);
     const sentiment = classifySentiment(tweet.text);
     const symbols = extractSymbols(tweet.text);
     const tenMinutesAgo = Date.now() - 10 * 60 * 1000;
     const isBreaking = macroLevel >= 3 && tweet.createdAt.getTime() > tenMinutesAgo;
+    const category = detectCategory(tweet.text, tweet.authorHandle);
+
+    let priceBrainAnalysis: PriceBrainAnalysis | null = null;
+    if (macroLevel >= 3) {
+        priceBrainAnalysis = await analyzeArticleWithPriceBrain({
+            title: tweet.text.substring(0, 200),
+            content: tweet.text,
+            summary: tweet.text.length > 200 ? tweet.text.substring(0, 300) + '...' : tweet.text,
+            macroLevel,
+            symbols,
+            source: 'X',
+        });
+    }
 
     return {
         title: tweet.text.substring(0, 200),
         summary: tweet.text.length > 200 ? tweet.text.substring(0, 300) + '...' : tweet.text,
         content: tweet.text,
-        source: 'Twitter',
+        source: 'X',
         url: tweet.url,
         publishedAt: tweet.createdAt.toISOString(),
         sentiment: Math.max(-1, Math.min(1, sentiment.score)),
@@ -107,11 +164,12 @@ function tweetToArticle(tweet: Tweet): Omit<NewsArticle, 'id'> {
         symbols,
         isBreaking,
         macroLevel,
-        priceBrainSentiment: sentiment.label,
-        priceBrainClassification: macroLevel >= 3 ? 'Counter-cyclical' : 'Cyclical',
-        impliedPoints: isBreaking ? (sentiment.score > 0 ? 5 : -5) : null,
-        instrument: null,
+        priceBrainSentiment: priceBrainAnalysis?.sentiment || sentiment.label,
+        priceBrainClassification: priceBrainAnalysis?.classification || (macroLevel >= 3 ? 'Counter-cyclical' : 'Cyclical'),
+        impliedPoints: priceBrainAnalysis?.impliedPoints || (isBreaking ? (sentiment.score > 0 ? 5 : -5) : null),
+        instrument: priceBrainAnalysis?.instrument || null,
         authorHandle: tweet.authorHandle,
+        category,
     };
 }
 
@@ -121,39 +179,57 @@ function tweetToArticle(tweet: Tweet): Omit<NewsArticle, 'id'> {
 
 /**
  * Startup initialization to prefetch Polymarket odds and populate feed
- * Generates 5-10 initial "odds" notifications as requested
+ * Fresh fetch on app open - only shows significant shifts within 24 hours
  */
 export async function initializePolymarketFeed() {
-    console.log('Initializing Polymarket Odds Prefetch...');
+    logger.info('Initializing Polymarket Odds Prefetch (fresh fetch on app open)...');
     try {
         const odds = await fetchAllPolymarketOdds();
-        console.log(`Fetched ${odds.length} Polymarket markets for initialization.`);
+        logger.info({ count: odds.length }, 'Fetched Polymarket markets for initialization');
 
-        // Take top 10 markets to populate the feed immediately
-        const initialArticles: Omit<NewsArticle, 'id'>[] = odds.slice(0, 10).map(m => ({
-            title: `PREDICTION ODDS SNAPSHOT: ${m.question}`,
-            summary: `Current Market Odds: Yes ${(m.yesOdds * 100).toFixed(1)}% | No ${(m.noOdds * 100).toFixed(1)}%`,
-            content: `Initial market snapshot for ${m.marketType}. Link: https://polymarket.com/event/${m.slug}`,
-            source: 'Polymarket',
-            url: `https://polymarket.com/event/${m.slug}`,
-            publishedAt: new Date().toISOString(),
-            sentiment: m.yesOdds > 0.6 ? 0.5 : (m.yesOdds < 0.4 ? -0.5 : 0),
-            ivImpact: 0.1,
-            symbols: ['MACRO'],
-            isBreaking: false,
-            macroLevel: 2,
-            priceBrainSentiment: 'Neutral',
-            priceBrainClassification: 'Cyclical',
-            impliedPoints: null,
-            instrument: null,
-            authorHandle: 'Polymarket'
-        }));
+        // Only show markets with significant shifts within 24 hours
+        const articlesWithShifts: Omit<NewsArticle, 'id'>[] = [];
+        
+        for (const m of odds) {
+            const { hasChange, changePercentage, previousOdds, isStale } = await checkSignificantChanges(m);
+            
+            // Skip stale data (>24 hours old) or no significant change
+            if (isStale || !hasChange) {
+                continue;
+            }
+            
+            const macroLevel = MARKET_MACRO_LEVELS[m.marketType] || 2;
+            
+            articlesWithShifts.push({
+                title: `ODDS SHIFT: ${m.question}`,
+                summary: `${m.question} probability shifted by ${changePercentage.toFixed(1)}% to ${(m.yesOdds * 100).toFixed(1)}% (was ${(previousOdds * 100).toFixed(1)}%)`,
+                content: `Polymarket odds shift detected. Previous: ${(previousOdds * 100).toFixed(1)}%, Current: ${(m.yesOdds * 100).toFixed(1)}%. Market: ${m.marketType}`,
+                source: 'Polymarket',
+                url: `https://polymarket.com/event/${m.slug}`,
+                publishedAt: new Date().toISOString(),
+                sentiment: m.yesOdds > 0.6 ? 0.5 : (m.yesOdds < 0.4 ? -0.5 : 0),
+                ivImpact: changePercentage > 10 ? 0.9 : 0.4,
+                symbols: ['MACRO'],
+                isBreaking: changePercentage > 10,
+                macroLevel,
+                priceBrainSentiment: 'Neutral',
+                priceBrainClassification: 'Counter-cyclical',
+                impliedPoints: null,
+                instrument: null,
+                authorHandle: 'Polymarket',
+                category: 'Odds Shifts'
+            });
+        }
 
-        await storeArticles(initialArticles);
-        console.log(`Stored ${initialArticles.length} initial Polymarket items.`);
+        if (articlesWithShifts.length > 0) {
+            await storeArticles(articlesWithShifts);
+            logger.info({ count: articlesWithShifts.length }, 'Stored Polymarket odds shifts (fresh fetch)');
+        } else {
+            logger.info('No significant Polymarket shifts within 24 hours');
+        }
 
     } catch (e) {
-        console.error('Failed to prefetch Polymarket odds:', e);
+        logger.error({ error: e }, 'Failed to prefetch Polymarket odds');
     }
 }
 
@@ -368,7 +444,7 @@ export async function fetchAndStoreNews(limit: number = 15): Promise<{ fetched: 
             if (xTweets.length > 0) {
                 // Convert all tweets to articles - no filtering by macro level
                 // Price Brain Layer will analyze Level 3-4 articles separately
-                const xArticles = xTweets.map(tweetToArticle);
+                const xArticles = await Promise.all(xTweets.map(tweetToArticle));
                 articles.push(...xArticles);
                 logger.info({ count: xArticles.length }, 'Fetched X API articles');
             } else {
@@ -392,36 +468,43 @@ export async function fetchAndStoreNews(limit: number = 15): Promise<{ fetched: 
             // Continue with other sources even if X API fails
         }
 
-        // 2. Fetch Polymarket Signals (Secondary)
+        // 2. Fetch Polymarket Signals (Secondary) - Only significant shifts within 24 hours
         try {
             const polyOdds = await fetchAllPolymarketOdds();
             for (const odds of polyOdds) {
-                const { hasChange, changePercentage, previousOdds } = await checkSignificantChanges(odds);
-                if (hasChange) {
-                    // Create a specialized news article for the signal
-                    const signalArticle: Omit<NewsArticle, 'id'> = {
-                        title: `ODDS ALERT: ${odds.question}`,
-                        summary: `${odds.question} probability shifted by ${changePercentage.toFixed(1)}% to ${(odds.yesOdds * 100).toFixed(1)}%.`,
-                        content: `Polymarket crowd sentiment shift. Previous: ${(previousOdds * 100).toFixed(1)}%, Current: ${(odds.yesOdds * 100).toFixed(1)}%. Market: ${odds.marketType}`,
-                        source: 'Polymarket',
-                        url: `https://polymarket.com/event/${odds.slug}`,
-                        publishedAt: new Date().toISOString(),
-                        sentiment: odds.yesOdds > 0.6 ? 0.8 : (odds.yesOdds < 0.4 ? -0.8 : 0), // Simple heuristic
-                        ivImpact: changePercentage > 10 ? 0.9 : 0.4,
-                        symbols: ['MACRO'],
-                        isBreaking: changePercentage > 10,
-                        macroLevel: changePercentage > 10 ? 4 : 3,
-                        priceBrainSentiment: odds.yesOdds > 0.5 ? 'Bullish' : 'Bearish', // Context dependent really
-                        priceBrainClassification: 'Counter-cyclical',
-                        impliedPoints: null,
-                        instrument: null,
-                        authorHandle: 'Polymarket'
-                    };
-                    articles.push(signalArticle);
+                const { hasChange, changePercentage, previousOdds, isStale } = await checkSignificantChanges(odds);
+                
+                // Skip stale data (>24 hours old) or no significant change
+                if (isStale || !hasChange) {
+                    continue;
                 }
+                
+                const macroLevel = MARKET_MACRO_LEVELS[odds.marketType] || 2;
+                
+                // Create a specialized news article for the signal
+                const signalArticle: Omit<NewsArticle, 'id'> = {
+                    title: `ODDS SHIFT: ${odds.question}`,
+                    summary: `${odds.question} probability shifted by ${changePercentage.toFixed(1)}% to ${(odds.yesOdds * 100).toFixed(1)}% (was ${(previousOdds * 100).toFixed(1)}%)`,
+                    content: `Polymarket crowd sentiment shift. Previous: ${(previousOdds * 100).toFixed(1)}%, Current: ${(odds.yesOdds * 100).toFixed(1)}%. Market: ${odds.marketType}`,
+                    source: 'Polymarket',
+                    url: `https://polymarket.com/event/${odds.slug}`,
+                    publishedAt: new Date().toISOString(),
+                    sentiment: odds.yesOdds > 0.6 ? 0.8 : (odds.yesOdds < 0.4 ? -0.8 : 0),
+                    ivImpact: changePercentage > 10 ? 0.9 : 0.4,
+                    symbols: ['MACRO'],
+                    isBreaking: changePercentage > 10,
+                    macroLevel,
+                    priceBrainSentiment: odds.yesOdds > 0.5 ? 'Bullish' : 'Bearish',
+                    priceBrainClassification: 'Counter-cyclical',
+                    impliedPoints: null,
+                    instrument: null,
+                    authorHandle: 'Polymarket',
+                    category: 'Odds Shifts'
+                };
+                articles.push(signalArticle);
             }
         } catch (e) {
-            console.error('Polymarket fetch failed:', e);
+            logger.error({ error: e }, 'Polymarket fetch failed');
         }
 
         // 3. Fetch FMP (Tertiary) if we need more volume
