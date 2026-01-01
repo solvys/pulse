@@ -142,10 +142,27 @@ class XClient {
                     url: url.substring(0, 100), // Log partial URL for debugging
                 });
 
-                // Handle 401/403 - Authentication errors (don't retry, token is invalid)
-                if (response.status === 401 || response.status === 403) {
-                    console.error(`[XClient] Authentication failed for ${account}. Check X_BEARER_TOKEN. Error:`, errorData);
-                    throw new Error(`X API Authentication failed (${response.status}): ${JSON.stringify(errorData)}`);
+                // STRICT: Handle 401/403 - Authentication errors (don't retry, token is invalid)
+                // Also check error message for auth-related patterns
+                const isAuthErrorResponse = 
+                    response.status === 401 || 
+                    response.status === 403 ||
+                    (errorData && (
+                        errorData.title?.toLowerCase().includes('unauthorized') ||
+                        errorData.title?.toLowerCase().includes('forbidden') ||
+                        errorData.detail?.toLowerCase().includes('token') ||
+                        errorData.detail?.toLowerCase().includes('authentication') ||
+                        errorData.message?.toLowerCase().includes('token') ||
+                        errorData.message?.toLowerCase().includes('authentication')
+                    ));
+                
+                if (isAuthErrorResponse) {
+                    const authErrorMsg = `X API Authentication failed (${response.status}) for ${account}. Check X_BEARER_TOKEN in Fly.io secrets. Error: ${JSON.stringify(errorData)}`;
+                    console.error(`[XClient] ${authErrorMsg}`);
+                    const authError = new Error(authErrorMsg);
+                    (authError as any).statusCode = response.status;
+                    (authError as any).errorData = errorData;
+                    throw authError;
                 }
 
                 // Retry on 5xx errors with exponential backoff
@@ -185,9 +202,29 @@ class XClient {
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : String(error);
             const errorStack = error instanceof Error ? error.stack : undefined;
+            const errorLower = errorMessage.toLowerCase();
             
-            // Don't retry on authentication errors (401/403)
-            const isAuthError = errorMessage.includes('401') || errorMessage.includes('403') || errorMessage.includes('Authentication');
+            // Check for status code in error object first (most reliable)
+            const hasAuthStatusCode = (error as any)?.statusCode === 401 || (error as any)?.statusCode === 403;
+            
+            // Strict authentication error detection - case-insensitive with precise patterns
+            // Use word boundaries and specific patterns to avoid false positives
+            const isAuthError = 
+                hasAuthStatusCode ||
+                // Status codes in error message (with word boundaries to avoid false positives like "14031")
+                /\b401\b/.test(errorMessage) || 
+                /\b403\b/.test(errorMessage) ||
+                // Case-insensitive auth-related keywords
+                errorLower.includes('authentication') ||
+                errorLower.includes('unauthorized') ||
+                errorLower.includes('forbidden') ||
+                errorLower.includes('invalid_token') ||
+                (errorLower.includes('token') && (errorLower.includes('invalid') || errorLower.includes('expired') || errorLower.includes('missing'))) ||
+                errorLower.includes('x_bearer_token') ||
+                errorLower.includes('bearer token') ||
+                errorLower.includes('not configured') ||
+                errorLower.includes('credentials') ||
+                errorLower.includes('authorization');
             
             console.error(`[XClient] Failed to fetch from X API for ${account}:`, {
                 account,
@@ -197,21 +234,23 @@ class XClient {
                 isAuthError,
             });
 
-            // If it's an auth error, throw it up so caller knows the token is invalid
+            // STRICT: Always throw authentication errors - never swallow them
             if (isAuthError) {
-                throw error; // Re-throw auth errors so they're visible
+                const authError = new Error(`X API Authentication failed for ${account}: ${errorMessage}`);
+                authError.stack = errorStack;
+                throw authError; // Re-throw auth errors so they propagate up
             }
 
-            // Retry on network errors with exponential backoff
-            if (retryCount < maxRetries && (errorMessage.includes('fetch') || errorMessage.includes('network'))) {
+            // Retry on network errors with exponential backoff (only for non-auth errors)
+            if (retryCount < maxRetries && (errorMessage.includes('fetch') || errorMessage.includes('network') || errorMessage.includes('ECONNREFUSED') || errorMessage.includes('ETIMEDOUT'))) {
                 const delay = baseDelay * Math.pow(2, retryCount);
                 console.warn(`[XClient] Network error for ${account}. Retrying in ${delay}ms (attempt ${retryCount + 1}/${maxRetries})`);
                 await new Promise(resolve => setTimeout(resolve, delay));
                 return this.fetchAccountTweets(account, limit, retryCount + 1);
             }
 
-            // Return empty array on final failure (fail gracefully for non-critical errors)
-            console.warn(`[XClient] Returning empty array for ${account} after ${retryCount + 1} attempts`);
+            // Return empty array on final failure (fail gracefully for non-critical, non-auth errors)
+            console.warn(`[XClient] Returning empty array for ${account} after ${retryCount + 1} attempts (non-auth error)`);
             return [];
         }
     }
@@ -231,17 +270,68 @@ class XClient {
     }
 
     /**
-     * Fetch from all monitored accounts in parallel (with concurrency limit optional, but simplified here)
+     * Fetch from all monitored accounts in parallel
+     * Uses Promise.allSettled to handle auth errors gracefully - if any account has auth error, throws immediately
      */
     async fetchAllFinancialNews(limitPerAccount: number = 5): Promise<Tweet[]> {
         if (this.isRateLimited()) return [];
 
         const promises = FINANCIAL_ACCOUNTS.map(account =>
-            this.fetchAccountTweets(account, limitPerAccount)
+            this.fetchAccountTweets(account, limitPerAccount).catch(error => {
+                // Re-throw auth errors immediately to fail fast
+                const errorMessage = error instanceof Error ? error.message : String(error);
+                const errorLower = errorMessage.toLowerCase();
+                const hasAuthStatusCode = (error as any)?.statusCode === 401 || (error as any)?.statusCode === 403;
+                const isAuthError = 
+                    hasAuthStatusCode ||
+                    /\b401\b/.test(errorMessage) || 
+                    /\b403\b/.test(errorMessage) ||
+                    errorLower.includes('authentication') ||
+                    errorLower.includes('unauthorized') ||
+                    errorLower.includes('forbidden') ||
+                    errorLower.includes('x_bearer_token') ||
+                    errorLower.includes('not configured');
+                
+                if (isAuthError) {
+                    throw error; // Re-throw auth errors to fail fast
+                }
+                // Return empty array for non-auth errors (graceful degradation)
+                console.warn(`[XClient] Non-auth error for ${account}, returning empty array:`, errorMessage);
+                return [];
+            })
         );
 
-        const results = await Promise.all(promises);
-        const allTweets = results.flat();
+        const results = await Promise.allSettled(promises);
+        
+        // Check if any promise was rejected due to auth error
+        for (const result of results) {
+            if (result.status === 'rejected') {
+                const error = result.reason;
+                const errorMessage = error instanceof Error ? error.message : String(error);
+                const errorLower = errorMessage.toLowerCase();
+                const hasAuthStatusCode = (error as any)?.statusCode === 401 || (error as any)?.statusCode === 403;
+                const isAuthError = 
+                    hasAuthStatusCode ||
+                    /\b401\b/.test(errorMessage) || 
+                    /\b403\b/.test(errorMessage) ||
+                    errorLower.includes('authentication') ||
+                    errorLower.includes('unauthorized') ||
+                    errorLower.includes('forbidden') ||
+                    errorLower.includes('x_bearer_token') ||
+                    errorLower.includes('not configured');
+                
+                if (isAuthError) {
+                    // Auth error detected - throw immediately to fail fast
+                    throw error;
+                }
+            }
+        }
+        
+        // Extract successful results
+        const allTweets = results
+            .filter((r): r is PromiseFulfilledResult<Tweet[]> => r.status === 'fulfilled')
+            .map(r => r.value)
+            .flat();
 
         // Sort by newest first
         return allTweets.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());

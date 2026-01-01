@@ -10,35 +10,60 @@ const GAMMA_API_URL = 'https://gamma-api.polymarket.com';
 
 export type PolymarketMarketType =
   | 'tariffs'
-  | 'rate_cuts'
-  | 'rate_hikes'
-  | 'recession'
-  | 'bubble_crash'
-  | 'ww3'
+  | 'supreme_court_tariffs'
   | 'trump_impeachment'
-  | 'supreme_court'
-  | 'ai_regulation'
-  | 'china_relations'
-  | 'geopolitics'
-  | 'mag7_stocks'
-  | 'semiconductors';
+  | 'fed_chair'
+  | 'emergency_rate_cut'
+  | 'regional_bank_failure'
+  | 'gold_new_highs'
+  | 'silver_new_highs'
+  | 'interest_rate_futures';
+
+// Macro level mapping for each market type
+export const MARKET_MACRO_LEVELS: Record<PolymarketMarketType, number> = {
+  'tariffs': 3,
+  'supreme_court_tariffs': 3,
+  'trump_impeachment': 2,
+  'fed_chair': 4,
+  'emergency_rate_cut': 3,
+  'regional_bank_failure': 3,
+  'gold_new_highs': 2,
+  'silver_new_highs': 3,
+  'interest_rate_futures': 4,
+};
 
 // Mapping topics to search keywords for better API discovery
 const TOPIC_KEYWORDS: Record<PolymarketMarketType, string[]> = {
-  'tariffs': ['Tariff', 'Trade War', 'Trump Tariff'],
-  'rate_cuts': ['Rate Cut', 'Fed Cut', 'FOMC'],
-  'rate_hikes': ['Rate Hike', 'Fed Hike', 'Interest Rate'],
-  'recession': ['Recession', 'US Recession', 'Hard Landing'],
-  'bubble_crash': ['Market Crash', 'Bubble', 'S&P 500 Crash'],
-  'ww3': ['World War 3', 'WW3', 'Nuclear'],
-  'trump_impeachment': ['Impeachment', 'Trump Impeach'],
-  'supreme_court': ['Supreme Court', 'SCOTUS'],
-  'ai_regulation': ['AI', 'Artificial Intelligence', 'AGI', 'OpenAI'],
-  'china_relations': ['China', 'Taiwan', 'US-China'],
-  'geopolitics': ['Geopolitics', 'War', 'Conflict', 'Middle East'],
-  'mag7_stocks': ['NVIDIA', 'NVDA', 'Apple', 'AAPL', 'Microsoft', 'MSFT', 'Amazon', 'AMZN', 'Google', 'GOOGL', 'Meta', 'Tesla', 'TSLA'],
-  'semiconductors': ['AMD', 'TSM', 'SMCI', 'Broadcom', 'AVGO'],
+  'tariffs': ['Tariff', 'Trade War', 'Trump Tariff', 'China Tariff', 'EU Tariff'],
+  'supreme_court_tariffs': ['Supreme Court', 'SCOTUS', 'Tariff', 'Trade', 'Court Ruling'],
+  'trump_impeachment': ['Impeachment', 'Trump Impeach', 'Impeach Trump'],
+  'fed_chair': ['Fed Chair', 'Federal Reserve Chair', 'Powell', 'Fed Nominee', 'FOMC Chair'],
+  'emergency_rate_cut': ['Emergency Rate Cut', 'Fed Emergency', 'Emergency Cut', 'FOMC Emergency'],
+  'regional_bank_failure': ['Bank Failure', 'Regional Bank', 'Bank Collapse', 'Bank Crisis', 'Bank Run'],
+  'gold_new_highs': ['Gold', 'Gold High', 'Gold Price', 'XAU', 'Gold Record'],
+  'silver_new_highs': ['Silver', 'Silver High', 'Silver Price', 'XAG', 'Silver Record'],
+  'interest_rate_futures': ['Interest Rate', 'Fed Funds', 'Rate Futures', 'FOMC Rate', 'Fed Rate'],
 };
+
+// Filter out irrelevant markets (nukes, WW3, etc.)
+const IRRELEVANT_KEYWORDS = [
+  'nuclear weapon',
+  'nuclear war',
+  'ww3',
+  'world war 3',
+  'nuke',
+  'atomic bomb',
+  'nuclear detonation',
+  'nuclear attack',
+];
+
+/**
+ * Check if a market is relevant (not filtered out)
+ */
+function isRelevantMarket(event: GammaEvent): boolean {
+  const text = (event.title + ' ' + event.slug + ' ' + (event.markets[0]?.question || '')).toLowerCase();
+  return !IRRELEVANT_KEYWORDS.some(keyword => text.includes(keyword));
+}
 
 export interface PolymarketOdds {
   marketId: string;
@@ -113,6 +138,9 @@ async function fetchGammaEvents(): Promise<GammaEvent[]> {
 export async function fetchAllPolymarketOdds(): Promise<PolymarketOdds[]> {
   try {
     const events = await fetchGammaEvents();
+    // Filter out irrelevant markets first
+    const relevantEvents = events.filter(isRelevantMarket);
+    
     const marketTypes = Object.keys(TOPIC_KEYWORDS) as PolymarketMarketType[];
     const result: PolymarketOdds[] = [];
 
@@ -120,8 +148,8 @@ export async function fetchAllPolymarketOdds(): Promise<PolymarketOdds[]> {
     for (const type of marketTypes) {
       const keywords = TOPIC_KEYWORDS[type];
 
-      // Find matching event
-      const match = events.find(e => {
+      // Find matching event from relevant events only
+      const match = relevantEvents.find(e => {
         const text = (e.title + ' ' + e.slug + ' ' + (e.markets[0]?.question || '')).toLowerCase();
         return keywords.some(k => text.includes(k.toLowerCase()));
       });
@@ -185,35 +213,45 @@ export async function fetchPolymarketOdds(marketType: PolymarketMarketType): Pro
 }
 
 /**
- * Check for significant odds changes (>5% threshold) using DB history
+ * Check for significant odds changes (>5% threshold) within last 24 hours
+ * Returns null if data is stale (>24 hours old)
  */
 export async function checkSignificantChanges(
   currentOdds: PolymarketOdds
-): Promise<{ hasChange: boolean; changePercentage: number; previousOdds: number }> {
+): Promise<{ hasChange: boolean; changePercentage: number; previousOdds: number; isStale: boolean }> {
   try {
-    // Get snapshot from ~60 mins ago
+    // Get snapshot from 24 hours ago (or most recent if less than 24h exists)
     const rows = await sql`
-            SELECT yes_odds FROM polymarket_odds
+            SELECT yes_odds, timestamp FROM polymarket_odds
             WHERE market_id = ${currentOdds.marketId}
-            AND timestamp > NOW() - INTERVAL '65 minutes'
-            AND timestamp < NOW() - INTERVAL '55 minutes'
+            AND timestamp > NOW() - INTERVAL '24 hours'
             ORDER BY timestamp DESC
             LIMIT 1
         `;
 
     if (rows.length === 0) {
-      // Try getting the oldest record if < 60 mins exist
-      const oldRows = await sql`
-                SELECT yes_odds FROM polymarket_odds
+      // Check if any data exists at all
+      const anyRows = await sql`
+                SELECT yes_odds, timestamp FROM polymarket_odds
                 WHERE market_id = ${currentOdds.marketId}
-                ORDER BY timestamp ASC
+                ORDER BY timestamp DESC
                 LIMIT 1
             `;
-      if (oldRows.length === 0) return { hasChange: false, changePercentage: 0, previousOdds: 0 };
+      
+      if (anyRows.length === 0) {
+        // No previous data - this is a new market
+        return { hasChange: false, changePercentage: 0, previousOdds: 0, isStale: false };
+      }
 
-      const prev = Number(oldRows[0].yes_odds);
+      // Data exists but is older than 24 hours - mark as stale
+      const prev = Number(anyRows[0].yes_odds);
       const change = Math.abs(currentOdds.yesOdds - prev);
-      return { hasChange: change > 0.05, changePercentage: change * 100, previousOdds: prev };
+      return { 
+        hasChange: change > 0.05, 
+        changePercentage: change * 100, 
+        previousOdds: prev,
+        isStale: true // Stale data - don't show in feed
+      };
     }
 
     const prev = Number(rows[0].yes_odds);
@@ -222,12 +260,13 @@ export async function checkSignificantChanges(
     return {
       hasChange: change > 0.05,
       changePercentage: change * 100,
-      previousOdds: prev
+      previousOdds: prev,
+      isStale: false // Data is fresh (<24 hours)
     };
 
   } catch (e) {
     console.error('Error checking significant changes:', e);
-    return { hasChange: false, changePercentage: 0, previousOdds: 0 };
+    return { hasChange: false, changePercentage: 0, previousOdds: 0, isStale: true };
   }
 }
 
