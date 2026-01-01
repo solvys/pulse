@@ -88,7 +88,7 @@ Respond ONLY with valid JSON, no additional text.`;
             model: model as any,
             prompt,
             temperature: 0.3, // Low temperature for consistency as per architecture docs
-            maxTokens: 500, // As specified in architecture docs
+            // maxTokens removed - configured on model level in AI SDK v6
         });
 
         // Parse the JSON response
