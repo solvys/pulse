@@ -59,8 +59,13 @@ class XClient {
      */
     async fetchAccountTweets(account: string, limit: number = 10, retryCount: number = 0): Promise<Tweet[]> {
         if (!env.X_BEARER_TOKEN) {
-            console.warn('[XClient] X_BEARER_TOKEN missing, skipping X API fetch');
-            return [];
+            console.error('[XClient] X_BEARER_TOKEN missing! Set X_BEARER_TOKEN in Fly.io secrets to enable X API fetching.');
+            throw new Error('X_BEARER_TOKEN not configured. Please set it in Fly.io secrets.');
+        }
+        
+        // Validate token format (should start with AAAA... for Bearer tokens)
+        if (!env.X_BEARER_TOKEN.startsWith('AAAA')) {
+            console.warn('[XClient] X_BEARER_TOKEN format may be incorrect. Bearer tokens typically start with "AAAA"');
         }
 
         if (this.isRateLimited()) {
@@ -128,11 +133,20 @@ class XClient {
                     errorData = { message: errorText };
                 }
                 
+                // Log detailed error information
                 console.error(`[XClient] X API Error ${response.status} for ${account}:`, {
                     status: response.status,
                     statusText: response.statusText,
                     error: errorData,
+                    account,
+                    url: url.substring(0, 100), // Log partial URL for debugging
                 });
+
+                // Handle 401/403 - Authentication errors (don't retry, token is invalid)
+                if (response.status === 401 || response.status === 403) {
+                    console.error(`[XClient] Authentication failed for ${account}. Check X_BEARER_TOKEN. Error:`, errorData);
+                    throw new Error(`X API Authentication failed (${response.status}): ${JSON.stringify(errorData)}`);
+                }
 
                 // Retry on 5xx errors with exponential backoff
                 if (response.status >= 500 && retryCount < maxRetries) {
@@ -142,6 +156,7 @@ class XClient {
                     return this.fetchAccountTweets(account, limit, retryCount + 1);
                 }
 
+                // For 4xx errors (except 401/403), throw to be caught by outer handler
                 throw new Error(`X API Error ${response.status}: ${JSON.stringify(errorData)}`);
             }
 
@@ -171,12 +186,21 @@ class XClient {
             const errorMessage = error instanceof Error ? error.message : String(error);
             const errorStack = error instanceof Error ? error.stack : undefined;
             
+            // Don't retry on authentication errors (401/403)
+            const isAuthError = errorMessage.includes('401') || errorMessage.includes('403') || errorMessage.includes('Authentication');
+            
             console.error(`[XClient] Failed to fetch from X API for ${account}:`, {
                 account,
                 error: errorMessage,
                 stack: errorStack,
                 retryCount,
+                isAuthError,
             });
+
+            // If it's an auth error, throw it up so caller knows the token is invalid
+            if (isAuthError) {
+                throw error; // Re-throw auth errors so they're visible
+            }
 
             // Retry on network errors with exponential backoff
             if (retryCount < maxRetries && (errorMessage.includes('fetch') || errorMessage.includes('network'))) {
@@ -186,7 +210,8 @@ class XClient {
                 return this.fetchAccountTweets(account, limit, retryCount + 1);
             }
 
-            // Return empty array on final failure (fail gracefully)
+            // Return empty array on final failure (fail gracefully for non-critical errors)
+            console.warn(`[XClient] Returning empty array for ${account} after ${retryCount + 1} attempts`);
             return [];
         }
     }

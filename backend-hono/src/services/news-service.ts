@@ -238,7 +238,25 @@ export async function prefetchHighPriorityNews(): Promise<{ fetched: number; sto
                 allTweets.push(...tweets);
                 logger.debug({ account, count: tweets.length }, 'Fetched tweets from high-priority account');
             } catch (error) {
-                logger.error({ error, account }, 'Failed to fetch from high-priority account');
+                const errorMessage = error instanceof Error ? error.message : String(error);
+                const isAuthError = errorMessage.includes('401') || errorMessage.includes('403') || errorMessage.includes('Authentication');
+                
+                if (isAuthError) {
+                    logger.error({ 
+                        error: errorMessage,
+                        account,
+                        hint: 'X_BEARER_TOKEN authentication failed. Check Fly.io secrets.'
+                    }, 'X API authentication failed for high-priority account');
+                    // Don't continue with other accounts if auth is broken
+                    throw error;
+                } else {
+                    logger.error({ 
+                        error: errorMessage,
+                        account,
+                        stack: error instanceof Error ? error.stack : undefined
+                    }, 'Failed to fetch from high-priority account');
+                    // Continue with other accounts on non-auth errors
+                }
             }
         }
         
@@ -327,10 +345,24 @@ export async function fetchAndStoreNews(limit: number = 15): Promise<{ fetched: 
                 articles.push(...xArticles);
                 logger.info({ count: xArticles.length }, 'Fetched X API articles');
             } else {
-                logger.warn('No tweets returned from X API');
+                logger.warn('No tweets returned from X API - check X_BEARER_TOKEN and rate limits');
             }
         } catch (e) {
-            logger.error({ error: e }, 'X Source failed');
+            const errorMessage = e instanceof Error ? e.message : String(e);
+            const isAuthError = errorMessage.includes('401') || errorMessage.includes('403') || errorMessage.includes('Authentication');
+            
+            if (isAuthError) {
+                logger.error({ 
+                    error: errorMessage,
+                    hint: 'X_BEARER_TOKEN may be invalid or expired. Check Fly.io secrets.'
+                }, 'X API authentication failed');
+            } else {
+                logger.error({ 
+                    error: errorMessage,
+                    stack: e instanceof Error ? e.stack : undefined
+                }, 'X Source failed');
+            }
+            // Continue with other sources even if X API fails
         }
 
         // 2. Fetch Polymarket Signals (Secondary)
