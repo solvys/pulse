@@ -235,16 +235,16 @@ export async function fetchAndStoreNews(limit: number = 15): Promise<{ fetched: 
         try {
             const xTweets = await xClient.fetchAllFinancialNews(Math.ceil(limit / FINANCIAL_ACCOUNTS.length));
             if (xTweets.length > 0) {
-                // Filter X API news: Only Level 3 (high) or Level 4 (critical) 
-                // This is a temporary measure due to the free plan limits.
-                const filteredArticles = xTweets
-                    .map(tweetToArticle)
-                    .filter(article => (article.macroLevel || 0) >= 3);
-
-                articles.push(...filteredArticles);
+                // Convert all tweets to articles - no filtering by macro level
+                // Price Brain Layer will analyze Level 3-4 articles separately
+                const xArticles = xTweets.map(tweetToArticle);
+                articles.push(...xArticles);
+                logger.info({ count: xArticles.length }, 'Fetched X API articles');
+            } else {
+                logger.warn('No tweets returned from X API');
             }
         } catch (e) {
-            console.error('X Source failed:', e);
+            logger.error({ error: e }, 'X Source failed');
         }
 
         // 2. Fetch Polymarket Signals (Secondary)
