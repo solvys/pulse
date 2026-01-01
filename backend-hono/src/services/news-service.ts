@@ -6,7 +6,7 @@
  */
 
 import { sql } from '../db/index.js';
-import { xClient, Tweet, FINANCIAL_ACCOUNTS } from './x-client.js';
+import { xClient, Tweet, FINANCIAL_ACCOUNTS, HIGH_PRIORITY_ACCOUNTS } from './x-client.js';
 import { fetchAllPolymarketOdds, checkSignificantChanges, PolymarketOdds } from './polymarket-service.js';
 import { fetchGeneralNews, FMPArticle } from './fmp-service.js';
 import { analyzeArticleWithPriceBrain, type ArticleInput } from './price-brain-service.js';
@@ -217,6 +217,92 @@ async function updateArticleWithPriceBrain(
         logger.debug({ url, sentiment: analysis.sentiment }, 'Updated article with Price Brain analysis');
     } catch (err) {
         logger.error({ err, url }, 'Failed to update article with Price Brain analysis');
+    }
+}
+
+/**
+ * Prefetch Level 3-4 news items from high-priority accounts
+ * Fetches the last 15 items from @financialjuice and @insiderwire, filtered to Level 3-4 only
+ */
+export async function prefetchHighPriorityNews(): Promise<{ fetched: number; stored: number }> {
+    try {
+        logger.info({ accounts: HIGH_PRIORITY_ACCOUNTS }, 'Starting high-priority news prefetch');
+        
+        let allTweets: Tweet[] = [];
+        
+        // Fetch from high-priority accounts
+        for (const account of HIGH_PRIORITY_ACCOUNTS) {
+            try {
+                // Fetch 15 tweets per account to ensure we get enough Level 3-4 items
+                const tweets = await xClient.fetchAccountTweets(account, 15);
+                allTweets.push(...tweets);
+                logger.debug({ account, count: tweets.length }, 'Fetched tweets from high-priority account');
+            } catch (error) {
+                logger.error({ error, account }, 'Failed to fetch from high-priority account');
+            }
+        }
+        
+        if (allTweets.length === 0) {
+            logger.warn('No tweets fetched from high-priority accounts');
+            return { fetched: 0, stored: 0 };
+        }
+        
+        // Convert to articles and filter for Level 3-4 only
+        const articles = allTweets
+            .map(tweetToArticle)
+            .filter(article => (article.macroLevel || 0) >= 3);
+        
+        logger.info({ 
+            totalTweets: allTweets.length, 
+            level3_4Articles: articles.length 
+        }, 'High-priority prefetch filtered to Level 3-4');
+        
+        if (articles.length === 0) {
+            logger.info('No Level 3-4 articles found in high-priority prefetch');
+            return { fetched: allTweets.length, stored: 0 };
+        }
+        
+        // Store articles
+        const { stored } = await storeArticles(articles);
+        
+        // Analyze with Price Brain Layer (all are Level 3-4)
+        for (const article of articles) {
+            try {
+                const analysis = await analyzeArticleWithPriceBrain({
+                    title: article.title,
+                    content: article.content || article.summary || '',
+                    summary: article.summary,
+                    macroLevel: article.macroLevel || 0,
+                    symbols: article.symbols || [],
+                    source: article.source,
+                });
+
+                if (analysis) {
+                    await updateArticleWithPriceBrain(article.url, {
+                        sentiment: analysis.sentiment,
+                        classification: analysis.classification,
+                        impliedPoints: analysis.impliedPoints,
+                        instrument: analysis.instrument || null,
+                    });
+                }
+            } catch (error) {
+                logger.error({ 
+                    error, 
+                    articleTitle: article.title.substring(0, 50) 
+                }, 'Price Brain analysis failed for prefetched article');
+            }
+        }
+        
+        logger.info({ 
+            fetched: allTweets.length, 
+            stored,
+            level3_4Count: articles.length 
+        }, 'High-priority news prefetch complete');
+        
+        return { fetched: allTweets.length, stored };
+    } catch (error) {
+        logger.error({ error }, 'High-priority news prefetch failed');
+        return { fetched: 0, stored: 0 };
     }
 }
 

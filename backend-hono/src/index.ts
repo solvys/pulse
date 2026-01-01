@@ -7,7 +7,7 @@ import { corsMiddleware } from './middleware/cors.js';
 import { loggerMiddleware, logger } from './middleware/logger.js';
 import { registerRoutes } from './routes/index.js';
 import { marketRoutes } from './routes/market.js';
-import { fetchAndStoreNews, initializePolymarketFeed } from './services/news-service.js';
+import { fetchAndStoreNews, initializePolymarketFeed, prefetchHighPriorityNews } from './services/news-service.js';
 
 const app = new Hono();
 
@@ -109,10 +109,14 @@ logger.info({ port, host }, `Server running at http://${host}:${port}`);
 // Initialize news feed on startup
 Promise.all([
   initializePolymarketFeed(),
+  prefetchHighPriorityNews(), // Prefetch Level 3-4 from high-priority accounts
   fetchAndStoreNews(15)
 ])
-  .then(([_, { fetched, stored }]) => {
-    logger.info({ fetched, stored }, 'News feed initialized on startup');
+  .then(([_, prefetchResult, fetchResult]) => {
+    logger.info({ 
+      prefetch: prefetchResult, 
+      general: fetchResult 
+    }, 'News feed initialized on startup');
 
     // Schedule background refresh every 5 minutes
     setInterval(async () => {

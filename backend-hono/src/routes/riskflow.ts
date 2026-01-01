@@ -9,6 +9,7 @@ import {
     getNewsFeed,
     getBreakingNews,
     fetchAndStoreNews,
+    prefetchHighPriorityNews,
 } from '../services/news-service.js';
 
 const riskflowRoutes = new Hono();
@@ -170,6 +171,19 @@ riskflowRoutes.post('/refresh', async (c) => {
         return c.json({ success: true, ...result });
     } catch (error) {
         return c.json({ success: false, error: 'Failed to refresh' }, 500);
+    }
+});
+
+/**
+ * POST /riskflow/prefetch
+ * Prefetch Level 3-4 news from high-priority accounts (@financialjuice, @insiderwire)
+ */
+riskflowRoutes.post('/prefetch', async (c) => {
+    try {
+        const result = await prefetchHighPriorityNews();
+        return c.json({ success: true, ...result });
+    } catch (error) {
+        return c.json({ success: false, error: 'Failed to prefetch' }, 500);
     }
 });
 

@@ -20,10 +20,17 @@ export interface Tweet {
 // Financial news accounts to follow (migrated from Nitter client)
 export const FINANCIAL_ACCOUNTS = [
     'financialjuice', // Primary - Financial Juice
+    'insiderwire',    // Insider Wire
     'zaboradar',      // Walter Bloomberg
     'FirstSquawk',    // First Squawk
     'DeItaone',       // DeItaOne
     'unusual_whales', // Unusual Whales
+];
+
+// High-priority accounts for Level 3-4 prefetch
+export const HIGH_PRIORITY_ACCOUNTS = [
+    'financialjuice',
+    'insiderwire',
 ];
 
 class XClient {
