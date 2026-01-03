@@ -1,5 +1,6 @@
 {
     "workbench.editor.autoLockGroups": {
         "jupyter-notebook": true
-    }
+    },
+    "claudeCodeChat.permissions.yoloMode": false
 }
