@@ -2,7 +2,7 @@ app = "pulse-api-withered-dust-1394"
 primary_region = "ord"
 
 [build]
-  dockerfile = "backend-hono/Dockerfile"
+  dockerfile = "Dockerfile"
 
 [env]
   NODE_ENV = "production"
