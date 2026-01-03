@@ -40,7 +40,7 @@ chatRoute.post('/', async (c) => {
         if (!activeConvId) {
             activeConvId = crypto.randomUUID();
             await sql `
-                INSERT INTO conversations (conversation_id, user_id, title)
+                INSERT INTO ai_conversations (id, user_id, title)
                 VALUES (${activeConvId}, ${userId}, 'New Chat')
             `;
         }
@@ -48,18 +48,18 @@ chatRoute.post('/', async (c) => {
         const lastUserMsg = messages[messages.length - 1];
         if (lastUserMsg && lastUserMsg.role === 'user') {
             await sql `
-                INSERT INTO messages (id, conversation_id, role, content)
+                INSERT INTO ai_messages (id, conversation_id, role, content)
                 VALUES (${crypto.randomUUID()}, ${activeConvId}, 'user', ${lastUserMsg.content})
             `;
         }
         // Update Conversation Timestamp
-        await sql `UPDATE conversations SET updated_at = NOW() WHERE conversation_id = ${activeConvId}`;
+        await sql `UPDATE ai_conversations SET updated_at = NOW() WHERE id = ${activeConvId}`;
         // 3. Stream Response with Persistence
         return await aiService.streamChat(messages, systemContext, async (fullResponseText) => {
             // Save Assistant Message on Finish
             try {
                 await sql `
-                    INSERT INTO messages (id, conversation_id, role, content)
+                    INSERT INTO ai_messages (id, conversation_id, role, content)
                     VALUES (${crypto.randomUUID()}, ${activeConvId}, 'assistant', ${fullResponseText})
                  `;
             }

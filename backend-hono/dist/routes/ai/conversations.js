@@ -9,15 +9,15 @@ conversationsRoute.get('/', async (c) => {
             return c.json({ error: 'Unauthorized' }, 401);
         const rows = await sql `
       SELECT 
-        c.conversation_id as "conversationId",
+        c.id as "conversationId",
         c.title,
         c.updated_at as "updatedAt",
-        c.pinned as "isPinned",
-        c.archived as "isArchived",
-        (SELECT COUNT(*) FROM messages m WHERE m.conversation_id = c.conversation_id) as "messageCount",
-        (SELECT content FROM messages m WHERE m.conversation_id = c.conversation_id ORDER BY created_at DESC LIMIT 1) as "preview"
-      FROM conversations c
-      WHERE c.user_id = ${userId} AND c.archived = false
+        false as "isPinned",
+        false as "isArchived",
+        (SELECT COUNT(*) FROM ai_messages m WHERE m.conversation_id = c.id) as "messageCount",
+        (SELECT content FROM ai_messages m WHERE m.conversation_id = c.id ORDER BY created_at DESC LIMIT 1) as "preview"
+      FROM ai_conversations c
+      WHERE c.user_id = ${userId}
       ORDER BY c.updated_at DESC
       LIMIT 50
     `;
@@ -36,8 +36,8 @@ conversationsRoute.get('/:id', async (c) => {
         if (!userId)
             return c.json({ error: 'Unauthorized' }, 401);
         const items = await sql `
-      SELECT * FROM conversations 
-      WHERE conversation_id = ${conversationId} AND user_id = ${userId}
+      SELECT * FROM ai_conversations 
+      WHERE id = ${conversationId} AND user_id = ${userId}
     `;
         if (items.length === 0) {
             return c.json({ error: 'Conversation not found' }, 404);
@@ -48,7 +48,7 @@ conversationsRoute.get('/:id', async (c) => {
         role,
         content,
         created_at as "createdAt"
-      FROM messages
+      FROM ai_messages
       WHERE conversation_id = ${conversationId}
       ORDER BY created_at ASC
     `;
