@@ -1,11 +1,15 @@
+# Production runtime for Pulse API
 FROM node:20-alpine
 
-WORKDIR /app/backend-hono
+WORKDIR /app
 
-# Copy the compiled backend along with its existing dependencies.
-# Assumes the working directory (build context) already sits inside `backend-hono/`.
+# Copy package files and install production dependencies
+COPY package.json package-lock.json* ./
+RUN npm ci --omit=dev || npm install --omit=dev
+
+# Copy compiled application
 COPY dist ./dist
-COPY node_modules ./node_modules
+
 ENV NODE_ENV=production
 ENV PORT=8080
 

@@ -1,0 +1,1 @@
+{"version":3,"file":"quick-pulse.d.ts","sourceRoot":"","sources":["../../../src/routes/ai/quick-pulse.ts"],"names":[],"mappings":"AACA,OAAO,EAAE,IAAI,EAAE,MAAM,MAAM,CAAC;AAI5B,KAAK,SAAS,GAAG;IACb,IAAI,EAAE;QACF,EAAE,EAAE,MAAM,CAAC;KACd,CAAC;CACL,CAAC;AAEF,eAAO,MAAM,eAAe;eAAyB,SAAS;yCAAK,CAAC"}
