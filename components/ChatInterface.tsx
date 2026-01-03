@@ -114,7 +114,7 @@ export default function ChatInterface() {
 
   // Custom fetch function for useChat with auth
   const fetchWithAuth = useCallback(async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
-    const token = await getToken();
+    const token = await getToken({ template: 'neon' });
     const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
 
     // If URL is relative, prepend API_BASE_URL
