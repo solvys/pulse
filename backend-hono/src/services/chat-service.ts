@@ -35,25 +35,50 @@ export type ChatResult = ChatStreamResult | ChatJsonResult
 
 const isUuid = (value?: string) => {
   if (!value) return false
-  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
     value
   )
 }
 
+const isValidRole = (role: unknown): role is AiMessage['role'] =>
+  role === 'system' || role === 'user' || role === 'assistant'
+
 const normalizeMessages = (messages: ChatRequest['messages']): AiMessage[] =>
-  messages
-    .map((message) => ({
+  messages.map((message, index) => {
+    const content = message.content.trim()
+    if (!content) {
+      throw new Error(`Message at index ${index} cannot be empty or whitespace only`)
+    }
+    return {
       role: message.role,
-      content: message.content.trim()
-    }))
-    .filter((message) => message.content.length > 0)
+      content
+    }
+  })
 
 const trimMessages = (messages: AiMessage[], maxMessages: number): AiMessage[] => {
+  if (maxMessages <= 0) return []
   if (messages.length <= maxMessages) return messages
-  const systemMessages = messages.filter((message) => message.role === 'system')
-  const nonSystemMessages = messages.filter((message) => message.role !== 'system')
-  const trimmed = nonSystemMessages.slice(-maxMessages)
-  return [...systemMessages, ...trimmed]
+
+  const systemIndexes = messages.reduce<number[]>((acc, message, index) => {
+    if (message.role === 'system') acc.push(index)
+    return acc
+  }, [])
+
+  if (systemIndexes.length >= maxMessages) {
+    const keep = systemIndexes.slice(-maxMessages)
+    return keep.map((index) => messages[index])
+  }
+
+  const indexesToKeep = new Set(systemIndexes)
+  let remaining = maxMessages - systemIndexes.length
+
+  for (let i = messages.length - 1; i >= 0 && remaining > 0; i -= 1) {
+    if (indexesToKeep.has(i)) continue
+    indexesToKeep.add(i)
+    remaining -= 1
+  }
+
+  return messages.filter((_, index) => indexesToKeep.has(index))
 }
 
 const getLastUserMessage = (messages: AiMessage[]) => {
@@ -105,6 +130,7 @@ export const createChatService = (deps: {
       if (existing) {
         return existing
       }
+      throw new Error(`Conversation ${conversationId} was not found`)
     }
 
     const metadata = request.metadata ?? null
@@ -128,10 +154,17 @@ export const createChatService = (deps: {
     if (incomingMessages.length) return incomingMessages
     if (!conversationId) return []
     const stored = await conversationManager.getConversationMessages(conversationId)
-    return stored.map((message) => ({
-      role: message.role as AiMessage['role'],
-      content: message.content
-    }))
+    return stored.map((message, index) => {
+      if (!isValidRole(message.role)) {
+        throw new Error(
+          `Conversation ${conversationId} contains message ${index} with invalid role ${message.role}`
+        )
+      }
+      return {
+        role: message.role,
+        content: message.content
+      }
+    })
   }
 
   const handleChat = async (
