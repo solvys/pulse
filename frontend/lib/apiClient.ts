@@ -6,12 +6,10 @@
  */
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080';
-import { signOutUser } from './authHelper';
 
 // Global auth failure state - stops all polling when auth fails
 let authFailed = false;
 let authFailedTimestamp: number | null = null;
-let signOutInProgress = false; // Prevent multiple simultaneous sign-outs
 const AUTH_RETRY_DELAY_MS = 30000; // Wait 30s before retrying after auth failure
 const MAX_401_COUNT = 3; // Maximum consecutive 401s before giving up
 let consecutive401Count = 0;
@@ -23,7 +21,6 @@ export function resetAuthState() {
   authFailedTimestamp = null;
   consecutive401Count = 0;
   last401Timestamp = null;
-  signOutInProgress = false;
 }
 
 // Check if auth has failed and we should skip requests
@@ -57,26 +54,10 @@ function handle401Error(): void {
   authFailed = true;
   authFailedTimestamp = now;
   
-  // Only sign out once, and only if we've seen multiple 401s
-  if (consecutive401Count >= MAX_401_COUNT && !signOutInProgress) {
-    signOutInProgress = true;
-    console.warn(`[API] Multiple auth failures (${consecutive401Count}). Signing out to allow re-authentication`);
-    
-    signOutUser()
-      .then(() => {
-        console.log('[API] Successfully signed out after auth failures');
-      })
-      .catch((err) => {
-        console.error('[API] Error signing out on 401:', err);
-      })
-      .finally(() => {
-        // Reset sign out flag after a delay to allow retry
-        setTimeout(() => {
-          signOutInProgress = false;
-        }, 5000);
-      });
+  if (consecutive401Count >= MAX_401_COUNT) {
+    console.warn(`[API] Multiple auth failures (${consecutive401Count}). Auto-logout disabled for debugging.`);
   } else if (consecutive401Count < MAX_401_COUNT) {
-    console.warn(`[API] Auth failed (${consecutive401Count}/${MAX_401_COUNT}). Will retry or sign out if continues.`);
+    console.warn(`[API] Auth failed (${consecutive401Count}/${MAX_401_COUNT}). Auto-logout disabled for debugging.`);
   }
 }
 
