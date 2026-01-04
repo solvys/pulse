@@ -1,5 +1,22 @@
 import { Pool, type PoolConfig, type QueryResult } from 'pg';
 
+export class DatabaseError extends Error {
+  status: number;
+  code?: string;
+
+  constructor(
+    message: string,
+    options: { status?: number; code?: string; cause?: unknown } = {},
+  ) {
+    super(message);
+    this.name = 'DatabaseError';
+    this.status = options.status ?? 503;
+    this.code = options.code;
+    // Preserve original error for debugging/logging.
+    (this as { cause?: unknown }).cause = options.cause;
+  }
+}
+
 type CacheEntry<T> = {
   value: T;
   expiresAt: number;
@@ -57,7 +74,50 @@ const buildPoolConfig = (): PoolConfig => ({
 
 const pool = new Pool(buildPoolConfig());
 
+pool.on('error', (error) => {
+  console.error('[db] pool error', {
+    name: error instanceof Error ? error.name : 'UnknownError',
+    message: error instanceof Error ? error.message : String(error),
+  });
+});
+
 const cache = new LruCache<string, QueryResult>(200, 60_000);
+
+const normalizeSql = (text: string) => text.replace(/\s+/g, ' ').trim().slice(0, 500);
+
+const getErrorCode = (error: unknown): string | undefined => {
+  if (!error || typeof error !== 'object') return undefined;
+  const code = (error as { code?: unknown }).code;
+  return typeof code === 'string' ? code : undefined;
+};
+
+const isConnectionError = (error: unknown): boolean => {
+  const code = getErrorCode(error);
+  if (!code) return false;
+  return (
+    code === 'ECONNREFUSED' ||
+    code === 'ECONNRESET' ||
+    code === 'ETIMEDOUT' ||
+    code === 'ENOTFOUND'
+  );
+};
+
+const wrapDbError = (error: unknown, context: { label: string; text: string; params: readonly unknown[] }) => {
+  const code = getErrorCode(error);
+  const status = isConnectionError(error) ? 503 : 500;
+  const message = error instanceof Error ? error.message : String(error);
+
+  console.error('[db] query failed', {
+    label: context.label,
+    status,
+    code,
+    message,
+    sql: normalizeSql(context.text),
+    paramsCount: context.params.length,
+  });
+
+  return new DatabaseError('Database query failed', { status, code, cause: error });
+};
 
 const buildCacheKey = (text: string, params: readonly unknown[]) => {
   const serializedParams = params.length ? JSON.stringify(params) : '';
@@ -77,14 +137,26 @@ export async function cachedQuery<T = unknown>(
     return cached as QueryResult<T>;
   }
 
-  const result = await pool.query<T>(text, params as unknown[]);
-  cache.set(key, result as QueryResult, options.ttlMs);
-  return result;
+  try {
+    const result = await pool.query<T>(text, params as unknown[]);
+    cache.set(key, result as QueryResult, options.ttlMs);
+    return result;
+  } catch (error) {
+    throw wrapDbError(error, { label: 'cachedQuery', text, params });
+  }
 }
 
 export async function query<T = unknown>(
   text: string,
   params: readonly unknown[] = [],
 ): Promise<QueryResult<T>> {
-  return pool.query<T>(text, params as unknown[]);
+  try {
+    return await pool.query<T>(text, params as unknown[]);
+  } catch (error) {
+    throw wrapDbError(error, { label: 'query', text, params });
+  }
+}
+
+export async function pingDb(): Promise<void> {
+  await query('SELECT 1');
 }

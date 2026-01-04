@@ -172,6 +172,7 @@ export const createChatService = (deps: {
     rawBody: unknown,
     acceptHeader?: string | null
   ): Promise<ChatResult> => {
+    const startedAt = Date.now()
     const request = parseChatRequest(rawBody)
     const normalizedMessages = normalizeMessages(request.messages)
     if (!normalizedMessages.length) {
@@ -182,6 +183,18 @@ export const createChatService = (deps: {
     if (!lastUserMessage) {
       throw new Error('Chat request must include a user message')
     }
+
+    const wantsStream = shouldStream(request, acceptHeader)
+    console.info('[chat] request', {
+      userId,
+      providedConversationId: request.conversationId ?? null,
+      messageCount: normalizedMessages.length,
+      lastUserChars: lastUserMessage.content.length,
+      stream: wantsStream,
+      accept: acceptHeader ?? null,
+      modelHint: request.model ?? null,
+      taskType: request.taskType ?? (request.metadata?.taskType as string | undefined) ?? null
+    })
 
     const conversation = await ensureConversation(userId, request, lastUserMessage)
     const promptMessages = await buildPromptMessages(conversation.id, normalizedMessages)
@@ -206,23 +219,41 @@ export const createChatService = (deps: {
     })
 
     const onFinish = async (finish: StreamFinish) => {
-      await conversationManager.addMessage({
-        conversationId: conversation.id,
-        role: 'assistant',
-        content: finish.text,
-        metadata: {
-          finishReason: finish.finishReason,
-          latencyMs: finish.latencyMs
-        },
-        model: finish.model,
-        inputTokens: finish.usage?.inputTokens ?? null,
-        outputTokens: finish.usage?.outputTokens ?? null,
-        totalTokens: finish.usage?.totalTokens ?? null,
-        costUsd: finish.costUsd ?? null
-      })
+      try {
+        await conversationManager.addMessage({
+          conversationId: conversation.id,
+          role: 'assistant',
+          content: finish.text,
+          metadata: {
+            finishReason: finish.finishReason,
+            latencyMs: finish.latencyMs
+          },
+          model: finish.model,
+          inputTokens: finish.usage?.inputTokens ?? null,
+          outputTokens: finish.usage?.outputTokens ?? null,
+          totalTokens: finish.usage?.totalTokens ?? null,
+          costUsd: finish.costUsd ?? null
+        })
+      } catch (error) {
+        console.error('[chat] failed to persist assistant message', {
+          userId,
+          conversationId: conversation.id,
+          model: finish.model,
+          messageChars: finish.text.length,
+          error: error instanceof Error ? error.message : String(error)
+        })
+      }
     }
 
-    if (!shouldStream(request, acceptHeader)) {
+    console.info('[chat] model selected', {
+      userId,
+      conversationId: conversation.id,
+      model: selection.model,
+      reason: selection.reason,
+      trimmedMessages: trimmedMessages.length
+    })
+
+    if (!wantsStream) {
       const result = await modelService.generateChat({
         model: selection.model,
         messages: trimmedMessages
@@ -235,6 +266,13 @@ export const createChatService = (deps: {
         finishReason: 'stop',
         costUsd: result.costUsd,
         latencyMs: result.latencyMs
+      })
+
+      console.info('[chat] completed (json)', {
+        userId,
+        conversationId: conversation.id,
+        model: result.model,
+        latencyMs: Date.now() - startedAt
       })
 
       return {
@@ -258,6 +296,13 @@ export const createChatService = (deps: {
         'X-Conversation-Id': conversation.id,
         'X-Model': streamResult.model
       }
+    })
+
+    console.info('[chat] started stream', {
+      userId,
+      conversationId: conversation.id,
+      model: streamResult.model,
+      latencyMs: Date.now() - startedAt
     })
 
     return {

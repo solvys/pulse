@@ -137,10 +137,30 @@ export const createAiModelService = (config: AiConfig = defaultAiConfig) => {
   const buildModelClient = (modelConfig: AiModelConfig) => {
     const apiKey = resolveApiKey(modelConfig)
     if (!apiKey) {
-      throw new Error(`Missing API key for ${modelConfig.displayName}`)
+      const message = `Missing API key for ${modelConfig.displayName} (env: ${modelConfig.apiKeyEnv})`
+      console.error('[ai] model api key missing', {
+        model: modelConfig.displayName,
+        provider: modelConfig.provider,
+        apiKeyEnv: modelConfig.apiKeyEnv
+      })
+      const error = new Error(message) as Error & { status?: number; statusCode?: number }
+      error.status = 500
+      error.statusCode = 500
+      throw error
     }
     if (modelConfig.provider === 'anthropic') {
       return anthropic(modelConfig.id, { apiKey })
+    }
+    if (!modelConfig.baseUrl) {
+      const message = `Missing baseUrl for ${modelConfig.displayName} (provider: ${modelConfig.provider})`
+      console.error('[ai] model baseUrl missing', {
+        model: modelConfig.displayName,
+        provider: modelConfig.provider
+      })
+      const error = new Error(message) as Error & { status?: number; statusCode?: number }
+      error.status = 500
+      error.statusCode = 500
+      throw error
     }
     return openai(modelConfig.id, { apiKey, baseURL: modelConfig.baseUrl })
   }

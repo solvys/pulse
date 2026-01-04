@@ -3,6 +3,8 @@ import type { Context } from 'hono'
 import { authMiddleware } from '../middleware/auth'
 import { createChatService } from '../services/chat-service'
 
+const isDev = process.env.NODE_ENV !== 'production'
+
 interface AuthPayload {
   sub?: string
   user_id?: string
@@ -30,11 +32,20 @@ const resolveErrorStatus = (error: unknown): number => {
   return 500
 }
 
+const buildRequestId = () => {
+  try {
+    return globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(16).slice(2)}`
+  } catch {
+    return `${Date.now()}-${Math.random().toString(16).slice(2)}`
+  }
+}
+
 export const createAiChatRoutes = () => {
   const router = new Hono()
   const chatService = createChatService()
 
   router.post('/chat', authMiddleware, async (c) => {
+    const requestId = c.req.header('x-request-id') ?? buildRequestId()
     const userId = getUserId(c)
     if (!userId) {
       return c.json({ error: 'Unauthorized' }, 401)
@@ -44,7 +55,8 @@ export const createAiChatRoutes = () => {
     try {
       body = await c.req.json()
     } catch (error) {
-      return c.json({ error: 'Invalid JSON payload' }, 400)
+      console.warn('[ai-chat] invalid json payload', { requestId, userId })
+      return c.json({ error: 'Invalid JSON payload', requestId }, 400)
     }
 
     try {
@@ -52,11 +64,30 @@ export const createAiChatRoutes = () => {
       if (result.type === 'stream') {
         return result.response
       }
-      return c.json(result.body, 200, { 'X-Conversation-Id': result.body.conversationId })
+      return c.json(result.body, 200, {
+        'X-Conversation-Id': result.body.conversationId,
+        'X-Request-Id': requestId
+      })
     } catch (error) {
       const status = resolveErrorStatus(error)
       const message = error instanceof Error ? error.message : 'Chat request failed'
-      return c.json({ error: message }, status)
+      console.error('[ai-chat] request failed', {
+        requestId,
+        userId,
+        status,
+        message,
+        name: error instanceof Error ? error.name : 'UnknownError',
+        stack: isDev && error instanceof Error ? error.stack : undefined
+      })
+      return c.json(
+        {
+          error: message,
+          requestId,
+          ...(isDev && error instanceof Error ? { stack: error.stack } : {})
+        },
+        status,
+        { 'X-Request-Id': requestId }
+      )
     }
   })
 

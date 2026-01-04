@@ -1,4 +1,4 @@
-import { query } from '../db/optimized'
+import { DatabaseError, query } from '../db/optimized'
 import { defaultAiConfig, type AiConfig } from '../config/ai-config'
 
 export interface ConversationRecord {
@@ -81,50 +81,86 @@ const mapMessage = (row: Record<string, unknown>): MessageRecord => ({
 })
 
 export const createConversationManager = (config: AiConfig = defaultAiConfig) => {
+  const mapDbErrorStatus = (error: DatabaseError) => {
+    // Postgres SQLSTATE codes:
+    // 23503: foreign_key_violation, 23505: unique_violation
+    if (error.code === '23503') return 400
+    if (error.code === '23505') return 409
+    return error.status
+  }
+
+  const wrapDbError = (error: unknown, message: string) => {
+    if (error instanceof DatabaseError) {
+      throw new DatabaseError(message, {
+        status: mapDbErrorStatus(error),
+        code: error.code,
+        cause: error
+      })
+    }
+    throw error
+  }
+
   const createConversation = async (input: CreateConversationInput): Promise<ConversationRecord> => {
-    const result = await query(
-      `
-      INSERT INTO ai_conversations (user_id, title, model, metadata, parent_id, thread_id)
-      VALUES ($1, $2, $3, $4, $5, $6)
-      RETURNING *
-      `,
-      [
-        input.userId,
-        input.title ?? null,
-        input.model ?? null,
-        normalizeMetadata(input.metadata),
-        input.parentId ?? null,
-        input.threadId ?? input.parentId ?? null
-      ]
-    )
+    let result
+    try {
+      result = await query(
+        `
+        INSERT INTO ai_conversations (user_id, title, model, metadata, parent_id, thread_id)
+        VALUES ($1, $2, $3, $4, $5, $6)
+        RETURNING *
+        `,
+        [
+          input.userId,
+          input.title ?? null,
+          input.model ?? null,
+          normalizeMetadata(input.metadata),
+          input.parentId ?? null,
+          input.threadId ?? input.parentId ?? null
+        ]
+      )
+    } catch (error) {
+      wrapDbError(error, 'Failed to create conversation')
+    }
 
     const conversation = mapConversation(result.rows[0] as Record<string, unknown>)
     if (!conversation.threadId) {
-      await query(`UPDATE ai_conversations SET thread_id = $1 WHERE id = $1`, [conversation.id])
+      try {
+        await query(`UPDATE ai_conversations SET thread_id = $1 WHERE id = $2`, [
+          conversation.id,
+          conversation.id
+        ])
+      } catch (error) {
+        wrapDbError(error, 'Failed to finalize conversation thread id')
+      }
       conversation.threadId = conversation.id
     }
     return conversation
   }
 
   const getConversation = async (userId: string, conversationId: string): Promise<ConversationRecord | null> => {
-    const result = await query(
-      `
-      SELECT c.*,
-        m.content AS last_message,
-        m.created_at AS last_message_at
-      FROM ai_conversations c
-      LEFT JOIN LATERAL (
-        SELECT content, created_at
-        FROM ai_messages
-        WHERE conversation_id = c.id
-        ORDER BY created_at DESC
+    let result
+    try {
+      result = await query(
+        `
+        SELECT c.*,
+          m.content AS last_message,
+          m.created_at AS last_message_at
+        FROM ai_conversations c
+        LEFT JOIN LATERAL (
+          SELECT content, created_at
+          FROM ai_messages
+          WHERE conversation_id = c.id
+          ORDER BY created_at DESC
+          LIMIT 1
+        ) m ON TRUE
+        WHERE c.id = $1 AND c.user_id = $2
         LIMIT 1
-      ) m ON TRUE
-      WHERE c.id = $1 AND c.user_id = $2
-      LIMIT 1
-      `,
-      [conversationId, userId]
-    )
+        `,
+        [conversationId, userId]
+      )
+    } catch (error) {
+      wrapDbError(error, 'Failed to load conversation')
+    }
     if (!result.rows.length) return null
     return mapConversation(result.rows[0] as Record<string, unknown>)
   }
@@ -135,25 +171,30 @@ export const createConversationManager = (config: AiConfig = defaultAiConfig) =>
   ): Promise<ConversationRecord[]> => {
     const limit = Math.min(options.limit ?? 50, 100)
     const offset = options.offset ?? 0
-    const result = await query(
-      `
-      SELECT c.*,
-        m.content AS last_message,
-        m.created_at AS last_message_at
-      FROM ai_conversations c
-      LEFT JOIN LATERAL (
-        SELECT content, created_at
-        FROM ai_messages
-        WHERE conversation_id = c.id
-        ORDER BY created_at DESC
-        LIMIT 1
-      ) m ON TRUE
-      WHERE c.user_id = $1
-      ORDER BY c.updated_at DESC
-      LIMIT $2 OFFSET $3
-      `,
-      [userId, limit, offset]
-    )
+    let result
+    try {
+      result = await query(
+        `
+        SELECT c.*,
+          m.content AS last_message,
+          m.created_at AS last_message_at
+        FROM ai_conversations c
+        LEFT JOIN LATERAL (
+          SELECT content, created_at
+          FROM ai_messages
+          WHERE conversation_id = c.id
+          ORDER BY created_at DESC
+          LIMIT 1
+        ) m ON TRUE
+        WHERE c.user_id = $1
+        ORDER BY c.updated_at DESC
+        LIMIT $2 OFFSET $3
+        `,
+        [userId, limit, offset]
+      )
+    } catch (error) {
+      wrapDbError(error, 'Failed to list conversations')
+    }
 
     return result.rows.map((row) => mapConversation(row as Record<string, unknown>))
   }
@@ -163,58 +204,72 @@ export const createConversationManager = (config: AiConfig = defaultAiConfig) =>
     options: { limit?: number } = {}
   ): Promise<MessageRecord[]> => {
     const limit = Math.min(options.limit ?? config.conversation.maxHistoryMessages, 200)
-    const result = await query(
-      `
-      SELECT *
-      FROM ai_messages
-      WHERE conversation_id = $1
-      ORDER BY created_at ASC
-      LIMIT $2
-      `,
-      [conversationId, limit]
-    )
+    let result
+    try {
+      result = await query(
+        `
+        SELECT *
+        FROM ai_messages
+        WHERE conversation_id = $1
+        ORDER BY created_at ASC
+        LIMIT $2
+        `,
+        [conversationId, limit]
+      )
+    } catch (error) {
+      wrapDbError(error, 'Failed to load conversation messages')
+    }
     return result.rows.map((row) => mapMessage(row as Record<string, unknown>))
   }
 
   const addMessage = async (input: AddMessageInput): Promise<MessageRecord> => {
-    const result = await query(
-      `
-      INSERT INTO ai_messages (
-        conversation_id,
-        role,
-        content,
-        metadata,
-        model,
-        input_tokens,
-        output_tokens,
-        total_tokens,
-        cost_usd
+    let result
+    try {
+      result = await query(
+        `
+        INSERT INTO ai_messages (
+          conversation_id,
+          role,
+          content,
+          metadata,
+          model,
+          input_tokens,
+          output_tokens,
+          total_tokens,
+          cost_usd
+        )
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+        RETURNING *
+        `,
+        [
+          input.conversationId,
+          input.role,
+          input.content,
+          normalizeMetadata(input.metadata),
+          input.model ?? null,
+          input.inputTokens ?? null,
+          input.outputTokens ?? null,
+          input.totalTokens ?? null,
+          input.costUsd ?? null
+        ]
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-      RETURNING *
-      `,
-      [
-        input.conversationId,
-        input.role,
-        input.content,
-        normalizeMetadata(input.metadata),
-        input.model ?? null,
-        input.inputTokens ?? null,
-        input.outputTokens ?? null,
-        input.totalTokens ?? null,
-        input.costUsd ?? null
-      ]
-    )
+    } catch (error) {
+      wrapDbError(error, 'Failed to save message')
+    }
 
-    await query(
-      `
-      UPDATE ai_conversations
-      SET updated_at = NOW(),
-          model = COALESCE($2, model)
-      WHERE id = $1
-      `,
-      [input.conversationId, input.model ?? null]
-    )
+    try {
+      await query(
+        `
+        UPDATE ai_conversations
+        SET updated_at = NOW(),
+            model = COALESCE($2, model)
+        WHERE id = $1
+        `,
+        [input.conversationId, input.model ?? null]
+      )
+    } catch (error) {
+      wrapDbError(error, 'Failed to update conversation metadata')
+    }
 
     return mapMessage(result.rows[0] as Record<string, unknown>)
   }
@@ -223,16 +278,20 @@ export const createConversationManager = (config: AiConfig = defaultAiConfig) =>
     conversationId: string,
     updates: { title?: string | null; metadata?: Record<string, unknown> | null }
   ) => {
-    await query(
-      `
-      UPDATE ai_conversations
-      SET title = COALESCE($2, title),
-          metadata = COALESCE($3, metadata),
-          updated_at = NOW()
-      WHERE id = $1
-      `,
-      [conversationId, updates.title ?? null, normalizeMetadata(updates.metadata)]
-    )
+    try {
+      await query(
+        `
+        UPDATE ai_conversations
+        SET title = COALESCE($2, title),
+            metadata = COALESCE($3, metadata),
+            updated_at = NOW()
+        WHERE id = $1
+        `,
+        [conversationId, updates.title ?? null, normalizeMetadata(updates.metadata)]
+      )
+    } catch (error) {
+      wrapDbError(error, 'Failed to update conversation')
+    }
   }
 
   return {
