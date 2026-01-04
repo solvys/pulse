@@ -52,11 +52,10 @@ export function useChatWithAuth(conversationId: string | undefined, setConversat
 
     const fullUrl = url.startsWith('http') ? url : `${API_BASE_URL}${url}`;
 
-    const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${token}`, // Always set Authorization header since we've verified token exists
-      ...(init?.headers as Record<string, string> || {}),
-    };
+    const normalizedToken = token.replace(/^Bearer\s+/i, '');
+    const headers = new Headers(init?.headers);
+    headers.set('Content-Type', 'application/json');
+    headers.set('Authorization', `Bearer ${normalizedToken}`); // Always set Authorization header since we've verified token exists
 
     let body = init?.body;
     if (body && conversationId) {
@@ -73,7 +72,7 @@ export function useChatWithAuth(conversationId: string | undefined, setConversat
 
     const response = await fetch(fullUrl, {
       ...init,
-      headers: headers as HeadersInit,
+      headers,
       body,
     });
 
@@ -101,15 +100,14 @@ export function useChatWithAuth(conversationId: string | undefined, setConversat
             console.log('[useChatWithAuth] Got fresh token. Retrying request with new token.');
             
             // Retry the original request with the fresh token
-            const retryHeaders: Record<string, string> = {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${freshToken}`,
-              ...(init?.headers as Record<string, string> || {}),
-            };
+            const retryNormalizedToken = freshToken.replace(/^Bearer\s+/i, '');
+            const retryHeaders = new Headers(init?.headers);
+            retryHeaders.set('Content-Type', 'application/json');
+            retryHeaders.set('Authorization', `Bearer ${retryNormalizedToken}`);
             
             const retryResponse = await fetch(fullUrl, {
               ...init,
-              headers: retryHeaders as HeadersInit,
+              headers: retryHeaders,
               body,
             });
             
