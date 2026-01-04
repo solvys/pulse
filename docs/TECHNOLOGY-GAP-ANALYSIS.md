@@ -5,6 +5,8 @@
 > **Status**: Final Review
 > **Date**: 2026-01-02
 
+> **Environment Update (Jan 2026):** All backend AI workloads now run exclusively through the Vercel AI Gateway (`VERCEL_AI_GATEWAY_API_KEY`). Remove legacy keys such as `ANTHROPIC_API_KEY`, `GROK_API_KEY`, and `CLAUDE_*` once the gateway is configured.
+
 ---
 
 ## 1. Authentication Gap (CRITICAL - Week 1 Priority)

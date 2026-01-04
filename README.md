@@ -60,7 +60,7 @@ See `docs/architecture/ARCHITECTURE.md` for complete system architecture.
 See `secrets.env` for environment variable reference (do not commit secrets).
 
 Required variables:
-- `DATABASE_URL` - Neon PostgreSQL connection string
+- `NEON_DATABASE_URL` - Neon PostgreSQL connection string (backend uses this)
 - `CLERK_SECRET_KEY` - Clerk authentication secret
 - `VITE_API_URL` - Backend API URL
 - `PROJECTX_USERNAME` / `PROJECTX_API_KEY` - TopStepX integration
