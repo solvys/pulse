@@ -1,18 +1,8 @@
-import './instrument.js';
-
-import * as Sentry from '@sentry/node';
 import { Hono } from 'hono';
 import { serve } from '@hono/node-server';
 import { createAiChatRoutes } from './routes/ai-chat.js';
 
 const app = new Hono();
-
-try {
-  // Trigger a test error to verify Sentry captures events.
-  foo();
-} catch (error) {
-  Sentry.captureException(error);
-}
 
 app.get('/health', (c) =>
   c.json({
@@ -24,7 +14,6 @@ app.get('/health', (c) =>
 app.route('/api/ai', createAiChatRoutes());
 
 app.onError((err, c) => {
-  Sentry.captureException(err);
   return c.json({ error: 'Internal server error' }, 500);
 });
 
