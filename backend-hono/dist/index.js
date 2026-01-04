@@ -30,13 +30,10 @@ if (sentryEnabled) {
 const app = new Hono();
 if (sentryEnabled) {
     app.use('*', async (c, next) => {
-        const hub = Sentry.getCurrentHub();
-        hub.pushScope();
-        hub.configureScope((scope) => {
-            scope.setContext('request', {
-                method: c.req.method,
-                path: c.req.path
-            });
+        const scope = Sentry.getCurrentScope();
+        scope.setContext('request', {
+            method: c.req.method,
+            path: c.req.path
         });
         try {
             await next();
@@ -44,9 +41,6 @@ if (sentryEnabled) {
         catch (error) {
             Sentry.captureException(error);
             throw error;
-        }
-        finally {
-            hub.popScope();
         }
     });
 }
