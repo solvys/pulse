@@ -8,7 +8,7 @@ import { useClerk, useAuth } from '@clerk/clerk-react';
 
 // Get app version from build timestamp (injected at build time)
 // Each build will have a unique timestamp, forcing re-auth on updates
-const APP_VERSION = import.meta.env.BUILD_TIME || new Date().toISOString();
+const APP_VERSION = import.meta.env.BUILD_TIME || 'dev';
 
 const VERSION_STORAGE_KEY = 'pulse_app_version';
 const VERSION_CHECK_FLAG_KEY = 'pulse_version_check_done';
