@@ -49,7 +49,11 @@ export interface ChatResponse {
 export interface NTNReport {
   report: {
     content: string;
+    reportType?: string;
+    generatedAt?: string;
   };
+  metadata?: Record<string, unknown> | null;
+  model?: string | null;
 }
 
 export interface Position {
@@ -70,6 +74,36 @@ export interface ProjectXAccount {
   accountId: string;
   accountName: string;
   balance?: number;
+}
+
+export interface PsychScores {
+  executions: number;
+  emotionalControl: number;
+  planAdherence: number;
+  riskSizing: number;
+  adaptability: number;
+}
+
+export interface PsychProfile {
+  blindSpots: string[];
+  goal: string | null;
+  orientationComplete: boolean;
+  psychScores: PsychScores;
+  lastAssessmentAt?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface AnalystReport {
+  id: string;
+  agentType: string;
+  reportData: {
+    title?: string;
+    summary?: string;
+    metrics?: Array<{ label: string; value: string }>;
+  };
+  confidenceScore?: number | null;
+  createdAt: string;
 }
 
 export interface ProjectXAccountsResponse {
@@ -135,6 +169,45 @@ export class AIService {
 
   async generateNTNReport(): Promise<NTNReport> {
     return this.client.post<NTNReport>('/api/ai/ntn-report');
+  }
+}
+
+// Psych Assist Service
+export class PsychService {
+  constructor(private client: ApiClient) { }
+
+  async getProfile(): Promise<PsychProfile> {
+    const response = await this.client.get<{ profile: PsychProfile }>('/api/psych/profile');
+    return response.profile;
+  }
+
+  async updateProfile(data: { blindSpots?: string[]; goal?: string | null; orientationComplete?: boolean; source?: 'orientation' | 'settings' }): Promise<PsychProfile> {
+    const response = await this.client.put<{ profile: PsychProfile }>('/api/psych/profile', data);
+    return response.profile;
+  }
+
+  async updateScores(scores: Partial<PsychScores>): Promise<PsychProfile> {
+    const response = await this.client.post<{ profile: PsychProfile }>('/api/psych/scores', scores);
+    return response.profile;
+  }
+}
+
+// Analyst Service
+export class AnalystService {
+  constructor(private client: ApiClient) { }
+
+  async getReports(params?: { refresh?: boolean; instrument?: string }): Promise<AnalystReport[]> {
+    const query = new URLSearchParams();
+    if (params?.refresh) query.append('refresh', 'true');
+    if (params?.instrument) query.append('instrument', params.instrument);
+    const endpoint = `/api/agents/reports${query.size ? `?${query.toString()}` : ''}`;
+    const response = await this.client.get<{ reports: AnalystReport[] }>(endpoint);
+    return response.reports || [];
+  }
+
+  async runReports(data?: { instrument?: string }): Promise<AnalystReport[]> {
+    const response = await this.client.post<{ reports: AnalystReport[] }>('/api/agents/reports/run', data ?? {});
+    return response.reports || [];
   }
 }
 
@@ -242,6 +315,8 @@ export interface BackendClient {
   account: AccountService;
   news: NewsService;
   ai: AIService;
+  psych: PsychService;
+  analysts: AnalystService;
   trading: TradingService;
   projectx: ProjectXService;
   notifications: NotificationsService;
@@ -255,6 +330,8 @@ export function createBackendClient(client: ApiClient): BackendClient {
     account: new AccountService(client),
     news: new NewsService(client),
     ai: new AIService(client),
+    psych: new PsychService(client),
+    analysts: new AnalystService(client),
     trading: new TradingService(client),
     projectx: new ProjectXService(client),
     notifications: new NotificationsService(client),

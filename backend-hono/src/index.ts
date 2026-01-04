@@ -1,9 +1,13 @@
 import { Hono } from 'hono';
 import { serve } from '@hono/node-server';
 import { createAiChatRoutes } from './routes/ai-chat.js';
+import { createPsychAssistRoutes } from './routes/psych-assist.js';
+import { createAnalystRoutes } from './routes/analysts.js';
+import { createHealthService } from './services/health-service.js';
 
 const app = new Hono();
 const isDev = process.env.NODE_ENV !== 'production';
+const healthService = createHealthService();
 
 const buildRequestId = () => {
   try {
@@ -13,14 +17,15 @@ const buildRequestId = () => {
   }
 };
 
-app.get('/health', (c) =>
-  c.json({
-    status: 'ok',
-    timestamp: new Date().toISOString(),
-  }),
-);
+app.get('/health', async (c) => {
+  const health = await healthService.checkAll();
+  const statusCode = health.status === 'ok' ? 200 : health.status === 'degraded' ? 207 : 503;
+  return c.json(health, statusCode);
+});
 
 app.route('/api/ai', createAiChatRoutes());
+app.route('/api/psych', createPsychAssistRoutes());
+app.route('/api/agents', createAnalystRoutes());
 
 app.onError((err, c) => {
   const requestId = c.req.header('x-request-id') ?? buildRequestId();

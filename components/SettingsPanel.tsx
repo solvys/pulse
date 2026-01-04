@@ -1,5 +1,6 @@
 import { X, Settings, Bell, Shield, CreditCard, Cpu, Code, Radio, Volume2, Terminal } from 'lucide-react';
 import { useSettings } from '../contexts/SettingsContext';
+import { usePsych } from '../contexts/PsychContext';
 import { useAuth } from '../contexts/AuthContext';
 import Toggle from './Toggle';
 import { Button } from './ui/Button';
@@ -33,6 +34,11 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
     setDeveloperSettings,
   } = useSettings();
   const backend = useBackend();
+  const {
+    profile: psychProfile,
+    saveProfile: savePsychProfile,
+    loading: psychLoading
+  } = usePsych();
   const [contractsPerTrade, setContractsPerTrade] = useState<number>(1);
 
   const [activeTab, setActiveTab] = useState<SettingsTab>('general');
@@ -84,6 +90,18 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
   const [prevTab, setPrevTab] = useState<SettingsTab | null>(null);
   const [tabTransitioning, setTabTransitioning] = useState(false);
   const [showSymbolDropdown, setShowSymbolDropdown] = useState(false);
+  const [psychBlindSpots, setPsychBlindSpots] = useState<string[]>(['', '', '']);
+  const [psychGoal, setPsychGoal] = useState('');
+  const [psychSaveMessage, setPsychSaveMessage] = useState<string | null>(null);
+  const [psychSaving, setPsychSaving] = useState(false);
+
+  useEffect(() => {
+    if (psychProfile) {
+      const spots = [...psychProfile.blindSpots, '', '', ''].slice(0, 3);
+      setPsychBlindSpots(spots);
+      setPsychGoal(psychProfile.goal ?? '');
+    }
+  }, [psychProfile]);
 
   const handleSave = async () => {
     setIsSaving(true);
@@ -117,6 +135,24 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
       setSaveMessage('Failed to save settings. Please try again.');
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handlePsychSave = async () => {
+    setPsychSaving(true);
+    setPsychSaveMessage(null);
+    try {
+      await savePsychProfile({
+        blindSpots: psychBlindSpots,
+        goal: psychGoal,
+        source: 'settings'
+      });
+      setPsychSaveMessage('Psych Assist profile updated.');
+    } catch (error) {
+      console.error('Failed to save psych profile:', error);
+      setPsychSaveMessage('Failed to save Psych Assist settings. Please try again.');
+    } finally {
+      setPsychSaving(false);
     }
   };
 
@@ -156,6 +192,7 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
   const tabs = [
     { id: 'general' as const, label: 'General', icon: Settings },
     { id: 'notifications' as const, label: 'Notifications', icon: Bell },
+    { id: 'psych' as const, label: 'Psych Assist', icon: Shield },
     { id: 'trading' as const, label: 'Trading', icon: Cpu },
     { id: 'api' as const, label: 'API', icon: Code },
     { id: 'developer' as const, label: 'Developer', icon: Terminal },
@@ -273,6 +310,96 @@ export function SettingsPanel({ onClose }: SettingsPanelProps) {
                     ))}
                   </div>
                 </section>
+              </div>
+            )}
+
+            {activeTab === 'psych' && (
+              <div key="psych" className={tabTransitioning && prevTab ? 'animate-fade-out-tab' : 'animate-fade-in-tab'}>
+                {psychLoading ? (
+                  <div className="text-sm text-zinc-500">Loading Psych Assist profile…</div>
+                ) : (
+                  <>
+                    <section>
+                      <h3 className="text-sm font-semibold text-[#FFC038] mb-3">Orientation Status</h3>
+                      <div className="bg-[#050500] border border-[#FFC038]/30 rounded-lg p-4 flex items-center justify-between gap-4">
+                        <div>
+                          <p className="text-sm text-white">
+                            {psychProfile?.orientationComplete ? 'Complete' : 'Required'}
+                          </p>
+                          <p className="text-xs text-zinc-500">
+                            {psychProfile?.updatedAt
+                              ? `Updated ${new Date(psychProfile.updatedAt).toLocaleString()}`
+                              : 'Not yet configured'}
+                          </p>
+                        </div>
+                        {!psychProfile?.orientationComplete && (
+                          <span className="text-xs uppercase tracking-[0.2em] text-red-400">
+                            Action Needed
+                          </span>
+                        )}
+                      </div>
+                    </section>
+
+                    <section className="pt-6 border-t border-zinc-800">
+                      <h3 className="text-sm font-semibold text-[#FFC038] mb-4">Blind Spots & Goal</h3>
+                      <div className="space-y-4">
+                        {psychBlindSpots.map((spot, idx) => (
+                          <div key={idx}>
+                            <label className="text-xs text-gray-500 mb-1 block">
+                              Blind Spot #{idx + 1}
+                            </label>
+                            <input
+                              type="text"
+                              value={spot}
+                              onChange={(e) =>
+                                setPsychBlindSpots((prev) =>
+                                  prev.map((current, sIdx) => (sIdx === idx ? e.target.value : current))
+                                )
+                              }
+                              className="w-full bg-[#0a0a00] border border-zinc-800 rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-[#FFC038]/30"
+                              placeholder={
+                                idx === 0
+                                  ? 'Example: Oversizing after a streak'
+                                  : idx === 1
+                                  ? 'Example: Fighting trend days'
+                                  : 'Example: Skipping resets after tilt'
+                              }
+                            />
+                          </div>
+                        ))}
+
+                        <div>
+                          <label className="text-xs text-gray-500 mb-1 block">Primary Goal</label>
+                          <textarea
+                            value={psychGoal}
+                            onChange={(e) => setPsychGoal(e.target.value)}
+                            rows={3}
+                            className="w-full bg-[#0a0a00] border border-zinc-800 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-[#FFC038]/30 resize-none"
+                            placeholder="Define the outcome Price should reinforce during sessions."
+                          />
+                        </div>
+
+                        {psychSaveMessage && (
+                          <div
+                            className={`text-sm px-3 py-2 rounded border ${
+                              psychSaveMessage.includes('Failed')
+                                ? 'text-red-400 border-red-500/30 bg-red-500/10'
+                                : 'text-emerald-400 border-emerald-500/30 bg-emerald-500/10'
+                            }`}
+                          >
+                            {psychSaveMessage}
+                          </div>
+                        )}
+
+                        <div className="flex justify-end">
+                          <Button variant="primary" onClick={handlePsychSave} disabled={psychSaving}>
+                            {psychSaving ? 'Saving…' : 'Save Psych Profile'}
+                          </Button>
+                        </div>
+                      </div>
+                    </section>
+                  </>
+                )}
               </div>
             )}
 

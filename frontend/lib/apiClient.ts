@@ -15,6 +15,20 @@ const MAX_401_COUNT = 3; // Maximum consecutive 401s before giving up
 let consecutive401Count = 0;
 let last401Timestamp: number | null = null;
 
+const MAX_RETRIES = 3;
+const RETRYABLE_STATUS = new Set([408, 425, 429, 500, 502, 503, 504]);
+const BASE_RETRY_DELAY_MS = 400;
+
+const sleep = (ms: number) =>
+  new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+
+const buildRetryDelay = (attempt: number) => {
+  const jitter = Math.random() * 150;
+  return BASE_RETRY_DELAY_MS * 2 ** attempt + jitter;
+};
+
 // Export function to reset auth state (call on successful login)
 export function resetAuthState() {
   authFailed = false;
@@ -80,87 +94,112 @@ class ApiClient {
     endpoint: string,
     options: RequestInit = {}
   ): Promise<T> {
-    // Skip request if auth has failed recently (prevents error cascade)
-    if (shouldSkipRequest()) {
-      throw {
-        code: 'auth_skipped',
-        message: 'Skipping request due to recent auth failure. Will retry in 30s.',
-        status: 401,
-      } as ApiError;
-    }
-
     const url = `${this.baseUrl}${endpoint}`;
 
-    const headers: HeadersInit = {
-      'Content-Type': 'application/json',
-      ...options.headers,
+    const execute = async (attempt: number): Promise<T> => {
+      // Skip request if auth has failed recently (prevents error cascade)
+      if (shouldSkipRequest()) {
+        throw {
+          code: 'auth_skipped',
+          message: 'Skipping request due to recent auth failure. Will retry in 30s.',
+          status: 401,
+        } as ApiError;
+      }
+
+      const headers: HeadersInit = {
+        'Content-Type': 'application/json',
+        ...options.headers,
+      };
+
+      // Add auth token if available
+      if (this.getAuthToken) {
+        const token = await this.getAuthToken();
+        if (token) {
+          (headers as Record<string, string>)['Authorization'] = `Bearer ${token}`;
+        }
+      }
+
+      try {
+        const response = await fetch(url, {
+          ...options,
+          headers,
+        });
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          let errorData: any;
+          try {
+            errorData = JSON.parse(errorText);
+          } catch {
+            errorData = { message: errorText };
+          }
+
+          const error: ApiError = {
+            code: errorData.code || `http_${response.status}`,
+            message: errorData.message || `HTTP ${response.status}: ${response.statusText}`,
+            status: response.status,
+          };
+
+          if (response.status === 401) {
+            error.code = errorData.code || 'unauthenticated';
+            handle401Error();
+            throw error;
+          }
+
+          if (RETRYABLE_STATUS.has(response.status) && attempt < MAX_RETRIES) {
+            console.warn(
+              `[API] Retryable response ${response.status} for ${endpoint} (attempt ${attempt + 1}/${MAX_RETRIES})`,
+            );
+            await sleep(buildRetryDelay(attempt));
+            return execute(attempt + 1);
+          }
+
+          if (response.status === 404) {
+            error.code = 'not_found';
+          } else if (response.status >= 500) {
+            error.code = 'server_error';
+            console.error(`[API] Server error ${response.status} for ${endpoint}:`, errorData);
+          }
+
+          // Reset 401 counter on successful requests
+          if (response.status !== 401) {
+            consecutive401Count = 0;
+            last401Timestamp = null;
+          }
+
+          throw error;
+        }
+
+        // Handle empty responses
+        const contentType = response.headers.get('content-type');
+        if (!contentType || !contentType.includes('application/json')) {
+          return {} as T;
+        }
+
+        return await response.json();
+      } catch (error) {
+        const isApiError = error && typeof error === 'object' && 'code' in error;
+        if (!isApiError && attempt < MAX_RETRIES) {
+          console.warn(
+            `[API] Network error on ${endpoint} (attempt ${attempt + 1}/${MAX_RETRIES})`,
+            error,
+          );
+          await sleep(buildRetryDelay(attempt));
+          return execute(attempt + 1);
+        }
+
+        if (isApiError) {
+          throw error;
+        }
+
+        throw {
+          code: 'network_error',
+          message: error instanceof Error ? error.message : 'Network request failed',
+        } as ApiError;
+      }
     };
 
-    // Add auth token if available
-    if (this.getAuthToken) {
-      const token = await this.getAuthToken();
-      if (token) {
-        (headers as Record<string, string>)['Authorization'] = `Bearer ${token}`;
-      }
-    }
-
-    try {
-      const response = await fetch(url, {
-        ...options,
-        headers,
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        let errorData: any;
-        try {
-          errorData = JSON.parse(errorText);
-        } catch {
-          errorData = { message: errorText };
-        }
-
-        const error: ApiError = {
-          code: errorData.code || `http_${response.status}`,
-          message: errorData.message || `HTTP ${response.status}: ${response.statusText}`,
-          status: response.status,
-        };
-
-        // Handle specific status codes
-        if (response.status === 401) {
-          error.code = errorData.code || 'unauthenticated';
-          handle401Error();
-        } else if (response.status === 404) {
-          error.code = 'not_found';
-        } else if (response.status >= 500) {
-          error.code = 'server_error';
-          console.error(`[API] Server error ${response.status} for ${endpoint}:`, errorData);
-        }
-        
-        // Reset 401 counter on successful requests
-        if (response.status !== 401) {
-          consecutive401Count = 0;
-          last401Timestamp = null;
-        }
-
-        throw error;
-      }
-
-      // Handle empty responses
-      const contentType = response.headers.get('content-type');
-      if (!contentType || !contentType.includes('application/json')) {
-        return {} as T;
-      }
-
-      return await response.json();
-    } catch (error) {
-      if (error && typeof error === 'object' && 'code' in error) {
-        throw error;
-      }
-      throw {
-        code: 'network_error',
-        message: error instanceof Error ? error.message : 'Network request failed',
-      } as ApiError;
-    }
+    return execute(0);
   }
 
   async get<T>(endpoint: string): Promise<T> {

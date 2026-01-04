@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import { defaultAiConfig, type AiConfig, type AiModelKey } from '../config/ai-config'
 import { createAiModelService, type AiMessage, type StreamFinish } from './ai-model-service'
-import { createConversationManager } from './conversation-manager'
+import { createConversationManager, type ConversationRecord } from './conversation-manager'
 
 const messageSchema = z.object({
   role: z.enum(['system', 'user', 'assistant']),
@@ -112,6 +112,18 @@ const normalizePreferredModel = (model?: RawChatRequest['model']): AiModelKey | 
   return model
 }
 
+const buildFallbackMessage = () =>
+  [
+    "Price (failsafe): I'm still booting up the reasoning stack.",
+    "Make sure the backend has valid AI credentials (e.g., VERCEL_AI_GATEWAY_API_KEY / AI_SYSTEM_PROMPT) and try again.",
+    "Until then I'll acknowledge your message, but I can't run full workflows yet."
+  ].join(' ')
+
+const isConversationStale = (conversation: ConversationRecord) => {
+  if (!conversation.staleAt) return false
+  return new Date(conversation.staleAt).getTime() <= Date.now()
+}
+
 export const createChatService = (deps: {
   config?: AiConfig
   modelService?: ReturnType<typeof createAiModelService>
@@ -209,6 +221,24 @@ export const createChatService = (deps: {
     })
 
     const conversation = await ensureConversation(userId, request, lastUserMessage)
+    if (conversation.isArchived) {
+      const error = new Error('Conversation is archived') as Error & { status?: number; code?: string }
+      error.status = 409
+      error.code = 'conversation_archived'
+      throw error
+    }
+
+    if (isConversationStale(conversation)) {
+      const error = new Error('Conversation is stale') as Error & {
+        status?: number
+        code?: string
+        metadata?: Record<string, unknown>
+      }
+      error.status = 409
+      error.code = 'conversation_stale'
+      error.metadata = { staleAt: conversation.staleAt }
+      throw error
+    }
     const promptMessages = await buildPromptMessages(conversation.id, normalizedMessages)
     const withSystem =
       config.systemPrompt && !promptMessages.some((message) => message.role === 'system')
@@ -262,66 +292,102 @@ export const createChatService = (deps: {
       conversationId: conversation.id,
       model: selection.model,
       reason: selection.reason,
-      trimmedMessages: trimmedMessages.length
+      trimmedMessages: trimmedMessages.length,
+      staleAt: conversation.staleAt ?? null
     })
 
-    if (!wantsStream) {
-      const result = await modelService.generateChat({
-        model: selection.model,
-        messages: trimmedMessages
-      })
-
-      await onFinish({
-        text: result.text,
-        model: result.model,
-        usage: result.usage,
-        finishReason: 'stop',
-        costUsd: result.costUsd,
-        latencyMs: result.latencyMs
-      })
-
-      console.info('[chat] completed (json)', {
-        userId,
+    const respondWithFallback = async (error: unknown) => {
+      const fallbackMessage = buildFallbackMessage()
+      await conversationManager.addMessage({
         conversationId: conversation.id,
-        model: result.model,
-        latencyMs: Date.now() - startedAt
+        role: 'assistant',
+        content: fallbackMessage,
+        metadata: {
+          fallback: true,
+          error: error instanceof Error ? error.message : String(error)
+        },
+        model: selection.model,
+        inputTokens: null,
+        outputTokens: null,
+        totalTokens: null,
+        costUsd: null
       })
-
       return {
         type: 'json',
         body: {
-          message: result.text,
+          message: fallbackMessage,
           conversationId: conversation.id,
-          model: result.model
+          model: selection.model
         }
       }
     }
 
-    const streamResult = await modelService.streamChat({
-      model: selection.model,
-      messages: trimmedMessages,
-      onFinish
-    })
+    try {
+      if (!wantsStream) {
+        const result = await modelService.generateChat({
+          model: selection.model,
+          messages: trimmedMessages
+        })
 
-    const response = streamResult.result.toDataStreamResponse({
-      headers: {
-        'X-Conversation-Id': conversation.id,
-        'X-Model': streamResult.model
+        await onFinish({
+          text: result.text,
+          model: result.model,
+          usage: result.usage,
+          finishReason: 'stop',
+          costUsd: result.costUsd,
+          latencyMs: result.latencyMs
+        })
+
+        console.info('[chat] completed (json)', {
+          userId,
+          conversationId: conversation.id,
+          model: result.model,
+          latencyMs: Date.now() - startedAt
+        })
+
+        return {
+          type: 'json',
+          body: {
+            message: result.text,
+            conversationId: conversation.id,
+            model: result.model
+          }
+        }
       }
-    })
 
-    console.info('[chat] started stream', {
-      userId,
-      conversationId: conversation.id,
-      model: streamResult.model,
-      latencyMs: Date.now() - startedAt
-    })
+      const streamResult = await modelService.streamChat({
+        model: selection.model,
+        messages: trimmedMessages,
+        onFinish
+      })
 
-    return {
-      type: 'stream',
-      response,
-      conversationId: conversation.id,
-      model: streamResult.model
+      const response = streamResult.result.toDataStreamResponse({
+        headers: {
+          'X-Conversation-Id': conversation.id,
+          'X-Model': streamResult.model
+        }
+      })
+
+      console.info('[chat] started stream', {
+        userId,
+        conversationId: conversation.id,
+        model: streamResult.model,
+        latencyMs: Date.now() - startedAt
+      })
+
+      return {
+        type: 'stream',
+        response,
+        conversationId: conversation.id,
+        model: streamResult.model
+      }
+    } catch (error) {
+      console.error('[chat] generation failed', {
+        userId,
+        conversationId: conversation.id,
+        message: error instanceof Error ? error.message : String(error)
+      })
+      return respondWithFallback(error)
     }
   }
 

@@ -1,7 +1,9 @@
 import { Hono } from 'hono'
 import type { Context } from 'hono'
+import type { ContentfulStatusCode } from 'hono/utils/http-status'
 import { authMiddleware } from '../middleware/auth'
 import { createChatService } from '../services/chat-service'
+import { createNtnReportService } from '../services/ntn-report-service'
 
 const isDev = process.env.NODE_ENV !== 'production'
 
@@ -16,16 +18,20 @@ const getUserId = (c: Context): string | null => {
   return payload?.sub ?? payload?.user_id ?? payload?.userId ?? null
 }
 
-const parseNumber = (value: string | null, fallback: number) => {
+const parseNumber = (value: string | null | undefined, fallback: number) => {
   if (!value) return fallback
   const parsed = Number.parseInt(value, 10)
   return Number.isNaN(parsed) ? fallback : parsed
 }
 
-const resolveErrorStatus = (error: unknown): number => {
+const isContentfulStatus = (value: number): value is ContentfulStatusCode => {
+  return value >= 100 && value <= 599 && value !== 101 && value !== 204 && value !== 205 && value !== 304
+}
+
+const resolveErrorStatus = (error: unknown): ContentfulStatusCode => {
   if (!error || typeof error !== 'object') return 500
   const status = (error as { status?: number }).status ?? (error as { statusCode?: number }).statusCode
-  if (status) return status
+  if (typeof status === 'number' && isContentfulStatus(status)) return status
   const message = 'message' in error ? String((error as { message?: string }).message) : ''
   if (message.toLowerCase().includes('rate limit')) return 429
   if (message.toLowerCase().includes('invalid chat request')) return 400
@@ -43,6 +49,7 @@ const buildRequestId = () => {
 export const createAiChatRoutes = () => {
   const router = new Hono()
   const chatService = createChatService()
+  const ntnReportService = createNtnReportService()
 
   router.post('/chat', authMiddleware, async (c) => {
     const requestId = c.req.header('x-request-id') ?? buildRequestId()
@@ -113,6 +120,54 @@ export const createAiChatRoutes = () => {
       return c.json({ error: 'Conversation not found' }, 404)
     }
     return c.json(result)
+  })
+
+  router.post('/ntn-report', authMiddleware, async (c) => {
+    const requestId = c.req.header('x-request-id') ?? buildRequestId()
+    const userId = getUserId(c)
+    if (!userId) {
+      return c.json({ error: 'Unauthorized' }, 401)
+    }
+
+    let body: Record<string, unknown> = {}
+    try {
+      body = await c.req.json()
+    } catch {
+      body = {}
+    }
+
+    const reportType = typeof body.reportType === 'string' ? body.reportType : undefined
+    const forceRefresh = Boolean(body.forceRefresh)
+
+    try {
+      const result = await ntnReportService.generateReport(userId, {
+        reportType,
+        forceRefresh
+      })
+      return c.json(result, 200, {
+        'X-Request-Id': requestId
+      })
+    } catch (error) {
+      const status = resolveErrorStatus(error)
+      const message =
+        error instanceof Error ? error.message : 'Failed to generate NTN report'
+      console.error('[ntn-report] generation failed', {
+        requestId,
+        userId,
+        status,
+        message,
+        name: error instanceof Error ? error.name : 'UnknownError',
+        stack: isDev && error instanceof Error ? error.stack : undefined
+      })
+      return c.json(
+        {
+          error: message,
+          requestId
+        },
+        status,
+        { 'X-Request-Id': requestId }
+      )
+    }
   })
 
   return router

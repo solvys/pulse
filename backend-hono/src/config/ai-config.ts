@@ -1,3 +1,5 @@
+import priceSystemPrompt from '../prompts/price-system-prompt'
+
 type Env = Record<string, string | undefined>
 
 const getEnv = (key: string): string | undefined => {
@@ -131,5 +133,5 @@ export const defaultAiConfig: AiConfig = {
   performance: {
     slowResponseMs: Number.parseInt(getEnv('AI_SLOW_RESPONSE_MS') ?? '3000', 10)
   },
-  systemPrompt: getEnv('AI_SYSTEM_PROMPT')
+  systemPrompt: priceSystemPrompt
 }

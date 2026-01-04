@@ -2,10 +2,12 @@ import { useState } from 'react';
 import { ClerkProvider, SignIn, SignedIn, SignedOut } from '@clerk/clerk-react';
 import { AuthProvider } from './contexts/AuthContext';
 import { SettingsProvider } from './contexts/SettingsContext';
+import { PsychProvider } from './contexts/PsychContext';
 import { ThreadProvider } from './contexts/ThreadContext';
 import { MainLayout } from './components/layout/MainLayout';
 import { SettingsPanel } from './components/SettingsPanel';
 import { NotificationContainer } from './components/NotificationToast';
+import { PsychOrientationModal } from './components/psych/PsychOrientationModal';
 import { dark } from '@clerk/themes';
 // ERProvider removed - using component-based ER monitoring for stability
 
@@ -24,8 +26,9 @@ function AppInner() {
   const appContent = (
     <AuthProvider>
       <SettingsProvider>
-        <ThreadProvider>
-          <div className="dark">
+        <PsychProvider>
+          <ThreadProvider>
+            <div className="dark">
             <style>{`
               @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&family=Roboto+Mono:wght@400;500&display=swap');
               
@@ -63,11 +66,13 @@ function AppInner() {
                 pointer-events: none;
               }
             `}</style>
-            <MainLayout onSettingsClick={() => setShowSettings(true)} />
-            {showSettings && <SettingsPanel onClose={() => setShowSettings(false)} />}
-            <NotificationContainer />
-          </div>
-        </ThreadProvider>
+              <MainLayout onSettingsClick={() => setShowSettings(true)} />
+              {showSettings && <SettingsPanel onClose={() => setShowSettings(false)} />}
+              <NotificationContainer />
+              <PsychOrientationModal />
+            </div>
+          </ThreadProvider>
+        </PsychProvider>
       </SettingsProvider>
     </AuthProvider>
   );

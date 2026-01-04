@@ -102,6 +102,23 @@ const isRateLimitError = (error: unknown): boolean => {
   return status === 429 || message.toLowerCase().includes('rate limit')
 }
 
+const isRetryableModelError = (error: unknown): boolean => {
+  if (!error || typeof error !== 'object') return false
+  const status =
+    (error as { status?: number }).status ??
+    (error as { statusCode?: number }).statusCode ??
+    null
+  if (status && [408, 425, 429, 500, 502, 503, 504].includes(status)) {
+    return true
+  }
+  const code = 'code' in error ? String((error as { code?: string }).code) : ''
+  if (code && ['etimedout', 'econnreset', 'fetch_failed'].includes(code.toLowerCase())) {
+    return true
+  }
+  const message = 'message' in error ? String((error as { message?: string }).message).toLowerCase() : ''
+  return message.includes('timeout') || message.includes('network') || message.includes('fetch')
+}
+
 const extractUsage = (usage: unknown): ModelUsage | undefined => {
   if (!usage || typeof usage !== 'object') return undefined
   const raw = usage as Record<string, number | undefined>
@@ -275,13 +292,19 @@ export const createAiModelService = (config: AiConfig = defaultAiConfig) => {
       return await attempt(options.model)
     } catch (error) {
       recordError(options.model, error)
-      if (!isRateLimitError(error)) {
+      const canFallback = isRateLimitError(error) || isRetryableModelError(error)
+      if (!canFallback) {
         throw error
       }
       const fallback = getFallbackModel(options.model)
       if (!fallback) {
         throw error
       }
+      console.warn('[ai] falling back to secondary model', {
+        from: options.model,
+        to: fallback,
+        reason: error instanceof Error ? error.message : String(error)
+      })
       return attempt(fallback)
     }
   }
@@ -318,13 +341,19 @@ export const createAiModelService = (config: AiConfig = defaultAiConfig) => {
       return await attempt(options.model)
     } catch (error) {
       recordError(options.model, error)
-      if (!isRateLimitError(error)) {
+      const canFallback = isRateLimitError(error) || isRetryableModelError(error)
+      if (!canFallback) {
         throw error
       }
       const fallback = getFallbackModel(options.model)
       if (!fallback) {
         throw error
       }
+      console.warn('[ai] falling back to secondary model', {
+        from: options.model,
+        to: fallback,
+        reason: error instanceof Error ? error.message : String(error)
+      })
       return attempt(fallback)
     }
   }

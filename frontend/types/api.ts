@@ -119,7 +119,11 @@ export interface ChatResponse {
 export interface NTNReport {
   report: {
     content: string;
+    reportType?: string;
+    generatedAt?: string;
   };
+  metadata?: Record<string, unknown> | null;
+  model?: string | null;
 }
 
 export interface ProjectXAccount {
@@ -128,6 +132,24 @@ export interface ProjectXAccount {
   balance?: number;
   provider?: string;
   isPaper?: boolean;
+}
+
+export interface PsychScores {
+  executions: number;
+  emotionalControl: number;
+  planAdherence: number;
+  riskSizing: number;
+  adaptability: number;
+}
+
+export interface PsychProfile {
+  blindSpots: string[];
+  goal: string | null;
+  orientationComplete: boolean;
+  psychScores: PsychScores;
+  lastAssessmentAt?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface BrokerAccount {

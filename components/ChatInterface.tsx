@@ -6,6 +6,7 @@ import { useAuth, useUser } from "@clerk/clerk-react";
 import { useBackend } from "../lib/backend";
 import { healingBowlPlayer } from "../utils/healingBowlSounds";
 import { useSettings } from "../contexts/SettingsContext";
+import { usePsych } from "../contexts/PsychContext";
 import ReactMarkdown from "react-markdown";
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080';
@@ -82,6 +83,7 @@ interface ConversationSession {
   isPinned?: boolean;
   customName?: string;
   isStale?: boolean; // Stale after 24 hours
+  staleAt?: string | null;
 }
 
 export default function ChatInterface() {
@@ -89,6 +91,7 @@ export default function ChatInterface() {
   const { alertConfig } = useSettings();
   const { getToken } = useAuth();
   const { user } = useUser();
+  const { orientationRequired, openOrientationModal } = usePsych();
   const [showSuggestions, setShowSuggestions] = useState(true);
   const [showAttachMenu, setShowAttachMenu] = useState(false);
   const [conversationId, setConversationId] = useState<string | undefined>();
@@ -264,10 +267,9 @@ export default function ChatInterface() {
       const conversations = Array.isArray(response) ? response : [];
       const enrichedConversations = await Promise.all(
         conversations.map(async (conv: any) => {
-          const now = new Date();
           const convDate = new Date(conv.updatedAt);
-          const hoursSinceUpdate = (now.getTime() - convDate.getTime()) / (1000 * 60 * 60);
-          const isStale = hoursSinceUpdate > 24;
+          const staleAt = (conv as any).staleAt || (conv as any).stale_at || null;
+          const isStale = staleAt ? new Date(staleAt).getTime() <= Date.now() : false;
 
           // Try to get ER status and P&L for this session
           let erStatus: "Stable" | "Tilt" | "Neutral" | undefined;
@@ -299,6 +301,7 @@ export default function ChatInterface() {
             erStatus,
             pnl,
             isStale,
+            staleAt,
             isArchived: false, // Default values - would be loaded from backend
             isPinned: false,
             customName: undefined,
@@ -356,6 +359,10 @@ export default function ChatInterface() {
     setShowHistory(false);
     try {
       const response = await backend.ai.getConversation({ conversationId: convId });
+      const staleAt = response.conversation?.staleAt || response.conversation?.stale_at;
+      if (staleAt && new Date(staleAt).getTime() <= Date.now()) {
+        alert("This chat thread has gone stale after 24 hours. You can view it, but cannot send new messages. Start a new chat to continue the conversation.");
+      }
       // Convert backend messages to useChat format
       const loadedMessages = (response.messages || []).map((msg: any, idx: number) => ({
         id: `${convId}-${idx}`,
@@ -378,6 +385,11 @@ export default function ChatInterface() {
   const handleSend = async (customMessage?: string) => {
     const messageText = customMessage || input.trim();
     if (!messageText || isLoading) return;
+
+    if (orientationRequired) {
+      openOrientationModal();
+      return;
+    }
 
     // Check if current conversation is stale
     if (conversationId) {
@@ -458,6 +470,20 @@ export default function ChatInterface() {
           </div>
         </div>
       </div>
+
+      {orientationRequired && (
+        <div className="bg-red-500/10 border-y border-red-500/30 px-6 py-3 flex flex-wrap items-center gap-3 justify-between">
+          <p className="text-sm text-red-200">
+            Finish Psych Assist orientation before chatting with Price. This keeps memory aligned with your blind spots.
+          </p>
+          <button
+            onClick={() => openOrientationModal()}
+            className="px-3 py-1.5 text-xs font-semibold text-red-200 border border-red-400/50 rounded hover:bg-red-500/20 transition-colors"
+          >
+            Launch Orientation
+          </button>
+        </div>
+      )}
 
       {/* Tilt Warning Banner */}
       {tiltWarning?.detected && (
@@ -641,7 +667,7 @@ export default function ChatInterface() {
                   <button
                     key={index}
                     onClick={() => handleSend(chip.prompt)}
-                    disabled={isLoading}
+                    disabled={isLoading || orientationRequired}
                     className="px-4 py-2.5 bg-white/5 backdrop-blur-sm border border-white/10 hover:border-[#FFC038]/40 hover:bg-[#FFC038]/10 disabled:opacity-50 rounded-full text-sm text-zinc-300 hover:text-[#FFC038] transition-all"
                   >
                     {chip.label}
@@ -813,7 +839,7 @@ export default function ChatInterface() {
               }
             }}
             placeholder="Analyze your performance, the news, or the markets…."
-            disabled={isLoading}
+            disabled={isLoading || orientationRequired}
             rows={1}
             className="flex-1 bg-white/5 backdrop-blur-sm border border-white/10 rounded-[18px] px-4 py-3 text-sm text-white placeholder-zinc-400 focus:outline-none focus:border-[#FFC038]/40 focus:shadow-[0_0_12px_rgba(255,192,56,0.1)] disabled:opacity-50 transition-all resize-none overflow-y-auto min-h-[42px] max-h-[200px] leading-relaxed"
           />
@@ -824,7 +850,7 @@ export default function ChatInterface() {
               e.preventDefault();
               handleSend();
             }}
-            disabled={!input.trim() || isLoading}
+            disabled={!input.trim() || isLoading || orientationRequired}
             className="flex items-center justify-center w-[42px] h-[42px] flex-shrink-0 rounded-full bg-[#FFC038] hover:bg-[#FFD060] disabled:bg-zinc-900 disabled:text-zinc-700 disabled:border disabled:border-zinc-800 transition-all self-end"
             type="button"
           >

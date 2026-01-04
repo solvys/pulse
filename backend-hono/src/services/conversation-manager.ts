@@ -13,6 +13,8 @@ export interface ConversationRecord {
   updatedAt: string
   lastMessage?: string | null
   lastMessageAt?: string | null
+  staleAt?: string | null
+  isArchived?: boolean
 }
 
 export interface MessageRecord {
@@ -63,7 +65,9 @@ const mapConversation = (row: Record<string, unknown>): ConversationRecord => ({
   createdAt: String(row.created_at),
   updatedAt: String(row.updated_at),
   lastMessage: row.last_message ? String(row.last_message) : null,
-  lastMessageAt: row.last_message_at ? String(row.last_message_at) : null
+  lastMessageAt: row.last_message_at ? String(row.last_message_at) : null,
+  staleAt: row.stale_at ? String(row.stale_at) : null,
+  isArchived: row.is_archived === true
 })
 
 const mapMessage = (row: Record<string, unknown>): MessageRecord => ({
@@ -79,6 +83,8 @@ const mapMessage = (row: Record<string, unknown>): MessageRecord => ({
   costUsd: row.cost_usd !== null && row.cost_usd !== undefined ? Number(row.cost_usd) : null,
   createdAt: String(row.created_at)
 })
+
+const STALE_WINDOW_HOURS = Number.parseInt(process.env.AI_CONVERSATION_STALE_HOURS ?? '24', 10)
 
 export const createConversationManager = (config: AiConfig = defaultAiConfig) => {
   const mapDbErrorStatus = (error: DatabaseError) => {
@@ -105,8 +111,8 @@ export const createConversationManager = (config: AiConfig = defaultAiConfig) =>
     try {
       result = await query(
         `
-        INSERT INTO ai_conversations (user_id, title, model, metadata, parent_id, thread_id)
-        VALUES ($1, $2, $3, $4, $5, $6)
+        INSERT INTO ai_conversations (user_id, title, model, metadata, parent_id, thread_id, stale_at)
+        VALUES ($1, $2, $3, $4, $5, $6, NOW() + ($7 || ' hours')::interval)
         RETURNING *
         `,
         [
@@ -115,7 +121,8 @@ export const createConversationManager = (config: AiConfig = defaultAiConfig) =>
           input.model ?? null,
           normalizeMetadata(input.metadata),
           input.parentId ?? null,
-          input.threadId ?? input.parentId ?? null
+          input.threadId ?? input.parentId ?? null,
+          STALE_WINDOW_HOURS
         ]
       )
     } catch (error) {
