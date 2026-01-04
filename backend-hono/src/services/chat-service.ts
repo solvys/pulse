@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { defaultAiConfig, type AiConfig, type AiModelKey } from '../config/ai-config'
+import { defaultAiConfig, type AiConfig, type AiModelKey, resolveModelKey } from '../config/ai-config'
 import { createAiModelService, type AiMessage, type StreamFinish } from './ai-model-service'
 import { createConversationManager, type ConversationRecord } from './conversation-manager'
 
@@ -8,7 +8,21 @@ const messageSchema = z.object({
   content: z.string().min(1)
 })
 
-const rawModelSchema = z.enum(['sonnet', 'grok', 'groq', 'opus', 'haiku'])
+// Model schema - Vercel Gateway primary, OpenRouter fallback routes
+const rawModelSchema = z.enum([
+  // Vercel Gateway models (primary)
+  'sonnet',
+  'grok',
+  'groq',
+  'opus',
+  'haiku',
+  // OpenRouter alternative routes
+  'openrouter-sonnet',
+  'openrouter-llama',
+  // Aliases
+  'openrouter-claude',
+  'llama-70b'
+])
 
 const chatRequestSchema = z.object({
   messages: z.array(messageSchema).min(1),
@@ -105,17 +119,40 @@ const shouldStream = (request: ChatRequest, acceptHeader?: string | null) => {
   return !acceptHeader.includes('application/json')
 }
 
+/**
+ * Normalize model key using config resolver
+ * Handles aliases and maps to canonical AiModelKey
+ */
 const normalizePreferredModel = (model?: RawChatRequest['model']): AiModelKey | undefined => {
   if (!model) return undefined
+
+  // Use the config's resolveModelKey for consistent mapping
+  const resolved = resolveModelKey(model)
+  if (resolved) return resolved
+
+  // Legacy fallback for old aliases
   if (model === 'opus') return 'sonnet'
   if (model === 'haiku') return 'groq'
-  return model
+
+  // If it's already a valid model key, use it directly
+  const validKeys: AiModelKey[] = [
+    'sonnet',
+    'grok',
+    'groq',
+    'openrouter-sonnet',
+    'openrouter-llama'
+  ]
+  if (validKeys.includes(model as AiModelKey)) {
+    return model as AiModelKey
+  }
+
+  return undefined
 }
 
 const buildFallbackMessage = () =>
   [
     "Price (failsafe): I'm still booting up the reasoning stack.",
-    "Make sure the backend has valid AI credentials (e.g., VERCEL_AI_GATEWAY_API_KEY / AI_SYSTEM_PROMPT) and try again.",
+    "Make sure the backend has valid AI credentials (e.g., OPENROUTER_API_KEY / VERCEL_AI_GATEWAY_API_KEY) and try again.",
     "Until then I'll acknowledge your message, but I can't run full workflows yet."
   ].join(' ')
 
@@ -130,7 +167,7 @@ export const createChatService = (deps: {
   conversationManager?: ReturnType<typeof createConversationManager>
 } = {}) => {
   const config = deps.config ?? defaultAiConfig
-  const modelService = deps.modelService ?? createAiModelService(config)
+  const modelService = deps.modelService ?? createAiModelService({ config })
   const conversationManager = deps.conversationManager ?? createConversationManager(config)
 
   const parseChatRequest = (body: unknown): ChatRequest => {
@@ -268,7 +305,8 @@ export const createChatService = (deps: {
           content: finish.text,
           metadata: {
             finishReason: finish.finishReason,
-            latencyMs: finish.latencyMs
+            latencyMs: finish.latencyMs,
+            provider: finish.provider
           },
           model: finish.model,
           inputTokens: finish.usage?.inputTokens ?? null,
@@ -281,6 +319,7 @@ export const createChatService = (deps: {
           userId,
           conversationId: conversation.id,
           model: finish.model,
+          provider: finish.provider,
           messageChars: finish.text.length,
           error: error instanceof Error ? error.message : String(error)
         })
@@ -291,7 +330,9 @@ export const createChatService = (deps: {
       userId,
       conversationId: conversation.id,
       model: selection.model,
+      provider: selection.provider,
       reason: selection.reason,
+      fallbackChain: selection.fallbackChain,
       trimmedMessages: trimmedMessages.length,
       staleAt: conversation.staleAt ?? null
     })
@@ -326,12 +367,14 @@ export const createChatService = (deps: {
       if (!wantsStream) {
         const result = await modelService.generateChat({
           model: selection.model,
-          messages: trimmedMessages
+          messages: trimmedMessages,
+          userId
         })
 
         await onFinish({
           text: result.text,
           model: result.model,
+          provider: result.provider,
           usage: result.usage,
           finishReason: 'stop',
           costUsd: result.costUsd,
@@ -342,6 +385,7 @@ export const createChatService = (deps: {
           userId,
           conversationId: conversation.id,
           model: result.model,
+          provider: result.provider,
           latencyMs: Date.now() - startedAt
         })
 
@@ -358,13 +402,15 @@ export const createChatService = (deps: {
       const streamResult = await modelService.streamChat({
         model: selection.model,
         messages: trimmedMessages,
+        userId,
         onFinish
       })
 
       const response = streamResult.result.toDataStreamResponse({
         headers: {
           'X-Conversation-Id': conversation.id,
-          'X-Model': streamResult.model
+          'X-Model': streamResult.model,
+          'X-Provider': streamResult.provider
         }
       })
 
@@ -372,6 +418,7 @@ export const createChatService = (deps: {
         userId,
         conversationId: conversation.id,
         model: streamResult.model,
+        provider: streamResult.provider,
         latencyMs: Date.now() - startedAt
       })
 
@@ -385,6 +432,8 @@ export const createChatService = (deps: {
       console.error('[chat] generation failed', {
         userId,
         conversationId: conversation.id,
+        model: selection.model,
+        provider: selection.provider,
         message: error instanceof Error ? error.message : String(error)
       })
       return respondWithFallback(error)

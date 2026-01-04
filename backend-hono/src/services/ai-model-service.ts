@@ -1,15 +1,35 @@
-import { openai } from '@ai-sdk/openai'
+import { createOpenAI } from '@ai-sdk/openai'
 import { generateText, streamText } from 'ai'
-import { defaultAiConfig, type AiConfig, type AiModelConfig, type AiModelKey } from '../config/ai-config'
+import {
+  defaultAiConfig,
+  type AiConfig,
+  type AiModelConfig,
+  type AiModelKey,
+  isOpenRouterModel,
+  getCrossProviderEquivalent
+} from '../config/ai-config'
+import type { AiProviderType, AiRequestTelemetry } from '../types/ai-types'
+import { createOpenRouterClient, buildOpenRouterHeaders } from './openrouter-service'
+import { getProviderHealthService, type ProviderHealthService } from './provider-health'
+import {
+  extractTokenUsage,
+  createCostRecord,
+  getCostTracker,
+  type TokenUsage,
+  type CostTracker
+} from '../utils/ai-cost-tracker'
+
 export interface AiMessage {
   role: 'system' | 'user' | 'assistant'
   content: string
 }
+
 export interface ModelUsage {
   inputTokens?: number
   outputTokens?: number
   totalTokens?: number
 }
+
 export interface ModelMetrics {
   totalRequests: number
   totalCompleted: number
@@ -22,31 +42,41 @@ export interface ModelMetrics {
   lastError?: string
   lastUsedAt?: string
 }
+
 export interface ModelSelection {
   model: AiModelKey
+  provider: AiProviderType
   reason: string
+  fallbackChain: AiModelKey[]
 }
+
 export interface StreamFinish {
   text: string
   usage?: ModelUsage
   model: AiModelKey
+  provider: AiProviderType
   finishReason?: string
   costUsd?: number
   latencyMs: number
 }
+
 export interface StreamChatOptions {
   model: AiModelKey
   messages: AiMessage[]
   temperature?: number
   maxTokens?: number
+  userId?: string
   onFinish?: (data: StreamFinish) => void | Promise<void>
 }
+
 export interface GenerateChatOptions {
   model: AiModelKey
   messages: AiMessage[]
   temperature?: number
   maxTokens?: number
+  userId?: string
 }
+
 const telemetryOptions = {
   experimental_telemetry: {
     isEnabled: true,
@@ -54,6 +84,7 @@ const telemetryOptions = {
     recordOutputs: true
   }
 }
+
 const getEnv = (key: string): string | undefined => {
   const env = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env
   return env?.[key]
@@ -62,38 +93,30 @@ const getEnv = (key: string): string | undefined => {
 const defaultGatewayBaseUrl =
   getEnv('VERCEL_AI_GATEWAY_BASE_URL') ?? 'https://ai-gateway.vercel.sh/v1/chat/completions'
 
-const buildMetrics = (): Record<AiModelKey, ModelMetrics> => ({
-  sonnet: {
-    totalRequests: 0,
-    totalCompleted: 0,
-    totalErrors: 0,
-    totalTokens: 0,
-    totalCostUsd: 0,
-    totalLatencyMs: 0,
-    avgLatencyMs: 0,
-    lastLatencyMs: 0
-  },
-  grok: {
-    totalRequests: 0,
-    totalCompleted: 0,
-    totalErrors: 0,
-    totalTokens: 0,
-    totalCostUsd: 0,
-    totalLatencyMs: 0,
-    avgLatencyMs: 0,
-    lastLatencyMs: 0
-  },
-  groq: {
-    totalRequests: 0,
-    totalCompleted: 0,
-    totalErrors: 0,
-    totalTokens: 0,
-    totalCostUsd: 0,
-    totalLatencyMs: 0,
-    avgLatencyMs: 0,
-    lastLatencyMs: 0
+const buildMetrics = (): Record<AiModelKey, ModelMetrics> => {
+  const keys: AiModelKey[] = [
+    'sonnet',
+    'grok',
+    'groq',
+    'openrouter-sonnet',
+    'openrouter-llama'
+  ]
+
+  const metrics: Partial<Record<AiModelKey, ModelMetrics>> = {}
+  for (const key of keys) {
+    metrics[key] = {
+      totalRequests: 0,
+      totalCompleted: 0,
+      totalErrors: 0,
+      totalTokens: 0,
+      totalCostUsd: 0,
+      totalLatencyMs: 0,
+      avgLatencyMs: 0,
+      lastLatencyMs: 0
+    }
   }
-})
+  return metrics as Record<AiModelKey, ModelMetrics>
+}
 
 const isRateLimitError = (error: unknown): boolean => {
   if (!error || typeof error !== 'object') return false
@@ -119,47 +142,37 @@ const isRetryableModelError = (error: unknown): boolean => {
   return message.includes('timeout') || message.includes('network') || message.includes('fetch')
 }
 
-const extractUsage = (usage: unknown): ModelUsage | undefined => {
-  if (!usage || typeof usage !== 'object') return undefined
-  const raw = usage as Record<string, number | undefined>
-  const inputTokens = raw.promptTokens ?? raw.inputTokens ?? raw.input_tokens
-  const outputTokens = raw.completionTokens ?? raw.outputTokens ?? raw.output_tokens
-  const totalTokens = raw.totalTokens ?? raw.total_tokens ?? (inputTokens ?? 0) + (outputTokens ?? 0)
-  return {
-    inputTokens,
-    outputTokens,
-    totalTokens
-  }
-}
-
-const computeCost = (config: AiModelConfig, usage?: ModelUsage): number | undefined => {
-  if (!usage) return undefined
-  const input = usage.inputTokens ?? 0
-  const output = usage.outputTokens ?? 0
-  const inputCost = (input / 1000) * config.costPer1kInputUsd
-  const outputCost = (output / 1000) * config.costPer1kOutputUsd
-  return inputCost + outputCost
-}
-
 const normalizeTaskType = (taskType?: string): string | undefined => {
   if (!taskType) return undefined
   return taskType.trim().toLowerCase()
 }
 
-export const createAiModelService = (config: AiConfig = defaultAiConfig) => {
+export interface AiModelServiceDeps {
+  config?: AiConfig
+  healthService?: ProviderHealthService
+  costTracker?: CostTracker
+}
+
+export const createAiModelService = (deps: AiModelServiceDeps = {}) => {
+  const config = deps.config ?? defaultAiConfig
+  const healthService = deps.healthService ?? getProviderHealthService()
+  const costTracker = deps.costTracker ?? getCostTracker()
   const metrics = buildMetrics()
-  const modelCache = new Map<AiModelKey, ReturnType<typeof openai>>()
+  const modelCache = new Map<AiModelKey, ReturnType<typeof createOpenAI>>()
 
   const resolveApiKey = (modelConfig: AiModelConfig): string | undefined =>
     getEnv(modelConfig.apiKeyEnv)
 
-  const buildModelClient = (modelConfig: AiModelConfig) => {
+  /**
+   * Build a Vercel Gateway client (existing behavior)
+   */
+  const buildVercelGatewayClient = (modelConfig: AiModelConfig) => {
     const apiKey = resolveApiKey(modelConfig)
     if (!apiKey) {
       const message = `Missing API key for ${modelConfig.displayName} (env: ${modelConfig.apiKeyEnv})`
       console.error('[ai] model api key missing', {
         model: modelConfig.displayName,
-        provider: modelConfig.provider,
+        provider: modelConfig.providerType,
         apiKeyEnv: modelConfig.apiKeyEnv
       })
       const error = new Error(message) as Error & { status?: number; statusCode?: number }
@@ -173,7 +186,7 @@ export const createAiModelService = (config: AiConfig = defaultAiConfig) => {
       const message = `Missing baseUrl for ${modelConfig.displayName}`
       console.error('[ai] model baseUrl missing', {
         model: modelConfig.displayName,
-        provider: modelConfig.provider
+        provider: modelConfig.providerType
       })
       const error = new Error(message) as Error & { status?: number; statusCode?: number }
       error.status = 500
@@ -181,7 +194,25 @@ export const createAiModelService = (config: AiConfig = defaultAiConfig) => {
       throw error
     }
 
-    return openai(modelConfig.id, { apiKey, baseURL: baseUrl })
+    const openai = createOpenAI({ apiKey, baseURL: baseUrl })
+    return openai(modelConfig.id)
+  }
+
+  /**
+   * Build an OpenRouter client
+   */
+  const buildOpenRouterClient = (modelConfig: AiModelConfig) => {
+    return createOpenRouterClient(modelConfig)
+  }
+
+  /**
+   * Build client based on provider type
+   */
+  const buildModelClient = (modelConfig: AiModelConfig) => {
+    if (modelConfig.providerType === 'openrouter') {
+      return buildOpenRouterClient(modelConfig)
+    }
+    return buildVercelGatewayClient(modelConfig)
   }
 
   const getModelClient = (modelKey: AiModelKey) => {
@@ -200,6 +231,8 @@ export const createAiModelService = (config: AiConfig = defaultAiConfig) => {
     costUsd?: number
   ) => {
     const metric = metrics[modelKey]
+    const modelConfig = config.models[modelKey]
+
     metric.totalCompleted += 1
     metric.totalLatencyMs += latencyMs
     metric.lastLatencyMs = latencyMs
@@ -211,44 +244,141 @@ export const createAiModelService = (config: AiConfig = defaultAiConfig) => {
     if (costUsd) {
       metric.totalCostUsd += costUsd
     }
+
+    // Record in provider health service
+    healthService.recordSuccess(modelConfig.providerType, latencyMs, costUsd)
   }
 
   const recordError = (modelKey: AiModelKey, error: unknown) => {
     const metric = metrics[modelKey]
+    const modelConfig = config.models[modelKey]
+
     metric.totalErrors += 1
     metric.lastError = error instanceof Error ? error.message : String(error)
+
+    // Record in provider health service
+    healthService.recordFailure(modelConfig.providerType, error)
   }
 
+  /**
+   * Build fallback chain for a model
+   * Includes same-provider fallback and cross-provider fallback
+   */
+  const buildFallbackChain = (modelKey: AiModelKey): AiModelKey[] => {
+    const chain: AiModelKey[] = []
+    const visited = new Set<AiModelKey>()
+    let current: AiModelKey | null = modelKey
+
+    // Add same-provider fallbacks
+    while (current && !visited.has(current)) {
+      visited.add(current)
+      const next = config.routing.fallbackMap[current]
+      if (next && next !== current) {
+        chain.push(next)
+        current = next
+      } else {
+        current = null
+      }
+    }
+
+    // Add cross-provider fallback if enabled
+    if (config.providers.enableFallback) {
+      const crossFallback = getCrossProviderEquivalent(modelKey, config)
+      if (crossFallback && !visited.has(crossFallback.model as AiModelKey)) {
+        chain.push(crossFallback.model as AiModelKey)
+      }
+    }
+
+    return chain
+  }
+
+  /**
+   * Select the best model for a request
+   */
   const selectModel = (options: {
     preferredModel?: AiModelKey
     taskType?: string
     messageCount?: number
     inputChars?: number
   }): ModelSelection => {
+    let model: AiModelKey
+    let reason: string
+
+    // Check preferred model first
     if (options.preferredModel && config.models[options.preferredModel]) {
-      return { model: options.preferredModel, reason: 'preferred' }
-    }
-    const normalizedTask = normalizeTaskType(options.taskType)
-    if (normalizedTask && config.routing.taskModelMap[normalizedTask]) {
-      return { model: config.routing.taskModelMap[normalizedTask], reason: 'task-map' }
-    }
-    const messageCount = options.messageCount ?? 0
-    const inputChars = options.inputChars ?? 0
-    if (normalizedTask) {
-      if (normalizedTask.includes('quick') || normalizedTask.includes('tech') || normalizedTask.includes('analysis')) {
-        return { model: 'groq', reason: 'task-keyword' }
+      model = options.preferredModel
+      reason = 'preferred'
+    } else {
+      // Check task type mapping
+      const normalizedTask = normalizeTaskType(options.taskType)
+      if (normalizedTask && config.routing.taskModelMap[normalizedTask]) {
+        model = config.routing.taskModelMap[normalizedTask]
+        reason = 'task-map'
+      } else {
+        // Check task keywords
+        const messageCount = options.messageCount ?? 0
+        const inputChars = options.inputChars ?? 0
+
+        if (normalizedTask) {
+        if (
+          normalizedTask.includes('quick') ||
+          normalizedTask.includes('tech') ||
+          normalizedTask.includes('analysis')
+        ) {
+          model = 'groq'
+          reason = 'task-keyword'
+        } else if (
+          normalizedTask.includes('reason') ||
+          normalizedTask.includes('interpret') ||
+          normalizedTask.includes('research')
+        ) {
+          model = 'sonnet'
+          reason = 'task-keyword'
+        } else if (
+          normalizedTask.includes('news') ||
+          normalizedTask.includes('sentiment')
+        ) {
+          model = 'grok'
+          reason = 'task-keyword'
+        } else {
+          model = config.routing.defaultModel
+          reason = 'default'
+        }
+      } else if (messageCount > 12 || inputChars > 2000) {
+        model = 'sonnet'
+        reason = 'complexity'
+      } else {
+          model = config.routing.defaultModel
+          reason = 'default'
+        }
       }
-      if (normalizedTask.includes('reason') || normalizedTask.includes('interpret') || normalizedTask.includes('research')) {
-        return { model: 'sonnet', reason: 'task-keyword' }
-      }
-      if (normalizedTask.includes('news') || normalizedTask.includes('sentiment') || normalizedTask.includes('general')) {
-        return { model: 'grok', reason: 'task-keyword' }
+    }
+
+    // Check provider health and potentially switch
+    const modelConfig = config.models[model]
+    const providerHealthy = healthService.isProviderHealthy(modelConfig.providerType)
+
+    if (!providerHealthy && config.providers.enableFallback) {
+      const crossFallback = getCrossProviderEquivalent(model, config)
+      if (crossFallback) {
+        const fallbackHealthy = healthService.isProviderHealthy(crossFallback.provider)
+        if (fallbackHealthy) {
+          console.info('[ai] switching to cross-provider fallback due to unhealthy provider', {
+            originalModel: model,
+            originalProvider: modelConfig.providerType,
+            fallbackModel: crossFallback.model,
+            fallbackProvider: crossFallback.provider
+          })
+          model = crossFallback.model as AiModelKey
+          reason = 'provider-fallback'
+        }
       }
     }
-    if (messageCount > 12 || inputChars > 2000) {
-      return { model: 'sonnet', reason: 'complexity' }
-    }
-    return { model: config.routing.defaultModel, reason: 'default' }
+
+    const provider = config.models[model].providerType
+    const fallbackChain = buildFallbackChain(model)
+
+    return { model, provider, reason, fallbackChain }
   }
 
   const getFallbackModel = (modelKey: AiModelKey): AiModelKey | null => {
@@ -256,12 +386,40 @@ export const createAiModelService = (config: AiConfig = defaultAiConfig) => {
     return fallback && fallback !== modelKey ? fallback : null
   }
 
+  /**
+   * Get cross-provider fallback for a model
+   */
+  const getCrossProviderFallback = (modelKey: AiModelKey): AiModelKey | null => {
+    if (!config.providers.enableFallback) return null
+    const equivalent = getCrossProviderEquivalent(modelKey, config)
+    return equivalent ? (equivalent.model as AiModelKey) : null
+  }
+
+  /**
+   * Stream chat with multi-provider fallback support
+   */
   const streamChat = async (options: StreamChatOptions) => {
-    const attempt = async (modelKey: AiModelKey) => {
+    const attempt = async (modelKey: AiModelKey, isFallback = false) => {
       const modelConfig = config.models[modelKey]
       const model = getModelClient(modelKey)
       const start = Date.now()
       metrics[modelKey].totalRequests += 1
+
+      const telemetry: AiRequestTelemetry = {
+        requestId: crypto.randomUUID(),
+        provider: modelConfig.providerType,
+        model: modelConfig.id,
+        startedAt: new Date().toISOString(),
+        status: 'pending',
+        fallbackUsed: isFallback
+      }
+
+      console.info('[ai] stream request started', {
+        model: modelKey,
+        provider: modelConfig.providerType,
+        isFallback,
+        requestId: telemetry.requestId
+      })
 
       const result = await streamText({
         model,
@@ -271,50 +429,99 @@ export const createAiModelService = (config: AiConfig = defaultAiConfig) => {
         ...telemetryOptions,
         onFinish: async (data) => {
           const latencyMs = Date.now() - start
-          const usage = extractUsage(data.usage)
-          const costUsd = computeCost(modelConfig, usage)
-          recordSuccess(modelKey, latencyMs, usage, costUsd)
+          const usage = extractTokenUsage(data.usage)
+          const costRecord = createCostRecord(modelConfig, usage)
+
+          recordSuccess(modelKey, latencyMs, usage, costRecord.totalCostUsd)
+          costTracker.recordCost(costRecord, options.userId)
+
+          telemetry.completedAt = new Date().toISOString()
+          telemetry.latencyMs = latencyMs
+          telemetry.status = 'success'
+          telemetry.usage = usage
+          telemetry.costUsd = costRecord.totalCostUsd
+
+          console.info('[ai] stream request completed', {
+            model: modelKey,
+            provider: modelConfig.providerType,
+            latencyMs,
+            tokens: usage?.totalTokens,
+            costUsd: costRecord.totalCostUsd.toFixed(6),
+            requestId: telemetry.requestId
+          })
+
           await options.onFinish?.({
             text: data.text,
             usage,
             model: modelKey,
+            provider: modelConfig.providerType,
             finishReason: data.finishReason,
-            costUsd,
+            costUsd: costRecord.totalCostUsd,
             latencyMs
           })
         }
       })
 
-      return { result, model: modelKey }
+      return { result, model: modelKey, provider: modelConfig.providerType }
     }
 
+    // Try primary model
     try {
       return await attempt(options.model)
     } catch (error) {
       recordError(options.model, error)
       const canFallback = isRateLimitError(error) || isRetryableModelError(error)
+
       if (!canFallback) {
         throw error
       }
-      const fallback = getFallbackModel(options.model)
-      if (!fallback) {
-        throw error
+
+      // Try same-provider fallback first
+      const sameProviderFallback = getFallbackModel(options.model)
+      if (sameProviderFallback) {
+        console.warn('[ai] falling back to same-provider model', {
+          from: options.model,
+          to: sameProviderFallback,
+          reason: error instanceof Error ? error.message : String(error)
+        })
+        try {
+          return await attempt(sameProviderFallback, true)
+        } catch (fallbackError) {
+          recordError(sameProviderFallback, fallbackError)
+          // Continue to cross-provider fallback
+        }
       }
-      console.warn('[ai] falling back to secondary model', {
-        from: options.model,
-        to: fallback,
-        reason: error instanceof Error ? error.message : String(error)
-      })
-      return attempt(fallback)
+
+      // Try cross-provider fallback
+      const crossProviderFallback = getCrossProviderFallback(options.model)
+      if (crossProviderFallback) {
+        console.warn('[ai] falling back to cross-provider model', {
+          from: options.model,
+          to: crossProviderFallback,
+          reason: error instanceof Error ? error.message : String(error)
+        })
+        return await attempt(crossProviderFallback, true)
+      }
+
+      throw error
     }
   }
 
+  /**
+   * Generate chat with multi-provider fallback support
+   */
   const generateChat = async (options: GenerateChatOptions) => {
-    const attempt = async (modelKey: AiModelKey) => {
+    const attempt = async (modelKey: AiModelKey, isFallback = false) => {
       const modelConfig = config.models[modelKey]
       const model = getModelClient(modelKey)
       const start = Date.now()
       metrics[modelKey].totalRequests += 1
+
+      console.info('[ai] generate request started', {
+        model: modelKey,
+        provider: modelConfig.providerType,
+        isFallback
+      })
 
       const result = await generateText({
         model,
@@ -325,36 +532,69 @@ export const createAiModelService = (config: AiConfig = defaultAiConfig) => {
       })
 
       const latencyMs = Date.now() - start
-      const usage = extractUsage(result.usage)
-      const costUsd = computeCost(modelConfig, usage)
-      recordSuccess(modelKey, latencyMs, usage, costUsd)
+      const usage = extractTokenUsage(result.usage)
+      const costRecord = createCostRecord(modelConfig, usage)
+
+      recordSuccess(modelKey, latencyMs, usage, costRecord.totalCostUsd)
+      costTracker.recordCost(costRecord, options.userId)
+
+      console.info('[ai] generate request completed', {
+        model: modelKey,
+        provider: modelConfig.providerType,
+        latencyMs,
+        tokens: usage?.totalTokens,
+        costUsd: costRecord.totalCostUsd.toFixed(6)
+      })
+
       return {
         text: result.text,
         model: modelKey,
+        provider: modelConfig.providerType,
         usage,
-        costUsd,
+        costUsd: costRecord.totalCostUsd,
         latencyMs
       }
     }
 
+    // Try primary model
     try {
       return await attempt(options.model)
     } catch (error) {
       recordError(options.model, error)
       const canFallback = isRateLimitError(error) || isRetryableModelError(error)
+
       if (!canFallback) {
         throw error
       }
-      const fallback = getFallbackModel(options.model)
-      if (!fallback) {
-        throw error
+
+      // Try same-provider fallback first
+      const sameProviderFallback = getFallbackModel(options.model)
+      if (sameProviderFallback) {
+        console.warn('[ai] falling back to same-provider model', {
+          from: options.model,
+          to: sameProviderFallback,
+          reason: error instanceof Error ? error.message : String(error)
+        })
+        try {
+          return await attempt(sameProviderFallback, true)
+        } catch (fallbackError) {
+          recordError(sameProviderFallback, fallbackError)
+          // Continue to cross-provider fallback
+        }
       }
-      console.warn('[ai] falling back to secondary model', {
-        from: options.model,
-        to: fallback,
-        reason: error instanceof Error ? error.message : String(error)
-      })
-      return attempt(fallback)
+
+      // Try cross-provider fallback
+      const crossProviderFallback = getCrossProviderFallback(options.model)
+      if (crossProviderFallback) {
+        console.warn('[ai] falling back to cross-provider model', {
+          from: options.model,
+          to: crossProviderFallback,
+          reason: error instanceof Error ? error.message : String(error)
+        })
+        return await attempt(crossProviderFallback, true)
+      }
+
+      throw error
     }
   }
 
@@ -362,6 +602,8 @@ export const createAiModelService = (config: AiConfig = defaultAiConfig) => {
     selectModel,
     streamChat,
     generateChat,
-    getMetrics: () => ({ ...metrics })
+    getMetrics: () => ({ ...metrics }),
+    getProviderHealth: () => healthService.getAllMetrics(),
+    getCostStats: () => costTracker.getAllStats()
   }
 }
