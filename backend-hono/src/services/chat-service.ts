@@ -8,16 +8,20 @@ const messageSchema = z.object({
   content: z.string().min(1)
 })
 
+const rawModelSchema = z.enum(['sonnet', 'grok', 'groq', 'opus', 'haiku'])
+
 const chatRequestSchema = z.object({
   messages: z.array(messageSchema).min(1),
   conversationId: z.string().optional(),
-  model: z.enum(['opus', 'haiku', 'grok']).optional(),
+  model: rawModelSchema.optional(),
   taskType: z.string().optional(),
   metadata: z.record(z.unknown()).optional(),
   stream: z.boolean().optional()
 })
 
-export type ChatRequest = z.infer<typeof chatRequestSchema>
+type RawChatRequest = z.infer<typeof chatRequestSchema>
+
+export type ChatRequest = Omit<RawChatRequest, 'model'> & { model?: AiModelKey }
 
 export interface ChatStreamResult {
   type: 'stream'
@@ -101,6 +105,13 @@ const shouldStream = (request: ChatRequest, acceptHeader?: string | null) => {
   return !acceptHeader.includes('application/json')
 }
 
+const normalizePreferredModel = (model?: RawChatRequest['model']): AiModelKey | undefined => {
+  if (!model) return undefined
+  if (model === 'opus') return 'sonnet'
+  if (model === 'haiku') return 'groq'
+  return model
+}
+
 export const createChatService = (deps: {
   config?: AiConfig
   modelService?: ReturnType<typeof createAiModelService>
@@ -116,7 +127,8 @@ export const createChatService = (deps: {
       const message = parsed.error.issues.map((issue) => issue.message).join(', ')
       throw new Error(`Invalid chat request: ${message}`)
     }
-    return parsed.data
+    const { model, ...rest } = parsed.data
+    return { ...rest, model: normalizePreferredModel(model) }
   }
 
   const ensureConversation = async (

@@ -1,4 +1,3 @@
-import { anthropic } from '@ai-sdk/anthropic'
 import { openai } from '@ai-sdk/openai'
 import { generateText, streamText } from 'ai'
 import { defaultAiConfig, type AiConfig, type AiModelConfig, type AiModelKey } from '../config/ai-config'
@@ -60,18 +59,11 @@ const getEnv = (key: string): string | undefined => {
   return env?.[key]
 }
 
+const defaultGatewayBaseUrl =
+  getEnv('VERCEL_AI_GATEWAY_BASE_URL') ?? 'https://ai-gateway.vercel.sh/v1/chat/completions'
+
 const buildMetrics = (): Record<AiModelKey, ModelMetrics> => ({
-  opus: {
-    totalRequests: 0,
-    totalCompleted: 0,
-    totalErrors: 0,
-    totalTokens: 0,
-    totalCostUsd: 0,
-    totalLatencyMs: 0,
-    avgLatencyMs: 0,
-    lastLatencyMs: 0
-  },
-  haiku: {
+  sonnet: {
     totalRequests: 0,
     totalCompleted: 0,
     totalErrors: 0,
@@ -82,6 +74,16 @@ const buildMetrics = (): Record<AiModelKey, ModelMetrics> => ({
     lastLatencyMs: 0
   },
   grok: {
+    totalRequests: 0,
+    totalCompleted: 0,
+    totalErrors: 0,
+    totalTokens: 0,
+    totalCostUsd: 0,
+    totalLatencyMs: 0,
+    avgLatencyMs: 0,
+    lastLatencyMs: 0
+  },
+  groq: {
     totalRequests: 0,
     totalCompleted: 0,
     totalErrors: 0,
@@ -129,7 +131,7 @@ const normalizeTaskType = (taskType?: string): string | undefined => {
 
 export const createAiModelService = (config: AiConfig = defaultAiConfig) => {
   const metrics = buildMetrics()
-  const modelCache = new Map<AiModelKey, ReturnType<typeof anthropic> | ReturnType<typeof openai>>()
+  const modelCache = new Map<AiModelKey, ReturnType<typeof openai>>()
 
   const resolveApiKey = (modelConfig: AiModelConfig): string | undefined =>
     getEnv(modelConfig.apiKeyEnv)
@@ -148,11 +150,10 @@ export const createAiModelService = (config: AiConfig = defaultAiConfig) => {
       error.statusCode = 500
       throw error
     }
-    if (modelConfig.provider === 'anthropic') {
-      return anthropic(modelConfig.id, { apiKey })
-    }
-    if (!modelConfig.baseUrl) {
-      const message = `Missing baseUrl for ${modelConfig.displayName} (provider: ${modelConfig.provider})`
+
+    const baseUrl = modelConfig.baseUrl ?? defaultGatewayBaseUrl
+    if (!baseUrl) {
+      const message = `Missing baseUrl for ${modelConfig.displayName}`
       console.error('[ai] model baseUrl missing', {
         model: modelConfig.displayName,
         provider: modelConfig.provider
@@ -162,7 +163,8 @@ export const createAiModelService = (config: AiConfig = defaultAiConfig) => {
       error.statusCode = 500
       throw error
     }
-    return openai(modelConfig.id, { apiKey, baseURL: modelConfig.baseUrl })
+
+    return openai(modelConfig.id, { apiKey, baseURL: baseUrl })
   }
 
   const getModelClient = (modelKey: AiModelKey) => {
@@ -215,11 +217,19 @@ export const createAiModelService = (config: AiConfig = defaultAiConfig) => {
     }
     const messageCount = options.messageCount ?? 0
     const inputChars = options.inputChars ?? 0
-    if (normalizedTask?.includes('news') || normalizedTask?.includes('sentiment')) {
-      return { model: 'grok', reason: 'task-keyword' }
+    if (normalizedTask) {
+      if (normalizedTask.includes('quick') || normalizedTask.includes('tech') || normalizedTask.includes('analysis')) {
+        return { model: 'groq', reason: 'task-keyword' }
+      }
+      if (normalizedTask.includes('reason') || normalizedTask.includes('interpret') || normalizedTask.includes('research')) {
+        return { model: 'sonnet', reason: 'task-keyword' }
+      }
+      if (normalizedTask.includes('news') || normalizedTask.includes('sentiment') || normalizedTask.includes('general')) {
+        return { model: 'grok', reason: 'task-keyword' }
+      }
     }
     if (messageCount > 12 || inputChars > 2000) {
-      return { model: 'opus', reason: 'complexity' }
+      return { model: 'sonnet', reason: 'complexity' }
     }
     return { model: config.routing.defaultModel, reason: 'default' }
   }

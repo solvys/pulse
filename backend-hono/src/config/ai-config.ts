@@ -5,8 +5,8 @@ const getEnv = (key: string): string | undefined => {
   return env?.[key]
 }
 
-export type AiModelKey = 'opus' | 'haiku' | 'grok'
-export type AiProvider = 'anthropic' | 'openai-compatible'
+export type AiModelKey = 'sonnet' | 'grok' | 'groq'
+export type AiProvider = 'openai-compatible'
 
 export interface AiModelConfig {
   id: string
@@ -43,68 +43,86 @@ export interface AiConfig {
   systemPrompt?: string
 }
 
-const resolveModelKey = (value?: string): AiModelKey | undefined => {
-  if (!value) return undefined
-  if (value === 'opus' || value === 'haiku' || value === 'grok') {
-    return value
-  }
-  return undefined
+const gatewayBaseUrl =
+  getEnv('VERCEL_AI_GATEWAY_BASE_URL') ?? 'https://ai-gateway.vercel.sh/v1/chat/completions'
+
+const modelAliases: Record<string, AiModelKey> = {
+  sonnet: 'sonnet',
+  'claude-sonnet': 'sonnet',
+  opus: 'sonnet',
+  grok: 'grok',
+  'grok-4.1': 'grok',
+  general: 'grok',
+  groq: 'groq',
+  'llama-3.3-70b': 'groq',
+  haiku: 'groq',
+  tech: 'groq'
 }
 
-const defaultModel = resolveModelKey(getEnv('AI_DEFAULT_MODEL')) ?? 'haiku'
+const resolveModelKey = (value?: string): AiModelKey | undefined => {
+  if (!value) return undefined
+  return modelAliases[value.toLowerCase()]
+}
+
+const defaultModel = resolveModelKey(getEnv('AI_DEFAULT_MODEL')) ?? 'grok'
 
 export const defaultAiConfig: AiConfig = {
   models: {
-    opus: {
-      id: getEnv('CLAUDE_OPUS_MODEL') ?? 'claude-opus-4-5',
-      displayName: 'Claude Opus 4.5',
-      provider: 'anthropic',
-      apiKeyEnv: 'ANTHROPIC_API_KEY',
+    sonnet: {
+      id: 'anthropic/claude-sonnet-4.5',
+      displayName: 'Claude Sonnet 4.5',
+      provider: 'openai-compatible',
+      apiKeyEnv: 'VERCEL_AI_GATEWAY_API_KEY',
+      baseUrl: gatewayBaseUrl,
+      temperature: 0.4,
+      maxTokens: 4096,
+      timeoutMs: 45_000,
+      costPer1kInputUsd: 0.0,
+      costPer1kOutputUsd: 0.0
+    },
+    grok: {
+      id: 'xai/grok-4.1',
+      displayName: 'Grok 4.1 Reasoning',
+      provider: 'openai-compatible',
+      apiKeyEnv: 'VERCEL_AI_GATEWAY_API_KEY',
+      baseUrl: gatewayBaseUrl,
       temperature: 0.4,
       maxTokens: 2048,
       timeoutMs: 30_000,
-      costPer1kInputUsd: 0.015,
-      costPer1kOutputUsd: 0.075
+      costPer1kInputUsd: 0.0,
+      costPer1kOutputUsd: 0.0
     },
-    haiku: {
-      id: getEnv('CLAUDE_HAIKU_MODEL') ?? 'claude-haiku-4-5',
-      displayName: 'Claude Haiku 4.5',
-      provider: 'anthropic',
-      apiKeyEnv: 'ANTHROPIC_API_KEY',
-      temperature: 0.3,
-      maxTokens: 1024,
-      timeoutMs: 15_000,
-      costPer1kInputUsd: 0.0008,
-      costPer1kOutputUsd: 0.004
-    },
-    grok: {
-      id: getEnv('GROK_MODEL') ?? 'grok-beta',
-      displayName: 'Grok',
+    groq: {
+      id: getEnv('GROQ_TECHNICAL_MODEL') ?? 'groq/llama-3.3-70b-versatile',
+      displayName: 'Groq Llama 3.3 70B',
       provider: 'openai-compatible',
-      apiKeyEnv: 'GROK_API_KEY',
-      baseUrl: getEnv('GROK_BASE_URL') ?? 'https://api.x.ai/v1',
-      temperature: 0.4,
-      maxTokens: 1024,
+      apiKeyEnv: 'VERCEL_AI_GATEWAY_API_KEY',
+      baseUrl: gatewayBaseUrl,
+      temperature: 0.25,
+      maxTokens: 2048,
       timeoutMs: 20_000,
-      costPer1kInputUsd: 0.005,
-      costPer1kOutputUsd: 0.015
+      costPer1kInputUsd: 0.0,
+      costPer1kOutputUsd: 0.0
     }
   },
   routing: {
     defaultModel,
     taskModelMap: {
-      analysis: 'opus',
-      research: 'opus',
-      reasoning: 'opus',
+      analysis: 'groq',
+      research: 'sonnet',
+      reasoning: 'sonnet',
+      technical: 'groq',
+      'quick-pulse': 'groq',
+      'quickpulse': 'groq',
       news: 'grok',
       sentiment: 'grok',
-      fast: 'haiku',
-      chat: 'haiku'
+      chat: 'grok',
+      general: 'grok'
     },
     fallbackMap: {
-      opus: 'haiku',
-      haiku: 'grok',
-      grok: 'haiku'
+      sonnet: 'grok',
+      grok: 'groq',
+      groq: 'sonnet'
     }
   },
   conversation: {

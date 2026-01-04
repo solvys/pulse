@@ -4,6 +4,8 @@
 > **Focus**: Vercel AI SDK, Collaborative Agent Pipeline, Chat Interface
 > **Timeline**: 8 weeks (parallel with Agent 1)
 
+> **Environment Update (Jan 2026):** All backend AI calls now route through the Vercel AI Gateway using `VERCEL_AI_GATEWAY_API_KEY`. Legacy provider-specific keys (`ANTHROPIC_API_KEY`, `GROK_API_KEY`, `CLAUDE_*`) are deprecated and can be removed once the gateway is configured.
+
 ---
 
 ## Week 1: AI Infrastructure Setup

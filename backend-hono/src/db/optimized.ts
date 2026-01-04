@@ -62,8 +62,25 @@ class LruCache<K, V> {
   }
 }
 
+const resolvedDatabase = (() => {
+  const neon = process.env.NEON_DATABASE_URL;
+  if (neon) {
+    return { connectionString: neon, source: 'NEON_DATABASE_URL' as const };
+  }
+
+  const legacy = process.env.DATABASE_URL;
+  if (legacy) {
+    console.warn(
+      '[db] DATABASE_URL detected. Please migrate to NEON_DATABASE_URL to avoid downtime.',
+    );
+    return { connectionString: legacy, source: 'DATABASE_URL' as const };
+  }
+
+  throw new Error('Missing NEON_DATABASE_URL (preferred) or DATABASE_URL (legacy fallback)');
+})();
+
 const buildPoolConfig = (): PoolConfig => ({
-  connectionString: process.env.DATABASE_URL,
+  connectionString: resolvedDatabase.connectionString,
   max: Number.parseInt(process.env.DB_POOL_MAX ?? '10', 10),
   idleTimeoutMillis: Number.parseInt(process.env.DB_IDLE_TIMEOUT_MS ?? '30000', 10),
   connectionTimeoutMillis: Number.parseInt(
