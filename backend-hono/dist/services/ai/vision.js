@@ -4,6 +4,13 @@
  */
 import { generateText } from 'ai';
 import { getVisionModel } from './model-config.js';
+const telemetryOptions = {
+    experimental_telemetry: {
+        isEnabled: true,
+        recordInputs: true,
+        recordOutputs: true,
+    },
+};
 export async function analyzeImage(imageData, prompt, marketContext) {
     try {
         const model = getVisionModel();
@@ -29,6 +36,7 @@ export async function analyzeImage(imageData, prompt, marketContext) {
             ],
             temperature: 0.7,
             // maxTokens removed - configured on model level in AI SDK v6
+            ...telemetryOptions,
         });
         return text;
     }

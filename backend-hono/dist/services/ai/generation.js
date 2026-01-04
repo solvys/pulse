@@ -5,6 +5,13 @@
 import { generateText } from 'ai';
 import { getModel } from './model-config.js';
 import { buildSystemPrompt } from './firmware.js';
+const telemetryOptions = {
+    experimental_telemetry: {
+        isEnabled: true,
+        recordInputs: true,
+        recordOutputs: true,
+    },
+};
 export async function generateAIResponse(prompt, modelName = 'grok-4', context) {
     try {
         const model = getModel(modelName);
@@ -14,6 +21,7 @@ export async function generateAIResponse(prompt, modelName = 'grok-4', context) 
             prompt: `${systemPrompt}\n\nUser: ${prompt}\n\nAssistant:`,
             temperature: 0.7,
             // maxTokens removed - configured on model level in AI SDK v6
+            ...telemetryOptions,
         });
         return text;
     }
@@ -44,6 +52,7 @@ Provide a concise market analysis focusing on volatility, risk, and trading oppo
             prompt,
             temperature: 0.7,
             // maxTokens removed - configured on model level in AI SDK v6
+            ...telemetryOptions,
         });
         return text;
     }
@@ -69,6 +78,7 @@ Provide insights on patterns, risks, and recommendations.`;
             prompt,
             temperature: 0.5,
             // maxTokens removed - configured on model level in AI SDK v6
+            ...telemetryOptions,
         });
         return text;
     }
