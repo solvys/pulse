@@ -1,5 +1,7 @@
 import { Hono } from 'hono';
 import { serve } from '@hono/node-server';
+import * as Sentry from '@sentry/node';
+import { nodeProfilingIntegration } from '@sentry/profiling-node';
 import { env } from './env.js';
 import { checkDatabase } from './db/index.js';
 import { authMiddleware } from './middleware/auth.js';
@@ -8,7 +10,32 @@ import { loggerMiddleware, logger } from './middleware/logger.js';
 import { registerRoutes } from './routes/index.js';
 import { marketRoutes } from './routes/market.js';
 import { fetchAndStoreNews, initializePolymarketFeed } from './services/news-service.js';
+const sentryEnabled = Boolean(process.env.SENTRY_DSN);
+if (sentryEnabled) {
+    Sentry.init({
+        dsn: process.env.SENTRY_DSN,
+        environment: env.NODE_ENV,
+        integrations: [nodeProfilingIntegration()],
+        tracesSampleRate: Number.parseFloat(process.env.SENTRY_TRACES_SAMPLE_RATE ?? '0.1'),
+        profilesSampleRate: Number.parseFloat(process.env.SENTRY_PROFILES_SAMPLE_RATE ?? '0.1')
+    });
+}
 const app = new Hono();
+if (sentryEnabled) {
+    app.use('*', async (c, next) => Sentry.runWithAsyncContext(async () => {
+        Sentry.setContext('request', {
+            method: c.req.method,
+            path: c.req.path
+        });
+        try {
+            await next();
+        }
+        catch (error) {
+            Sentry.captureException(error);
+            throw error;
+        }
+    }));
+}
 // CORS must be first to handle preflight requests
 // Apply CORS to all routes including protected ones
 app.use('*', corsMiddleware);
@@ -60,6 +87,11 @@ app.onError((err, c) => {
         c.header('Access-Control-Allow-Origin', origin);
         c.header('Access-Control-Allow-Credentials', 'true');
     }
+    if (sentryEnabled) {
+        Sentry.captureException(err, {
+            tags: { path: c.req.path }
+        });
+    }
     logger.error({ err }, 'Unhandled error');
     return c.json({
         error: 'Internal server error',
@@ -101,11 +133,17 @@ Promise.all([
         }
         catch (err) {
             logger.error({ err }, 'Background news refresh failed');
+            if (sentryEnabled) {
+                Sentry.captureException(err, { tags: { task: 'background-news-refresh' } });
+            }
         }
     }, 5 * 60 * 1000); // 5 minutes
 })
     .catch((err) => {
     logger.error({ err }, 'Failed to initialize news feed on startup');
+    if (sentryEnabled) {
+        Sentry.captureException(err, { tags: { task: 'startup-news-init' } });
+    }
 });
 export default app;
 //# sourceMappingURL=index.js.map
