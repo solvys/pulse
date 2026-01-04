@@ -214,6 +214,11 @@ export const createAiModelService = (config: AiConfig = defaultAiConfig) => {
         messages: options.messages,
         temperature: options.temperature ?? modelConfig.temperature,
         maxTokens: options.maxTokens ?? modelConfig.maxTokens,
+        experimental_telemetry: {
+          isEnabled: true,
+          recordInputs: true,
+          recordOutputs: true
+        },
         onFinish: async (data) => {
           const latencyMs = Date.now() - start
           const usage = extractUsage(data.usage)
@@ -259,7 +264,12 @@ export const createAiModelService = (config: AiConfig = defaultAiConfig) => {
         model,
         messages: options.messages,
         temperature: options.temperature ?? modelConfig.temperature,
-        maxTokens: options.maxTokens ?? modelConfig.maxTokens
+        maxTokens: options.maxTokens ?? modelConfig.maxTokens,
+        experimental_telemetry: {
+          isEnabled: true,
+          recordInputs: true,
+          recordOutputs: true
+        }
       })
 
       const latencyMs = Date.now() - start
