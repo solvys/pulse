@@ -8,20 +8,21 @@ export default defineConfig(() => {
   const plugins = [tailwindcss(), react()]
 
   if (process.env.SENTRY_AUTH_TOKEN && process.env.SENTRY_ORG && process.env.SENTRY_PROJECT) {
+    const releaseName =
+      process.env.SENTRY_RELEASE ||
+      process.env.VERCEL_GIT_COMMIT_SHA ||
+      process.env.GITHUB_SHA ||
+      'local-dev'
+    
     plugins.push(
       sentryVitePlugin({
-        org: process.env.SENTRY_ORG,
-        project: process.env.SENTRY_PROJECT,
-        authToken: process.env.SENTRY_AUTH_TOKEN,
-        release:
-          process.env.SENTRY_RELEASE ||
-          process.env.VERCEL_GIT_COMMIT_SHA ||
-          process.env.GITHUB_SHA ||
-          'local-dev',
-        sourcemaps: {
-          assets: './dist/**'
+        org: process.env.SENTRY_ORG!,
+        project: process.env.SENTRY_PROJECT!,
+        authToken: process.env.SENTRY_AUTH_TOKEN!,
+        release: {
+          name: releaseName
         }
-      })
+      } as any)
     )
   }
 

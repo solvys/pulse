@@ -15,9 +15,16 @@ if (sentryEnabled) {
     Sentry.init({
         dsn: process.env.SENTRY_DSN,
         environment: env.NODE_ENV,
-        integrations: [nodeProfilingIntegration()],
+        integrations: [
+            nodeProfilingIntegration(),
+            Sentry.vercelAIIntegration({
+                recordInputs: true,
+                recordOutputs: true,
+            }),
+        ],
         tracesSampleRate: Number.parseFloat(process.env.SENTRY_TRACES_SAMPLE_RATE ?? '0.1'),
-        profilesSampleRate: Number.parseFloat(process.env.SENTRY_PROFILES_SAMPLE_RATE ?? '0.1')
+        profilesSampleRate: Number.parseFloat(process.env.SENTRY_PROFILES_SAMPLE_RATE ?? '0.1'),
+        sendDefaultPii: true,
     });
 }
 const app = new Hono();

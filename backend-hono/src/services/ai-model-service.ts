@@ -48,6 +48,13 @@ export interface GenerateChatOptions {
   temperature?: number
   maxTokens?: number
 }
+const telemetryOptions = {
+  experimental_telemetry: {
+    isEnabled: true,
+    recordInputs: true,
+    recordOutputs: true
+  }
+}
 const getEnv = (key: string): string | undefined => {
   const env = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env
   return env?.[key]
@@ -214,6 +221,7 @@ export const createAiModelService = (config: AiConfig = defaultAiConfig) => {
         messages: options.messages,
         temperature: options.temperature ?? modelConfig.temperature,
         maxTokens: options.maxTokens ?? modelConfig.maxTokens,
+        ...telemetryOptions,
         onFinish: async (data) => {
           const latencyMs = Date.now() - start
           const usage = extractUsage(data.usage)
@@ -259,7 +267,8 @@ export const createAiModelService = (config: AiConfig = defaultAiConfig) => {
         model,
         messages: options.messages,
         temperature: options.temperature ?? modelConfig.temperature,
-        maxTokens: options.maxTokens ?? modelConfig.maxTokens
+        maxTokens: options.maxTokens ?? modelConfig.maxTokens,
+        ...telemetryOptions
       })
 
       const latencyMs = Date.now() - start

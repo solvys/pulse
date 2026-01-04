@@ -6,6 +6,13 @@ import { streamText, convertToModelMessages } from 'ai';
 import { getModel } from './model-config.js';
 import { getTools } from './tools.js';
 import { buildSystemPrompt } from './firmware.js';
+const telemetryOptions = {
+    experimental_telemetry: {
+        isEnabled: true,
+        recordInputs: true,
+        recordOutputs: true,
+    },
+};
 export async function createStreamingChatResponse(uiMessages, modelName = 'grok-4', context, onFinish, enableTools = false) {
     // Fallback logic based on use case model hierarchy:
     // Claude Opus 4: Complex reasoning, QuickPulse (primary)
@@ -42,6 +49,7 @@ export async function createStreamingChatResponse(uiMessages, modelName = 'grok-
                 temperature: 0.7,
                 // maxTokens removed - configured on model level in AI SDK v6
                 tools: enableTools ? getTools() : undefined,
+                ...telemetryOptions,
                 onFinish: async ({ text }) => {
                     if (onFinish) {
                         await onFinish(text);
@@ -76,6 +84,7 @@ export async function* streamAIResponse(prompt, conversationHistory, modelName =
             messages,
             temperature: 0.7,
             // maxTokens removed - configured on model level in AI SDK v6
+            ...telemetryOptions,
         });
         const { textStream } = streamResult;
         for await (const chunk of textStream) {

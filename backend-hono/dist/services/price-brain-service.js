@@ -4,6 +4,13 @@
  */
 import { generateText } from 'ai';
 import { getModel } from './ai/model-config.js';
+const telemetryOptions = {
+    experimental_telemetry: {
+        isEnabled: true,
+        recordInputs: true,
+        recordOutputs: true,
+    },
+};
 /**
  * Score news item using Price Brain Layer (AI Gateway)
  */
@@ -41,6 +48,7 @@ Provide your analysis as JSON.`;
             prompt: `${systemPrompt}\n\n${userPrompt}`,
             temperature: 0.3, // Lower temperature for more consistent analysis
             maxTokens: 500,
+            ...telemetryOptions,
         });
         // Parse JSON response
         try {

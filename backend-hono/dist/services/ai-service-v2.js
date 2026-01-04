@@ -15,6 +15,13 @@ const MODELS = {
     // Fast Logic / Chat
     FAST: openRouter('meta-llama/llama-3.3-70b-instruct'),
 };
+const telemetryOptions = {
+    experimental_telemetry: {
+        isEnabled: true,
+        recordInputs: true,
+        recordOutputs: true,
+    },
+};
 export class AIService {
     /**
      * Stream a chat response from the Brain
@@ -26,6 +33,7 @@ export class AIService {
                 messages,
                 system: systemContext,
                 temperature: 0.7,
+                ...telemetryOptions,
                 onFinish: async (event) => {
                     if (onFinish && event.text) {
                         await onFinish(event.text);
@@ -60,6 +68,7 @@ export class AIService {
                     }
                 ],
                 temperature: 0.2, // Low temp for analytical precision
+                ...telemetryOptions,
             });
             return text;
         }
