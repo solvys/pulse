@@ -22,10 +22,14 @@ if (sentryEnabled) {
 }
 const app = new Hono();
 if (sentryEnabled) {
-    app.use('*', async (c, next) => Sentry.runWithAsyncContext(async () => {
-        Sentry.setContext('request', {
-            method: c.req.method,
-            path: c.req.path
+    app.use('*', async (c, next) => {
+        const hub = Sentry.getCurrentHub();
+        hub.pushScope();
+        hub.configureScope((scope) => {
+            scope.setContext('request', {
+                method: c.req.method,
+                path: c.req.path
+            });
         });
         try {
             await next();
@@ -34,7 +38,10 @@ if (sentryEnabled) {
             Sentry.captureException(error);
             throw error;
         }
-    }));
+        finally {
+            hub.popScope();
+        }
+    });
 }
 // CORS must be first to handle preflight requests
 // Apply CORS to all routes including protected ones
