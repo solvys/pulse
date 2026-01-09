@@ -277,9 +277,9 @@ export const createChatService = (deps: {
       throw error
     }
     const promptMessages = await buildPromptMessages(conversation.id, normalizedMessages)
-    const withSystem =
+    const withSystem: AiMessage[] =
       config.systemPrompt && !promptMessages.some((message) => message.role === 'system')
-        ? [{ role: 'system', content: config.systemPrompt }, ...promptMessages]
+        ? [{ role: 'system' as const, content: config.systemPrompt }, ...promptMessages]
         : promptMessages
     const trimmedMessages = trimMessages(withSystem, config.conversation.maxHistoryMessages)
 
@@ -337,7 +337,7 @@ export const createChatService = (deps: {
       staleAt: conversation.staleAt ?? null
     })
 
-    const respondWithFallback = async (error: unknown) => {
+    const respondWithFallback = async (error: unknown): Promise<ChatJsonResult> => {
       const fallbackMessage = buildFallbackMessage()
       await conversationManager.addMessage({
         conversationId: conversation.id,
@@ -354,7 +354,7 @@ export const createChatService = (deps: {
         costUsd: null
       })
       return {
-        type: 'json',
+        type: 'json' as const,
         body: {
           message: fallbackMessage,
           conversationId: conversation.id,
@@ -406,7 +406,7 @@ export const createChatService = (deps: {
         onFinish
       })
 
-      const response = streamResult.result.toDataStreamResponse({
+      const response = streamResult.result.toTextStreamResponse({
         headers: {
           'X-Conversation-Id': conversation.id,
           'X-Model': streamResult.model,

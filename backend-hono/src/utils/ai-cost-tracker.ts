@@ -31,7 +31,7 @@ export interface CostCalculation {
 }
 
 // In-memory cost aggregation
-interface CostAggregation {
+export interface CostAggregation {
   byProvider: Record<AiProviderType, AiCostStats>
   byModel: Record<string, AiCostStats>
   byUser: Record<string, AiCostStats>
@@ -52,11 +52,11 @@ export const extractTokenUsage = (usage: unknown): TokenUsage | undefined => {
     raw.promptTokens ?? raw.inputTokens ?? raw.input_tokens ?? undefined
   const outputTokens =
     raw.completionTokens ?? raw.outputTokens ?? raw.output_tokens ?? undefined
+  const calculatedTotal = (inputTokens ?? 0) + (outputTokens ?? 0)
   const totalTokens =
     raw.totalTokens ??
     raw.total_tokens ??
-    ((inputTokens ?? 0) + (outputTokens ?? 0)) ||
-    undefined
+    (calculatedTotal > 0 ? calculatedTotal : undefined)
 
   if (inputTokens === undefined && outputTokens === undefined && totalTokens === undefined) {
     return undefined

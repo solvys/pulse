@@ -9,70 +9,14 @@ import { LayoutGrid, GripVertical, Layers, ChevronDown, Monitor } from 'lucide-r
 
 type LayoutOption = 'movable' | 'tickers-only' | 'combined';
 
-function RadarLogo() {
+function PulseLogo() {
   return (
-    <div className="relative w-8 h-8 flex items-center justify-center">
-      <svg
-        width="32"
-        height="32"
-        viewBox="0 0 32 32"
-        className="overflow-visible"
-      >
-        <defs>
-          <filter id="glow">
-            <feGaussianBlur stdDeviation="2" result="coloredBlur"/>
-            <feMerge>
-              <feMergeNode in="coloredBlur"/>
-              <feMergeNode in="SourceGraphic"/>
-            </feMerge>
-          </filter>
-        </defs>
-        
-        {/* Outer radar circle */}
-        <circle
-          cx="16"
-          cy="16"
-          r="14"
-          fill="none"
-          stroke="#FFC038"
-          strokeWidth="0.5"
-          opacity="0.4"
-        />
-        {/* Inner radar circle */}
-        <circle
-          cx="16"
-          cy="16"
-          r="8"
-          fill="none"
-          stroke="#FFC038"
-          strokeWidth="0.5"
-          opacity="0.4"
-        />
-        
-        {/* Center dot */}
-        <circle
-          cx="16"
-          cy="16"
-          r="1.5"
-          fill="#FFC038"
-          opacity="0.8"
-        />
-        
-        {/* Protruding needle - rotated 30 degrees, brilliantly bright */}
-        <g transform="rotate(30 16 16)">
-          <line
-            x1="16"
-            y1="16"
-            x2="16"
-            y2="2"
-            stroke="#FFC038"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            opacity="1"
-            filter="url(#glow)"
-          />
-        </g>
-      </svg>
+    <div className="relative w-10 h-10 flex items-center justify-center">
+      <img 
+        src="/pulse-logo.png" 
+        alt="Pulse Logo" 
+        className="w-10 h-10 object-contain"
+      />
     </div>
   );
 }
@@ -187,7 +131,7 @@ export function TopHeader({
     <div className={`bg-[#0a0a00] border-b border-[#FFC038]/20 flex items-center justify-between px-6 ${topStepXEnabled && layoutOption === 'tickers-only' ? 'h-[65px]' : 'h-[70px]'}`}>
       <div className="flex items-center gap-6">
         <div className="flex items-center gap-3">
-          <RadarLogo />
+          <PulseLogo />
           <button
             onClick={() => setShowUpgrade(true)}
             className="relative bg-[#050500] border border-[#FFC038]/20 rounded-lg px-3 py-1 hover:bg-[#FFC038]/10 hover:border-[#FFC038]/40 transition-colors cursor-pointer flex items-center"

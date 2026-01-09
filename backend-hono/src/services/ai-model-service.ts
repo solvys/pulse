@@ -1,23 +1,24 @@
 import { createOpenAI } from '@ai-sdk/openai'
-import { generateText, streamText } from 'ai'
+import { generateText, streamText, type LanguageModel } from 'ai'
 import {
   defaultAiConfig,
   type AiConfig,
   type AiModelConfig,
   type AiModelKey,
-  isOpenRouterModel,
   getCrossProviderEquivalent
 } from '../config/ai-config'
-import type { AiProviderType, AiRequestTelemetry } from '../types/ai-types'
-import { createOpenRouterClient, buildOpenRouterHeaders } from './openrouter-service'
+import type { AiProviderType } from '../types/ai-types'
+import { createOpenRouterClient } from './openrouter-service'
 import { getProviderHealthService, type ProviderHealthService } from './provider-health'
 import {
   extractTokenUsage,
   createCostRecord,
   getCostTracker,
-  type TokenUsage,
   type CostTracker
 } from '../utils/ai-cost-tracker'
+
+// Type alias for model clients - both providers return LanguageModelV1-compatible models
+type ModelClient = LanguageModel
 
 export interface AiMessage {
   role: 'system' | 'user' | 'assistant'
@@ -158,7 +159,7 @@ export const createAiModelService = (deps: AiModelServiceDeps = {}) => {
   const healthService = deps.healthService ?? getProviderHealthService()
   const costTracker = deps.costTracker ?? getCostTracker()
   const metrics = buildMetrics()
-  const modelCache = new Map<AiModelKey, ReturnType<typeof createOpenAI>>()
+  const modelCache = new Map<AiModelKey, ModelClient>()
 
   const resolveApiKey = (modelConfig: AiModelConfig): string | undefined =>
     getEnv(modelConfig.apiKeyEnv)
@@ -207,12 +208,13 @@ export const createAiModelService = (deps: AiModelServiceDeps = {}) => {
 
   /**
    * Build client based on provider type
+   * Both providers return LanguageModelV1-compatible models
    */
-  const buildModelClient = (modelConfig: AiModelConfig) => {
+  const buildModelClient = (modelConfig: AiModelConfig): ModelClient => {
     if (modelConfig.providerType === 'openrouter') {
-      return buildOpenRouterClient(modelConfig)
+      return buildOpenRouterClient(modelConfig) as unknown as ModelClient
     }
-    return buildVercelGatewayClient(modelConfig)
+    return buildVercelGatewayClient(modelConfig) as unknown as ModelClient
   }
 
   const getModelClient = (modelKey: AiModelKey) => {
@@ -270,12 +272,12 @@ export const createAiModelService = (deps: AiModelServiceDeps = {}) => {
     let current: AiModelKey | null = modelKey
 
     // Add same-provider fallbacks
-    while (current && !visited.has(current)) {
+    while (current !== null && !visited.has(current)) {
       visited.add(current)
-      const next = config.routing.fallbackMap[current]
-      if (next && next !== current) {
-        chain.push(next)
-        current = next
+      const nextModel: AiModelKey | undefined = config.routing.fallbackMap[current]
+      if (nextModel && nextModel !== current) {
+        chain.push(nextModel)
+        current = nextModel
       } else {
         current = null
       }
@@ -320,34 +322,34 @@ export const createAiModelService = (deps: AiModelServiceDeps = {}) => {
         const inputChars = options.inputChars ?? 0
 
         if (normalizedTask) {
-        if (
-          normalizedTask.includes('quick') ||
-          normalizedTask.includes('tech') ||
-          normalizedTask.includes('analysis')
-        ) {
-          model = 'groq'
-          reason = 'task-keyword'
-        } else if (
-          normalizedTask.includes('reason') ||
-          normalizedTask.includes('interpret') ||
-          normalizedTask.includes('research')
-        ) {
+          if (
+            normalizedTask.includes('quick') ||
+            normalizedTask.includes('tech') ||
+            normalizedTask.includes('analysis')
+          ) {
+            model = 'groq'
+            reason = 'task-keyword'
+          } else if (
+            normalizedTask.includes('reason') ||
+            normalizedTask.includes('interpret') ||
+            normalizedTask.includes('research')
+          ) {
+            model = 'sonnet'
+            reason = 'task-keyword'
+          } else if (
+            normalizedTask.includes('news') ||
+            normalizedTask.includes('sentiment')
+          ) {
+            model = 'grok'
+            reason = 'task-keyword'
+          } else {
+            model = config.routing.defaultModel
+            reason = 'default'
+          }
+        } else if (messageCount > 12 || inputChars > 2000) {
           model = 'sonnet'
-          reason = 'task-keyword'
-        } else if (
-          normalizedTask.includes('news') ||
-          normalizedTask.includes('sentiment')
-        ) {
-          model = 'grok'
-          reason = 'task-keyword'
+          reason = 'complexity'
         } else {
-          model = config.routing.defaultModel
-          reason = 'default'
-        }
-      } else if (messageCount > 12 || inputChars > 2000) {
-        model = 'sonnet'
-        reason = 'complexity'
-      } else {
           model = config.routing.defaultModel
           reason = 'default'
         }
@@ -403,30 +405,22 @@ export const createAiModelService = (deps: AiModelServiceDeps = {}) => {
       const modelConfig = config.models[modelKey]
       const model = getModelClient(modelKey)
       const start = Date.now()
+      const requestId = crypto.randomUUID()
       metrics[modelKey].totalRequests += 1
-
-      const telemetry: AiRequestTelemetry = {
-        requestId: crypto.randomUUID(),
-        provider: modelConfig.providerType,
-        model: modelConfig.id,
-        startedAt: new Date().toISOString(),
-        status: 'pending',
-        fallbackUsed: isFallback
-      }
 
       console.info('[ai] stream request started', {
         model: modelKey,
         provider: modelConfig.providerType,
         isFallback,
-        requestId: telemetry.requestId
+        requestId
       })
 
       const result = await streamText({
         model,
         messages: options.messages,
         temperature: options.temperature ?? modelConfig.temperature,
-        maxTokens: options.maxTokens ?? modelConfig.maxTokens,
-        ...telemetryOptions,
+        maxOutputTokens: options.maxTokens ?? modelConfig.maxTokens,
+        experimental_telemetry: telemetryOptions.experimental_telemetry,
         onFinish: async (data) => {
           const latencyMs = Date.now() - start
           const usage = extractTokenUsage(data.usage)
@@ -435,19 +429,13 @@ export const createAiModelService = (deps: AiModelServiceDeps = {}) => {
           recordSuccess(modelKey, latencyMs, usage, costRecord.totalCostUsd)
           costTracker.recordCost(costRecord, options.userId)
 
-          telemetry.completedAt = new Date().toISOString()
-          telemetry.latencyMs = latencyMs
-          telemetry.status = 'success'
-          telemetry.usage = usage
-          telemetry.costUsd = costRecord.totalCostUsd
-
           console.info('[ai] stream request completed', {
             model: modelKey,
             provider: modelConfig.providerType,
             latencyMs,
             tokens: usage?.totalTokens,
             costUsd: costRecord.totalCostUsd.toFixed(6),
-            requestId: telemetry.requestId
+            requestId
           })
 
           await options.onFinish?.({
@@ -527,8 +515,8 @@ export const createAiModelService = (deps: AiModelServiceDeps = {}) => {
         model,
         messages: options.messages,
         temperature: options.temperature ?? modelConfig.temperature,
-        maxTokens: options.maxTokens ?? modelConfig.maxTokens,
-        ...telemetryOptions
+        maxOutputTokens: options.maxTokens ?? modelConfig.maxTokens,
+        experimental_telemetry: telemetryOptions.experimental_telemetry
       })
 
       const latencyMs = Date.now() - start
