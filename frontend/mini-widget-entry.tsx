@@ -9,6 +9,8 @@ import { useBackend } from './lib/backend';
 import './index.css';
 
 const CLERK_PUBLISHABLE_KEY = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
+const CLERK_DOMAIN = import.meta.env.VITE_CLERK_DOMAIN;
+const CLERK_PROXY_URL = import.meta.env.VITE_CLERK_PROXY_URL;
 
 /**
  * Mini Widget App - Standalone floating widget for persistent display
@@ -88,6 +90,8 @@ function MiniWidgetRoot() {
   return (
     <ClerkProvider
       publishableKey={CLERK_PUBLISHABLE_KEY}
+      domain={CLERK_DOMAIN}
+      proxyUrl={CLERK_PROXY_URL}
       appearance={{
         baseTheme: dark,
         variables: {
