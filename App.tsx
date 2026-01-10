@@ -117,9 +117,38 @@ export default function App() {
     return <AppInner />;
   }
 
+  if (!clerkKey && DEV_MODE) {
+    console.warn('[DEV MODE] Missing VITE_CLERK_PUBLISHABLE_KEY. Showing AuthShell preview without Clerk.');
+    return (
+      <AuthShell>
+        <MockSignInPreview />
+      </AuthShell>
+    );
+  }
+
   return (
     <ClerkProvider publishableKey={clerkKey} domain={clerkDomain} proxyUrl={clerkProxyUrl}>
       <AppInner />
     </ClerkProvider>
+  );
+}
+
+function MockSignInPreview() {
+  return (
+    <div className="flex flex-col gap-4 rounded-[28px] border border-yellow-500/20 bg-black/60 px-6 py-8 text-center text-yellow-100">
+      <p className="text-xs uppercase tracking-[0.4em] text-yellow-500/70">Clerk Preview</p>
+      <p className="text-sm text-yellow-100/80">
+        Set <span className="font-semibold">VITE_CLERK_PUBLISHABLE_KEY</span> to load the real Clerk widget.
+      </p>
+      <div className="space-y-2 text-left text-[0.85rem] text-yellow-100/80">
+        <label className="text-[0.6rem] uppercase tracking-[0.3em] text-yellow-600/80">Email address</label>
+        <div className="rounded-full border border-yellow-500/20 bg-black/50 px-4 py-3 text-yellow-100/60">user@example.com</div>
+        <label className="text-[0.6rem] uppercase tracking-[0.3em] text-yellow-600/80">Password</label>
+        <div className="rounded-full border border-yellow-500/20 bg-black/50 px-4 py-3 text-yellow-100/60">••••••••</div>
+        <button className="mt-4 w-full rounded-full border-2 border-yellow-500 bg-black py-3 text-xs font-bold uppercase tracking-[0.3em] text-yellow-500">
+          Continue
+        </button>
+      </div>
+    </div>
   );
 }
