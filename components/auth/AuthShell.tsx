@@ -5,10 +5,38 @@ type AuthShellProps = {
   children: React.ReactNode;
 };
 
+const DEBUG_ENDPOINT = 'http://127.0.0.1:7245/ingest/50c95ce7-65d5-47b9-89a4-349e601c30e6';
+
+const agentDebugLog = (entry: {
+  hypothesisId: string;
+  location: string;
+  message: string;
+  data?: Record<string, unknown>;
+}) => {
+  fetch(DEBUG_ENDPOINT, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      sessionId: 'debug-session',
+      runId: 'initial',
+      timestamp: Date.now(),
+      ...entry,
+    }),
+  }).catch(() => {});
+};
+
 export const AuthShell: React.FC<AuthShellProps> = ({ children }) => {
   const [showClerk, setShowClerk] = useState(false);
 
   useEffect(() => {
+    // #region agent log
+    agentDebugLog({
+      hypothesisId: 'H3',
+      location: 'AuthShell.tsx:26',
+      message: 'AuthShell mounted; scheduling Clerk reveal',
+      data: {},
+    });
+    // #endregion
     const timer = setTimeout(() => setShowClerk(true), 500);
     return () => clearTimeout(timer);
   }, []);

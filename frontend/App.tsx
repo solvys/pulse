@@ -112,9 +112,11 @@ function AppInner() {
 
 export default function App() {
   // Production Clerk publishable key
+  const DEFAULT_CLERK_DOMAIN = 'clerk.pricedinresearch.io';
+  const DEFAULT_CLERK_PROXY_URL = 'https://clerk.pricedinresearch.io';
   const clerkKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY || '';
-  const clerkDomain = import.meta.env.VITE_CLERK_DOMAIN || undefined;
-  const clerkProxyUrl = import.meta.env.VITE_CLERK_PROXY_URL || undefined;
+  const clerkDomain = import.meta.env.VITE_CLERK_DOMAIN || DEFAULT_CLERK_DOMAIN;
+  const clerkProxyUrl = import.meta.env.VITE_CLERK_PROXY_URL || DEFAULT_CLERK_PROXY_URL;
 
   // In dev mode with auth bypass, skip ClerkProvider
   if (BYPASS_AUTH) {
