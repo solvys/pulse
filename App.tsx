@@ -16,27 +16,8 @@ import { pulseAppearance } from './components/auth/pulseAppearance';
 const DEV_MODE = import.meta.env.DEV || import.meta.env.MODE === 'development';
 const BYPASS_AUTH = DEV_MODE && import.meta.env.VITE_BYPASS_AUTH === 'true';
 
-const DEBUG_ENDPOINT = 'http://127.0.0.1:7245/ingest/50c95ce7-65d5-47b9-89a4-349e601c30e6';
 const DEFAULT_CLERK_DOMAIN = 'clerk.app.pricedinresearch.io';
 const DEFAULT_CLERK_PROXY_URL = 'https://clerk.app.pricedinresearch.io';
-
-const agentDebugLog = (entry: {
-  hypothesisId: string;
-  location: string;
-  message: string;
-  data?: Record<string, unknown>;
-}) => {
-  fetch(DEBUG_ENDPOINT, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      sessionId: 'debug-session',
-      runId: 'initial',
-      timestamp: Date.now(),
-      ...entry,
-    }),
-  }).catch(() => {});
-};
 
 // Debug logging
 if (DEV_MODE) {
@@ -109,17 +90,6 @@ function AppInner() {
   return (
     <>
       <SignedOut>
-        {(() => {
-          // #region agent log
-          agentDebugLog({
-            hypothesisId: 'H3',
-            location: 'App.tsx:97',
-            message: 'Rendering SignedOut state',
-            data: { bypassAuth: BYPASS_AUTH },
-          });
-          // #endregion
-          return null;
-        })()}
         <AuthShell>
           <SignIn
             appearance={pulseAppearance}
@@ -141,20 +111,6 @@ export default function App() {
   const clerkKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY || '';
   const clerkDomain = import.meta.env.VITE_CLERK_DOMAIN || DEFAULT_CLERK_DOMAIN;
   const clerkProxyUrl = import.meta.env.VITE_CLERK_PROXY_URL || DEFAULT_CLERK_PROXY_URL;
-
-  // #region agent log
-  agentDebugLog({
-    hypothesisId: 'H1-H2',
-    location: 'App.tsx:121',
-    message: 'Clerk environment snapshot',
-    data: {
-      hasKey: Boolean(clerkKey),
-      resolvedDomain: clerkDomain,
-      resolvedProxy: clerkProxyUrl,
-      bypassAuth: BYPASS_AUTH,
-    },
-  });
-  // #endregion
 
   // In dev mode with auth bypass, skip ClerkProvider
   if (BYPASS_AUTH) {
