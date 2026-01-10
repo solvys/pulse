@@ -17,8 +17,8 @@ const DEV_MODE = import.meta.env.DEV || import.meta.env.MODE === 'development';
 const BYPASS_AUTH = DEV_MODE && import.meta.env.VITE_BYPASS_AUTH === 'true';
 
 const DEBUG_ENDPOINT = 'http://127.0.0.1:7245/ingest/50c95ce7-65d5-47b9-89a4-349e601c30e6';
-const DEFAULT_CLERK_DOMAIN = 'clerk.pricedinresearch.io';
-const DEFAULT_CLERK_PROXY_URL = 'https://clerk.pricedinresearch.io';
+const DEFAULT_CLERK_DOMAIN = 'clerk.app.pricedinresearch.io';
+const DEFAULT_CLERK_PROXY_URL = 'https://clerk.app.pricedinresearch.io';
 
 const agentDebugLog = (entry: {
   hypothesisId: string;

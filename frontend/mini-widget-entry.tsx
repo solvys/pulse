@@ -8,8 +8,8 @@ import { FloatingWidget } from './components/layout/FloatingWidget';
 import { useBackend } from './lib/backend';
 import './index.css';
 
-const DEFAULT_CLERK_DOMAIN = 'clerk.pricedinresearch.io';
-const DEFAULT_CLERK_PROXY_URL = 'https://clerk.pricedinresearch.io';
+const DEFAULT_CLERK_DOMAIN = 'clerk.app.pricedinresearch.io';
+const DEFAULT_CLERK_PROXY_URL = 'https://clerk.app.pricedinresearch.io';
 
 const CLERK_PUBLISHABLE_KEY = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
 const CLERK_DOMAIN = import.meta.env.VITE_CLERK_DOMAIN || DEFAULT_CLERK_DOMAIN;
