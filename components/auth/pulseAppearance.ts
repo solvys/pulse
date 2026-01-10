@@ -3,32 +3,90 @@ import type { Appearance } from '@clerk/types';
 export const pulseAppearance: Appearance = {
   variables: {
     colorPrimary: '#EAB308',
-    colorText: '#ffffff',
+    colorText: '#F5F3FF',
     colorBackground: 'transparent',
-    colorInputBackground: 'rgba(0, 0, 0, 0.6)',
-    colorInputText: '#f4f4f5',
+    colorInputBackground: 'rgba(0, 0, 0, 0.65)',
+    colorInputText: '#FDE68A',
     borderRadius: '9999px',
     fontSize: '16px',
+    fontFamily: 'Roboto, "Roboto Mono", system-ui, sans-serif',
+    colorDanger: '#f87171',
   },
   elements: {
-    rootBox: 'w-full',
-    card: 'bg-transparent shadow-none',
-    headerTitle: 'text-yellow-200 tracking-[0.3em] uppercase text-xs',
-    headerSubtitle: 'text-zinc-400',
-    formFieldLabel: 'text-zinc-200 tracking-[0.2em]',
-    formFieldInput:
-      'bg-black/60 border border-yellow-500/20 text-zinc-100 placeholder:text-zinc-500 focus:border-yellow-500/60',
-    formFieldInputShowPasswordButton: 'text-yellow-500 hover:text-yellow-300',
-    dividerLine: 'bg-yellow-500/20',
-    dividerText: 'text-yellow-500/70 uppercase tracking-[0.2em]',
-    socialButtonsBlockButton:
-      'bg-black/70 border border-yellow-500/30 text-yellow-100 hover:bg-yellow-500/10 transition-all duration-500',
-    formButtonPrimary:
-      'bg-black border-2 border-yellow-500 text-yellow-500 font-bold tracking-[0.25em] uppercase ' +
-      'hover:bg-yellow-500 hover:text-black hover:shadow-[0_0_30px_rgba(234,179,8,0.6)] transition-all duration-700',
-    footerActionLink: 'text-yellow-500 hover:text-yellow-300',
-    formFieldAction__password: 'text-yellow-500 hover:text-yellow-300',
-    identityPreviewEditButton: 'text-yellow-400 hover:text-yellow-200',
-    footer: 'text-zinc-500 text-xs tracking-[0.2em]',
+    rootBox: {
+      width: '100%',
+    },
+    card: {
+      background: 'transparent',
+      boxShadow: 'none',
+    },
+    headerTitle: {
+      color: '#fde68a',
+      fontSize: '0.78rem',
+      letterSpacing: '0.3em',
+      textTransform: 'uppercase',
+      fontWeight: 600,
+    },
+    headerSubtitle: {
+      color: '#a1a1aa',
+      fontSize: '0.85rem',
+    },
+    formFieldLabel: {
+      color: '#fef08a',
+      letterSpacing: '0.15em',
+      textTransform: 'uppercase',
+      fontSize: '0.65rem',
+    },
+    formFieldInput: {
+      backgroundColor: 'rgba(0, 0, 0, 0.65)',
+      border: '1px solid rgba(234,179,8,0.25)',
+      borderRadius: '9999px',
+      color: '#fefce8',
+      paddingInline: '1.25rem',
+      minHeight: '3.25rem',
+      boxShadow: '0 0 20px rgba(234,179,8,0.15)',
+    },
+    formFieldInputShowPasswordButton: {
+      color: '#facc15',
+    },
+    dividerLine: {
+      backgroundColor: 'rgba(234,179,8,0.3)',
+    },
+    dividerText: {
+      color: '#facc15',
+      letterSpacing: '0.25em',
+      textTransform: 'uppercase',
+    },
+    socialButtonsBlockButton: {
+      backgroundColor: 'rgba(0,0,0,0.7)',
+      border: '1px solid rgba(234,179,8,0.35)',
+      color: '#fef9c3',
+      textTransform: 'uppercase',
+      letterSpacing: '0.18em',
+    },
+    formButtonPrimary: {
+      textTransform: 'uppercase',
+      letterSpacing: '0.25em',
+      fontWeight: 700,
+      border: '2px solid #facc15',
+      color: '#facc15',
+      backgroundColor: 'rgba(0,0,0,0.9)',
+      boxShadow: '0 0 40px rgba(234,179,8,0.35)',
+    },
+    footerActionLink: {
+      color: '#facc15',
+    },
+    formFieldAction__password: {
+      color: '#facc15',
+    },
+    identityPreviewEditButton: {
+      color: '#facc15',
+    },
+    footer: {
+      color: '#71717a',
+      letterSpacing: '0.25em',
+      textTransform: 'uppercase',
+      fontSize: '0.6rem',
+    },
   },
 };

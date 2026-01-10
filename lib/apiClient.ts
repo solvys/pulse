@@ -13,7 +13,7 @@ export interface ApiError {
   status?: number;
 }
 
-class ApiClient {
+export class ApiClient {
   private baseUrl: string;
   private getAuthToken?: () => Promise<string | null>;
 
