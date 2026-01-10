@@ -113,6 +113,8 @@ function AppInner() {
 export default function App() {
   // Production Clerk publishable key
   const clerkKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY || '';
+  const clerkDomain = import.meta.env.VITE_CLERK_DOMAIN || undefined;
+  const clerkProxyUrl = import.meta.env.VITE_CLERK_PROXY_URL || undefined;
 
   // In dev mode with auth bypass, skip ClerkProvider
   if (BYPASS_AUTH) {
@@ -120,7 +122,7 @@ export default function App() {
   }
 
   return (
-    <ClerkProvider publishableKey={clerkKey}>
+    <ClerkProvider publishableKey={clerkKey} domain={clerkDomain} proxyUrl={clerkProxyUrl}>
       <VersionCheckWrapper>
         <AppInner />
       </VersionCheckWrapper>
