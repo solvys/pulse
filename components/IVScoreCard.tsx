@@ -6,51 +6,72 @@ interface IVScoreCardProps {
   score: number;
 }
 
-// Instrument configurations for point move calculations
+// Instrument configurations with Grok-spec betas for point move calculations
+// Based on Rule of 16: Implied % = VIX / 16, then adjusted by instrument beta
 const INSTRUMENT_CONFIG = {
   "/MNQ": {
-    tickSize: 0.25,
-    typicalDailyRange: 250,
+    beta: 1.2,
     currentPrice: 21000,
+    notes: 'Micro Nasdaq - Tech-heavy',
   },
   "/ES": {
-    tickSize: 0.25,
-    typicalDailyRange: 40,
+    beta: 1.0,
     currentPrice: 6000,
+    notes: 'S&P 500 - Base',
   },
   "/NQ": {
-    tickSize: 0.25,
-    typicalDailyRange: 160,
+    beta: 1.2,
     currentPrice: 21000,
+    notes: 'Nasdaq 100 - Tech-heavy',
   },
   "/YM": {
-    tickSize: 1.0,
-    typicalDailyRange: 350,
+    beta: 0.95,
     currentPrice: 44000,
+    notes: 'Dow - Industrials',
   },
   "/RTY": {
-    tickSize: 0.10,
-    typicalDailyRange: 20,
+    beta: 1.1,
     currentPrice: 2200,
+    notes: 'Russell 2000 - Small caps',
+  },
+  "/GC": {
+    beta: 0.2,
+    currentPrice: 2000,
+    notes: 'Gold - Safe-haven, low correlation',
+  },
+  "/SI": {
+    beta: 0.4,
+    currentPrice: 30,
+    notes: 'Silver - Industrial/vol proxy',
   },
 } as const;
+
+// VIX baseline estimate (can be overridden by actual VIX from backend)
+const DEFAULT_VIX = 20;
 
 function calculateExpectedMove(ivScore: number, symbol: string) {
   const config = INSTRUMENT_CONFIG[symbol as keyof typeof INSTRUMENT_CONFIG];
   if (!config) return null;
 
-  // Convert IV score (0-10) to volatility multiplier
-  const volatilityMultiplier = (ivScore / 10) * 1.5;
+  // Use IV score to estimate VIX-like volatility (score 0-10 maps to roughly VIX 10-35)
+  const estimatedVix = 10 + (ivScore * 2.5);
+  
+  // Rule of 16: Implied daily % move = VIX / 16
+  const impliedPct = estimatedVix / 16;
+  
+  // Base points = price * implied %
+  const basePoints = config.currentPrice * (impliedPct / 100);
+  
+  // Adjust by instrument beta
+  const adjustedPoints = basePoints * config.beta;
 
-  // Calculate expected point move
-  const expectedPoints = config.typicalDailyRange * volatilityMultiplier;
-
-  // Calculate as percentage
-  const expectedPercent = (expectedPoints / config.currentPrice) * 100;
+  // Calculate as percentage of current price
+  const expectedPercent = (adjustedPoints / config.currentPrice) * 100;
 
   return {
-    points: Math.round(expectedPoints * 100) / 100,
+    points: Math.round(adjustedPoints * 10) / 10,
     percent: Math.round(expectedPercent * 100) / 100,
+    beta: config.beta,
   };
 }
 

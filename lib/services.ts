@@ -160,6 +160,38 @@ export class NewsService {
 }
 
 // AI Service
+export interface ConversationListItem {
+  id: string;
+  conversationId: string; // alias for id
+  title: string;
+  model?: string;
+  messageCount: number;
+  lastMessageAt: string;
+  updatedAt: string;
+  createdAt: string;
+  isArchived: boolean;
+  preview?: string;
+  staleAt?: string;
+}
+
+export interface ConversationListResponse {
+  conversations: ConversationListItem[];
+  total: number;
+  hasMore: boolean;
+}
+
+export interface ConversationWithMessages {
+  id: string;
+  title: string;
+  messages: Array<{
+    id: string;
+    role: 'user' | 'assistant' | 'system';
+    content: string;
+    createdAt: string;
+  }>;
+  staleAt?: string;
+}
+
 export class AIService {
   constructor(private client: ApiClient) { }
 
@@ -169,6 +201,30 @@ export class AIService {
 
   async generateNTNReport(): Promise<NTNReport> {
     return this.client.post<NTNReport>('/api/ai/ntn-report');
+  }
+
+  async listConversations(params?: { limit?: number; archived?: boolean }): Promise<ConversationListItem[]> {
+    const query = new URLSearchParams();
+    if (params?.limit) query.append('limit', params.limit.toString());
+    if (params?.archived) query.append('archived', 'true');
+    
+    const queryString = query.toString();
+    const endpoint = `/api/ai/conversations${queryString ? `?${queryString}` : ''}`;
+    const response = await this.client.get<ConversationListResponse>(endpoint);
+    
+    // Map id to conversationId for consistency with frontend
+    return (response.conversations || []).map(c => ({
+      ...c,
+      conversationId: c.id,
+    }));
+  }
+
+  async getConversation(params: { conversationId: string }): Promise<{ conversation: ConversationWithMessages; messages: any[] }> {
+    const response = await this.client.get<ConversationWithMessages>(`/api/ai/conversations/${params.conversationId}`);
+    return {
+      conversation: response,
+      messages: response.messages || [],
+    };
   }
 }
 
@@ -276,6 +332,66 @@ export class EventsService {
   }
 }
 
+// RiskFlow Service (IV Scoring, News Feed)
+export interface IVAggregateResponse {
+  score: number;
+  impliedPoints: {
+    impliedPct: number;
+    basePoints: number;
+    adjustedPoints: number;
+    instrument: string;
+    beta: number;
+  };
+  session: {
+    name: string;
+    multiplier: number;
+  };
+  vix: {
+    level: number;
+    percentChange: number;
+    isSpike: boolean;
+    spikeDirection: 'up' | 'down' | 'none';
+    multiplier: number;
+    context: string;
+    staleMinutes: number;
+  };
+  activity: {
+    eventCount: number;
+    synergy: boolean;
+    baseline: number;
+    isEarningsSeason: boolean;
+    isFOMCWeek: boolean;
+  };
+  rationale: string[];
+  alert?: string;
+  instrument: string;
+  timestamp: string;
+}
+
+export class RiskFlowService {
+  constructor(private client: ApiClient) { }
+
+  async getIVAggregate(params?: { instrument?: string; price?: number }): Promise<IVAggregateResponse> {
+    const query = new URLSearchParams();
+    if (params?.instrument) query.append('instrument', params.instrument);
+    if (params?.price) query.append('price', params.price.toString());
+    
+    const queryString = query.toString();
+    const endpoint = `/api/riskflow/iv-aggregate${queryString ? `?${queryString}` : ''}`;
+    return this.client.get<IVAggregateResponse>(endpoint);
+  }
+
+  async getFeed(params?: { limit?: number; minMacroLevel?: number }): Promise<any> {
+    const query = new URLSearchParams();
+    if (params?.limit) query.append('limit', params.limit.toString());
+    if (params?.minMacroLevel) query.append('minMacroLevel', params.minMacroLevel.toString());
+    
+    const queryString = query.toString();
+    const endpoint = `/api/riskflow/feed${queryString ? `?${queryString}` : ''}`;
+    return this.client.get(endpoint);
+  }
+}
+
 
 // Twitter Service
 export class TwitterService {
@@ -322,6 +438,7 @@ export interface BackendClient {
   notifications: NotificationsService;
   er: ERService;
   events: EventsService;
+  riskflow: RiskFlowService;
 }
 
 // Create backend client from API client
@@ -337,5 +454,6 @@ export function createBackendClient(client: ApiClient): BackendClient {
     notifications: new NotificationsService(client),
     er: new ERService(client),
     events: new EventsService(client),
+    riskflow: new RiskFlowService(client),
   };
 }
