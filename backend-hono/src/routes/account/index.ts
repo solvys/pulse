@@ -9,6 +9,7 @@ import {
   handleCreateAccount,
   handleUpdateSettings,
   handleGetTier,
+  handleUpdateTier,
   handleSelectTier,
   handleGetFeatures,
 } from './handlers.js';
@@ -27,6 +28,9 @@ export function createAccountRoutes(): Hono {
 
   // GET /api/account/tier - Get user tier
   router.get('/tier', handleGetTier);
+
+  // PATCH /api/account/tier - Update user tier (idempotent)
+  router.patch('/tier', handleUpdateTier);
 
   // POST /api/account/select-tier - Select tier
   router.post('/select-tier', handleSelectTier);

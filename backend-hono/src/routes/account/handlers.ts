@@ -91,6 +91,37 @@ export async function handleGetTier(c: Context) {
 }
 
 /**
+ * PATCH /api/account/tier
+ * Update user's tier (idempotent)
+ */
+export async function handleUpdateTier(c: Context) {
+  const userId = c.get('userId') as string | undefined;
+
+  if (!userId) {
+    return c.json({ error: 'Unauthorized' }, 401);
+  }
+
+  try {
+    const body = await c.req.json<SelectTierRequest>().catch(() => ({} as SelectTierRequest));
+
+    if (!body.tier) {
+      return c.json({ error: 'Tier is required' }, 400);
+    }
+
+    const account = await accountService.selectTier(userId, body.tier);
+
+    if (!account) {
+      return c.json({ error: 'Account not found' }, 404);
+    }
+
+    return c.json({ success: true, tier: account.tier });
+  } catch (error) {
+    console.error('[Account] Update tier error:', error);
+    return c.json({ error: 'Failed to update tier' }, 500);
+  }
+}
+
+/**
  * POST /api/account/select-tier
  * Select a tier for the account
  */
