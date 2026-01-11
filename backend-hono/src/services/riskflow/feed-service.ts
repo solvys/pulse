@@ -419,11 +419,34 @@ export async function getFeed(userId: string, filters?: FeedFilters): Promise<Fe
   console.log(`[RiskFlow] After filters (minMacroLevel: ${effectiveFilters.minMacroLevel}): ${items.length} items`);
   
   // If no items with minMacroLevel 3+, fall back to all items (for initial load)
+  // This ensures users see something even if database only has low-level items
   if (items.length === 0 && effectiveFilters.minMacroLevel === 3 && !filters?.minMacroLevel) {
-    console.log(`[RiskFlow] No level 3+ items found, falling back to all items`);
+    console.log(`[RiskFlow] No level 3+ items found, falling back to all items (level 1+)`);
     const fallbackItems = allItems.filter(item => matchesWatchlist(watchlist, item));
-    items = applyFilters(fallbackItems, { ...effectiveFilters, minMacroLevel: 1 });
-    console.log(`[RiskFlow] Fallback items: ${items.length}`);
+    const fallbackFilters = { ...effectiveFilters, minMacroLevel: 1 as MacroLevel };
+    items = applyFilters(fallbackItems, fallbackFilters);
+    console.log(`[RiskFlow] Fallback items after level 1+ filter: ${items.length}`);
+    
+    // If still no items, try without any macro level filter at all
+    if (items.length === 0) {
+      console.log(`[RiskFlow] Still no items, trying without macro level filter`);
+      items = fallbackItems.filter(item => {
+        // Only apply non-macro filters
+        if (effectiveFilters.sources?.length && !effectiveFilters.sources.includes(item.source)) return false;
+        if (effectiveFilters.symbols?.length) {
+          const symbolSet = new Set(effectiveFilters.symbols.map(s => s.toUpperCase()));
+          if (!item.symbols.some(s => symbolSet.has(s.toUpperCase()))) return false;
+        }
+        if (effectiveFilters.tags?.length) {
+          const tagSet = new Set(effectiveFilters.tags.map(t => t.toUpperCase()));
+          if (!item.tags.some(t => tagSet.has(t.toUpperCase()))) return false;
+        }
+        if (effectiveFilters.breakingOnly && !item.isBreaking) return false;
+        if (effectiveFilters.minIvScore !== undefined && (item.ivScore ?? 0) < effectiveFilters.minIvScore) return false;
+        return true;
+      });
+      console.log(`[RiskFlow] Items without macro level filter: ${items.length}`);
+    }
   }
 
   // Sort by macro level (highest first), then by published date

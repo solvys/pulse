@@ -208,11 +208,15 @@ export class AccountService {
 export class RiskFlowService {
   constructor(private client: ApiClient) { }
 
-  async list(params?: { limit?: number; offset?: number; symbol?: string }): Promise<RiskFlowListResponse> {
+  async list(params?: { limit?: number; offset?: number; symbol?: string; minMacroLevel?: number }): Promise<RiskFlowListResponse> {
     const query = new URLSearchParams();
     if (params?.limit) query.append('limit', params.limit.toString());
     if (params?.offset) query.append('offset', params.offset.toString());
     if (params?.symbol) query.append('symbols', params.symbol); // Backend expects 'symbols' not 'symbol'
+    // Allow frontend to override minMacroLevel for debugging (default is 3)
+    if (params?.minMacroLevel !== undefined) {
+      query.append('minMacroLevel', params.minMacroLevel.toString());
+    }
 
     const queryString = query.toString();
     const endpoint = `/api/riskflow/feed${queryString ? `?${queryString}` : ''}`;

@@ -102,7 +102,12 @@ export function FeedSection() {
           // Fetch RiskFlow items from the database (pre-fetched by cron job)
           // The cron job runs every 5 minutes to fetch and classify events,
           // so we don't need to trigger API calls here - just load from DB
-          const response = await backend.riskflow.list({ limit: 50 });
+          // Try with minMacroLevel 1 first to see all items, then fall back to default (3+)
+          let response = await backend.riskflow.list({ limit: 50, minMacroLevel: 1 });
+          if (response.items.length === 0) {
+            // If still empty, try default (level 3+)
+            response = await backend.riskflow.list({ limit: 50 });
+          }
           // Filter out null items (raw/unprocessed data)
           const convertedItems = response.items
             .map((item: RiskFlowItem) => convertRiskFlowToFeedItem(item))
@@ -127,7 +132,12 @@ export function FeedSection() {
           const newItem = generateMockFeedItem();
           setFeedItems(prev => [newItem, ...prev].slice(0, 50));
         } else {
-          const response = await backend.riskflow.list({ limit: 50 });
+          // Try with minMacroLevel 1 first to see all items, then fall back to default (3+)
+          let response = await backend.riskflow.list({ limit: 50, minMacroLevel: 1 });
+          if (response.items.length === 0) {
+            // If still empty, try default (level 3+)
+            response = await backend.riskflow.list({ limit: 50 });
+          }
           // Filter out null items (raw/unprocessed data)
           const convertedItems = response.items
             .map((item: RiskFlowItem) => convertRiskFlowToFeedItem(item))
