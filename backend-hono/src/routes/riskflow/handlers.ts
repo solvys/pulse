@@ -223,6 +223,8 @@ export async function handleRemoveSymbols(c: Context) {
  */
 export async function handleBreakingStream(c: Context) {
   const userId = c.get('userId') || 'anonymous';
+  console.log(`[SSE] New connection from user: ${userId}`);
+  
   let heartbeatId: ReturnType<typeof setInterval> | null = null;
 
   // Get origin from request for CORS
@@ -233,7 +235,16 @@ export async function handleBreakingStream(c: Context) {
 
   const stream = new ReadableStream({
     start(controller) {
+      console.log(`[SSE] Stream started for user: ${userId}`);
       addClient(controller, userId);
+      
+      // Send initial connection message to confirm stream is working
+      try {
+        controller.enqueue(new TextEncoder().encode(': connected\n\n'));
+      } catch (error) {
+        console.error('[SSE] Failed to send initial message', error);
+      }
+      
       heartbeatId = setInterval(() => {
         try {
           controller.enqueue(new TextEncoder().encode(': heartbeat\n\n'));
@@ -245,6 +256,7 @@ export async function handleBreakingStream(c: Context) {
       }, 30000);
     },
     cancel(controller) {
+      console.log(`[SSE] Stream cancelled for user: ${userId}`);
       if (heartbeatId) {
         clearInterval(heartbeatId);
       }
@@ -252,6 +264,18 @@ export async function handleBreakingStream(c: Context) {
     },
   });
 
+  // Set CORS headers on context first (Hono will merge with response headers)
+  c.header('Content-Type', 'text/event-stream');
+  c.header('Cache-Control', 'no-cache');
+  c.header('Connection', 'keep-alive');
+  c.header('Access-Control-Allow-Origin', allowedOrigin);
+  c.header('Access-Control-Allow-Credentials', 'true');
+  c.header('Access-Control-Allow-Headers', 'Cache-Control');
+  c.header('X-Accel-Buffering', 'no'); // Disable buffering in nginx/proxy
+
+  console.log(`[SSE] Returning SSE response for user: ${userId}, origin: ${origin}`);
+  
+  // Return the stream response - Hono will handle it correctly
   return new Response(stream, {
     headers: {
       'Content-Type': 'text/event-stream',
@@ -260,7 +284,7 @@ export async function handleBreakingStream(c: Context) {
       'Access-Control-Allow-Origin': allowedOrigin,
       'Access-Control-Allow-Credentials': 'true',
       'Access-Control-Allow-Headers': 'Cache-Control',
-      'X-Accel-Buffering': 'no', // Disable buffering in nginx/proxy
+      'X-Accel-Buffering': 'no',
     },
   });
 }

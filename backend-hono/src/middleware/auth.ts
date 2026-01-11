@@ -31,8 +31,13 @@ const buildUnauthorizedResponse = (c: Context, details?: string) =>
   );
 
 export const authMiddleware = async (c: Context, next: Next) => {
+  const isSSE = c.req.path.includes('/stream');
   const token = getBearerToken(c);
+  
   if (!token) {
+    if (isSSE) {
+      console.warn('[auth] SSE endpoint missing token, path:', c.req.path);
+    }
     return buildUnauthorizedResponse(c, 'Missing Authorization bearer token');
   }
 
@@ -44,6 +49,9 @@ export const authMiddleware = async (c: Context, next: Next) => {
                    (payload as { sub?: string }).sub;
     if (userId) {
       c.set('userId', userId);
+      if (isSSE) {
+        console.log(`[auth] SSE auth successful for user: ${userId}`);
+      }
     }
     // Extract email if available
     const email = (payload as { email?: string }).email;
@@ -58,6 +66,8 @@ export const authMiddleware = async (c: Context, next: Next) => {
     console.error('[auth] clerk verification failed', {
       name,
       message,
+      path: c.req.path,
+      isSSE,
     });
 
     if (error instanceof ClerkConfigError) {
