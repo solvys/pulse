@@ -1,42 +1,33 @@
+/**
+ * Pulse API - Main Entry Point
+ * Hono backend on Fly.io
+ */
+
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
-import type { ContentfulStatusCode } from 'hono/utils/http-status';
 import { serve } from '@hono/node-server';
-import { createAiChatRoutes } from './routes/ai-chat.js';
-import { createPsychAssistRoutes } from './routes/psych-assist.js';
-import { createAnalystRoutes } from './routes/analysts.js';
+import type { ContentfulStatusCode } from 'hono/utils/http-status';
+
+import { corsConfig } from './config/cors.js';
+import { getEnvConfig, isDev } from './config/env.js';
+import { registerRoutes } from './routes/index.js';
 import { createHealthService } from './services/health-service.js';
 
 const app = new Hono();
-const isDev = process.env.NODE_ENV !== 'production';
 const healthService = createHealthService();
+const config = getEnvConfig();
 
-// CORS configuration - allow requests from frontend domains
-app.use('*', cors({
-  origin: [
-    'https://app.pricedinresearch.io',
-    'https://pulse.solvys.io',
-    'https://pulse-solvys.vercel.app',
-    'http://localhost:5173',
-    'http://localhost:5174',
-    'http://127.0.0.1:5173',
-    'http://127.0.0.1:5174',
-  ],
-  allowMethods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowHeaders: ['Content-Type', 'Authorization', 'X-Request-Id', 'X-Conversation-Id'],
-  exposeHeaders: ['X-Request-Id', 'X-Conversation-Id', 'X-Model', 'X-Provider'],
-  credentials: true,
-  maxAge: 86400,
-}));
+// CORS middleware
+app.use('*', cors(corsConfig));
 
-const buildRequestId = () => {
-  try {
-    return globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(16).slice(2)}`;
-  } catch {
-    return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
-  }
-};
+// Request ID middleware
+app.use('*', async (c, next) => {
+  const requestId = c.req.header('x-request-id') || crypto.randomUUID();
+  c.header('X-Request-Id', requestId);
+  await next();
+});
 
+// Health check endpoint
 app.get('/health', async (c) => {
   const health = await healthService.checkAll();
   const statusCode: ContentfulStatusCode =
@@ -44,43 +35,39 @@ app.get('/health', async (c) => {
   return c.json(health, statusCode);
 });
 
-app.route('/api/ai', createAiChatRoutes());
-app.route('/api/psych', createPsychAssistRoutes());
-app.route('/api/agents', createAnalystRoutes());
+// Register all API routes
+registerRoutes(app);
 
+// Global error handler
 app.onError((err, c) => {
-  const requestId = c.req.header('x-request-id') ?? buildRequestId();
-  const status =
-    ((err as { status?: number }).status ?? (err as { statusCode?: number }).statusCode ?? 500) as ContentfulStatusCode;
+  const requestId = c.req.header('x-request-id') || 'unknown';
+  const status = ((err as { status?: number }).status ?? 500) as ContentfulStatusCode;
 
-  console.error('[api] unhandled error', {
+  console.error('[API] Error:', {
     requestId,
     status,
     method: c.req.method,
     path: c.req.path,
     message: err instanceof Error ? err.message : String(err),
-    name: err instanceof Error ? err.name : 'UnknownError',
     stack: isDev && err instanceof Error ? err.stack : undefined,
   });
 
   return c.json(
     {
-      error: status >= 500 ? 'Internal server error' : err instanceof Error ? err.message : String(err),
+      error: status >= 500 ? 'Internal server error' : err.message,
       requestId,
-      ...(isDev && err instanceof Error ? { stack: err.stack } : {}),
     },
-    status,
-    { 'X-Request-Id': requestId },
+    status
   );
 });
 
+// 404 handler
 app.notFound((c) => c.json({ error: 'Not found' }, 404));
 
-const port = Number(process.env.PORT || 8080);
+// Start server
+serve({ fetch: app.fetch, port: config.PORT });
 
-serve({
-  fetch: app.fetch,
-  port,
-});
+console.log(`[API] Server started on port ${config.PORT}`);
+console.log(`[API] Environment: ${config.NODE_ENV}`);
 
 export default app;
