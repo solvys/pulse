@@ -5,11 +5,11 @@ import {
   GrokHeadlineResponse,
   ParsedHeadline,
   RawArticle
-} from '../types/news-analysis'
-import { buildHeadlineParsePrompt } from '../prompts/grok-prompts'
-import { parseHeadline } from './headline-parser'
-import { detectHotPrint } from './hot-print-detector'
-import { scoreNews } from './iv-scoring-engine'
+} from '../types/news-analysis.js'
+import { buildHeadlineParsePrompt } from '../prompts/grok-prompts.js'
+import { parseHeadline } from './headline-parser.js'
+import { detectHotPrint } from './hot-print-detector.js'
+import { scoreNews } from './iv-scoring-engine.js'
 
 const chunk = <T>(items: T[], size: number): T[][] => {
   const result: T[][] = []

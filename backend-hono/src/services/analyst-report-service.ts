@@ -1,4 +1,4 @@
-import { query } from '../db/optimized'
+import { query } from '../db/optimized.js'
 
 export type AnalystType = 'market_data' | 'news_sentiment' | 'technical'
 

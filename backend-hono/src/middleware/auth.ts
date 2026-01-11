@@ -1,6 +1,6 @@
 import type { Context, Next } from 'hono';
 import type { Context, Next } from 'hono';
-import { ClerkConfigError, verifyClerkToken } from '../services/clerk-auth';
+import { ClerkConfigError, verifyClerkToken } from '../services/clerk-auth.js';
 
 const getBearerToken = (c: Context) => {
   const authHeader = c.req.header('authorization') || '';

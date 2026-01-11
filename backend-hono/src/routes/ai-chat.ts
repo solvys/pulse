@@ -1,9 +1,9 @@
 import { Hono } from 'hono'
 import type { Context } from 'hono'
 import type { ContentfulStatusCode } from 'hono/utils/http-status'
-import { authMiddleware } from '../middleware/auth'
-import { createChatService } from '../services/chat-service'
-import { createNtnReportService } from '../services/ntn-report-service'
+import { authMiddleware } from '../middleware/auth.js'
+import { createChatService } from '../services/chat-service.js'
+import { createNtnReportService } from '../services/ntn-report-service.js'
 
 const isDev = process.env.NODE_ENV !== 'production'
 

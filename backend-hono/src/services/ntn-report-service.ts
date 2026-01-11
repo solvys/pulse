@@ -1,8 +1,8 @@
-import { query } from '../db/optimized'
-import { createAiModelService } from './ai-model-service'
-import type { AiModelKey } from '../config/ai-config'
-import { createFmpService, type NormalizedEconomicEvent } from './fmp-service'
-import { generateMockNewsPage } from '../utils/mock-generator'
+import { query } from '../db/optimized.js'
+import { createAiModelService } from './ai-model-service.js'
+import type { AiModelKey } from '../config/ai-config.js'
+import { createFmpService, type NormalizedEconomicEvent } from './fmp-service.js'
+import { generateMockNewsPage } from '../utils/mock-generator.js'
 
 export interface NtnReportRecord {
   id: string

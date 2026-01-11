@@ -7,16 +7,16 @@ import {
   type AiModelConfig,
   type AiModelKey,
   getCrossProviderEquivalent
-} from '../config/ai-config'
-import type { AiProviderType } from '../types/ai-types'
-import { createOpenRouterClient } from './openrouter-service'
-import { getProviderHealthService, type ProviderHealthService } from './provider-health'
+} from '../config/ai-config.js'
+import type { AiProviderType } from '../types/ai-types.js'
+import { createOpenRouterClient } from './openrouter-service.js'
+import { getProviderHealthService, type ProviderHealthService } from './provider-health.js'
 import {
   extractTokenUsage,
   createCostRecord,
   getCostTracker,
   type CostTracker
-} from '../utils/ai-cost-tracker'
+} from '../utils/ai-cost-tracker.js'
 
 // Type alias for model clients - both providers return LanguageModelV1-compatible models
 type ModelClient = LanguageModel

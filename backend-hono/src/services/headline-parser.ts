@@ -1,4 +1,4 @@
-import type { ParsedHeadline, NewsSource, UrgencyLevel } from '../types/news-analysis'
+import type { ParsedHeadline, NewsSource, UrgencyLevel } from '../types/news-analysis.js'
 
 const breakingPatterns = [/^BREAKING[:\s-]/i, /^JUST IN[:\s-]/i, /^ALERT[:\s-]/i, /^URGENT[:\s-]/i]
 const econDataPatterns = [

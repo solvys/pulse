@@ -1,4 +1,4 @@
-import { HotPrint, IVScoreResult, ParsedHeadline } from '../types/news-analysis'
+import { HotPrint, IVScoreResult, ParsedHeadline } from '../types/news-analysis.js'
 
 type BaseWeightKey =
   | 'fedDecision'

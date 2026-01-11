@@ -1,5 +1,5 @@
-import { defaultFmpConfig, fmpEndpoints } from '../config/fmp-config'
-import { createRateLimiter } from './rate-limiter'
+import { defaultFmpConfig, fmpEndpoints } from '../config/fmp-config.js'
+import { createRateLimiter } from './rate-limiter.js'
 
 type Env = Record<string, string | undefined>
 

@@ -1,7 +1,7 @@
 import { Hono } from 'hono'
 import type { Context } from 'hono'
-import { authMiddleware } from '../middleware/auth'
-import { createAnalystReportService } from '../services/analyst-report-service'
+import { authMiddleware } from '../middleware/auth.js'
+import { createAnalystReportService } from '../services/analyst-report-service.js'
 
 const analystService = createAnalystReportService()
 

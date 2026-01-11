@@ -1,5 +1,5 @@
-import { DatabaseError, query } from '../db/optimized'
-import { defaultAiConfig, type AiConfig } from '../config/ai-config'
+import { DatabaseError, query } from '../db/optimized.js'
+import { defaultAiConfig, type AiConfig } from '../config/ai-config.js'
 
 export interface ConversationRecord {
   id: string

@@ -1,5 +1,5 @@
-import priceSystemPrompt from '../prompts/price-system-prompt'
-import type { AiProviderType, CrossProviderFallback } from '../types/ai-types'
+import priceSystemPrompt from '../prompts/price-system-prompt.js'
+import type { AiProviderType, CrossProviderFallback } from '../types/ai-types.js'
 
 type Env = Record<string, string | undefined>
 

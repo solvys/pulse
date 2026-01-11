@@ -5,8 +5,8 @@
  */
 
 import { createOpenAI } from '@ai-sdk/openai'
-import type { AiModelConfig } from '../config/ai-config'
-import type { OpenRouterMetadata, AiRequestCost } from '../types/ai-types'
+import type { AiModelConfig } from '../config/ai-config.js'
+import type { OpenRouterMetadata, AiRequestCost } from '../types/ai-types.js'
 
 // Environment access helper
 const getEnv = (key: string): string | undefined => {

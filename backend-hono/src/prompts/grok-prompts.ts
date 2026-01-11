@@ -1,4 +1,4 @@
-import { GrokHeadlineRequest } from '../types/news-analysis'
+import { GrokHeadlineRequest } from '../types/news-analysis.js'
 
 const headlineSchema = `
 [

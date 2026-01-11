@@ -1,4 +1,4 @@
-import { query } from '../db/optimized'
+import { query } from '../db/optimized.js'
 
 export type PsychScores = {
   executions: number

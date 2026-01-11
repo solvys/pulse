@@ -1,6 +1,6 @@
-import { pingDb } from '../db/optimized'
-import { defaultAiConfig } from '../config/ai-config'
-import { clerkHealth } from './clerk-auth'
+import { pingDb } from '../db/optimized.js'
+import { defaultAiConfig } from '../config/ai-config.js'
+import { clerkHealth } from './clerk-auth.js'
 
 type ComponentStatus = 'ok' | 'degraded' | 'error'
 

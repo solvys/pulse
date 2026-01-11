@@ -4,8 +4,8 @@
  * Supports both OpenRouter and Vercel Gateway providers.
  */
 
-import type { AiModelConfig } from '../config/ai-config'
-import type { AiProviderType, AiRequestCost, AiCostStats } from '../types/ai-types'
+import type { AiModelConfig } from '../config/ai-config.js'
+import type { AiProviderType, AiRequestCost, AiCostStats } from '../types/ai-types.js'
 
 // Token usage interface (normalized across providers)
 export interface TokenUsage {

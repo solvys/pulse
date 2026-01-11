@@ -1,5 +1,5 @@
 import { verifyToken, type VerifyTokenOptions, type TokenPayload } from '@clerk/backend'
-import { retryWithBackoff } from '../middleware/auth-retry'
+import { retryWithBackoff } from '../middleware/auth-retry.js'
 
 class ClerkConfigError extends Error {
   constructor(message: string) {

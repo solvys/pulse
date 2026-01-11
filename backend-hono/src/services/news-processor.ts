@@ -1,6 +1,6 @@
-import { ParsedTweetNews } from './x-api-service'
-import { NormalizedEconomicEvent } from './fmp-service'
-import { defaultFmpConfig } from '../config/fmp-config'
+import { ParsedTweetNews } from './x-api-service.js'
+import { NormalizedEconomicEvent } from './fmp-service.js'
+import { defaultFmpConfig } from '../config/fmp-config.js'
 
 export type StandardizedSource = 'X' | 'FMP'
 

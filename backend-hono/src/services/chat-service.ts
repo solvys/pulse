@@ -1,7 +1,7 @@
 import { z } from 'zod'
-import { defaultAiConfig, type AiConfig, type AiModelKey, resolveModelKey } from '../config/ai-config'
-import { createAiModelService, type AiMessage, type StreamFinish } from './ai-model-service'
-import { createConversationManager, type ConversationRecord } from './conversation-manager'
+import { defaultAiConfig, type AiConfig, type AiModelKey, resolveModelKey } from '../config/ai-config.js'
+import { createAiModelService, type AiMessage, type StreamFinish } from './ai-model-service.js'
+import { createConversationManager, type ConversationRecord } from './conversation-manager.js'
 
 const messageSchema = z.object({
   role: z.enum(['system', 'user', 'assistant']),

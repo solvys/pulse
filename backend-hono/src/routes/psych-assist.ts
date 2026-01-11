@@ -1,7 +1,7 @@
 import { Hono } from 'hono'
 import type { Context } from 'hono'
-import { authMiddleware } from '../middleware/auth'
-import { createPsychAssistService } from '../services/psych-assist-service'
+import { authMiddleware } from '../middleware/auth.js'
+import { createPsychAssistService } from '../services/psych-assist-service.js'
 
 const service = createPsychAssistService()
 

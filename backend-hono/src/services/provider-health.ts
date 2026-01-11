@@ -13,7 +13,7 @@ import type {
   CircuitState,
   ProviderHealthStatus,
   ProviderMetrics
-} from '../types/ai-types'
+} from '../types/ai-types.js'
 
 // Circuit breaker configuration
 export interface CircuitBreakerConfig {

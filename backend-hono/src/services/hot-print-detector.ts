@@ -1,4 +1,4 @@
-import { HotPrint } from '../types/news-analysis'
+import { HotPrint } from '../types/news-analysis.js'
 
 export interface HotPrintInput {
   type: string

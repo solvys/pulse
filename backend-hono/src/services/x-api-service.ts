@@ -1,5 +1,5 @@
-import { createRateLimiter } from './rate-limiter'
-import { defaultXApiConfig, XApiSource, xApiEndpoints } from '../config/x-api-config'
+import { createRateLimiter } from './rate-limiter.js'
+import { defaultXApiConfig, XApiSource, xApiEndpoints } from '../config/x-api-config.js'
 
 type Env = Record<string, string | undefined>
 
