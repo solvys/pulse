@@ -334,6 +334,9 @@ export async function handleBreakingStream(c: Context) {
 /**
  * GET /api/riskflow/debug
  * Debug endpoint to check database state
+ * Query params:
+ *   - limit: Number of items to return (default: 5, max: 100)
+ *   - all: If true, return all items (respects limit)
  */
 export async function handleDebug(c: Context) {
   const userId = c.get('userId') as string | undefined;
@@ -348,6 +351,10 @@ export async function handleDebug(c: Context) {
       return c.json({ error: 'Database not available' }, 503);
     }
 
+    const limitParam = c.req.query('limit');
+    const limit = limitParam ? Math.min(parseInt(limitParam, 10), 100) : 5;
+    const showAll = c.req.query('all') === 'true';
+
     // Get raw counts
     const totalCount = await sql`SELECT COUNT(*) as count FROM news_feed_items`;
     const recentCount = await sql`
@@ -359,11 +366,51 @@ export async function handleDebug(c: Context) {
       WHERE published_at >= NOW() - INTERVAL '48 hours' 
         AND (macro_level IS NULL OR macro_level >= 3)
     `;
-    const sampleItems = await sql`
-      SELECT id, headline, source, macro_level, published_at, is_breaking
+    const level4Count = await sql`
+      SELECT COUNT(*) as count FROM news_feed_items 
+      WHERE published_at >= NOW() - INTERVAL '48 hours' 
+        AND macro_level = 4
+    `;
+    
+    // Get items with full details
+    const itemsQuery = showAll
+      ? sql`
+          SELECT 
+            id, headline, source, macro_level, published_at, is_breaking,
+            sentiment, iv_score, urgency, symbols, tags, body
+          FROM news_feed_items
+          ORDER BY published_at DESC
+          LIMIT ${limit}
+        `
+      : sql`
+          SELECT 
+            id, headline, source, macro_level, published_at, is_breaking,
+            sentiment, iv_score, urgency, symbols, tags
+          FROM news_feed_items
+          ORDER BY published_at DESC
+          LIMIT ${limit}
+        `;
+
+    const items = await itemsQuery;
+
+    // Get breakdown by source
+    const sourceBreakdown = await sql`
+      SELECT source, COUNT(*) as count
       FROM news_feed_items
-      ORDER BY published_at DESC
-      LIMIT 5
+      WHERE published_at >= NOW() - INTERVAL '48 hours'
+      GROUP BY source
+      ORDER BY count DESC
+    `;
+
+    // Get breakdown by macro level
+    const levelBreakdown = await sql`
+      SELECT 
+        COALESCE(macro_level::text, 'NULL') as level,
+        COUNT(*) as count
+      FROM news_feed_items
+      WHERE published_at >= NOW() - INTERVAL '48 hours'
+      GROUP BY macro_level
+      ORDER BY macro_level DESC NULLS LAST
     `;
 
     return c.json({
@@ -371,11 +418,39 @@ export async function handleDebug(c: Context) {
         total: Number(totalCount[0]?.count ?? 0),
         recent48h: Number(recentCount[0]?.count ?? 0),
         level3Plus: Number(level3Count[0]?.count ?? 0),
+        level4: Number(level4Count[0]?.count ?? 0),
       },
-      sample: sampleItems,
+      breakdown: {
+        bySource: sourceBreakdown.map((row: any) => ({
+          source: row.source,
+          count: Number(row.count),
+        })),
+        byLevel: levelBreakdown.map((row: any) => ({
+          level: row.level,
+          count: Number(row.count),
+        })),
+      },
+      items: items.map((item: any) => ({
+        id: item.id,
+        headline: item.headline,
+        source: item.source,
+        macroLevel: item.macro_level,
+        isBreaking: item.is_breaking,
+        sentiment: item.sentiment,
+        ivScore: item.iv_score,
+        urgency: item.urgency,
+        symbols: item.symbols,
+        tags: item.tags,
+        publishedAt: item.published_at,
+        ...(showAll && { body: item.body }),
+      })),
       env: {
         hasXApiToken: !!process.env.X_API_BEARER_TOKEN,
         nodeEnv: process.env.NODE_ENV,
+      },
+      query: {
+        limit,
+        showAll,
       }
     });
   } catch (error) {
