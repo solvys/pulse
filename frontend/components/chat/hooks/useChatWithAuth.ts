@@ -179,7 +179,9 @@ export function useChatWithAuth(conversationId: string | undefined, setConversat
                 .map((part: any) => part.text)
                 .join('') || '',
             })),
-            conversationId: conversationId || id,
+            // Only send conversationId if it's a valid UUID from our backend
+            // Don't use `id` from useChat - it's not a UUID
+            ...(conversationId && { conversationId }),
           },
         };
       },
