@@ -229,9 +229,15 @@ async function fetchFreshFeed(): Promise<FeedItem[]> {
       (item, idx, arr) => idx === arr.findIndex(i => i.id === item.id)
     );
 
+    console.log(`[RiskFlow] fetchFreshFeed: Merged ${merged.length} items (${tweetItems.length} tweets, ${econItems.length} economic, ${polyItems.length} polymarket)`);
     return merged;
   } catch (error) {
     console.error('[RiskFlow] X API fetch error:', error);
+    console.error('[RiskFlow] Fetch error details:', {
+      message: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+      hasXApiToken: !!process.env.X_API_BEARER_TOKEN,
+    });
     return [];
   }
 }
