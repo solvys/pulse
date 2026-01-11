@@ -4,8 +4,10 @@ import { Button } from '../ui/Button';
 import { UpgradeModal } from '../UpgradeModal';
 import { IVScoreCard } from '../IVScoreCard';
 import { useBackend } from '../../lib/backend';
+import { useSettings } from '../../contexts/SettingsContext';
 import { isElectron } from '../../lib/platform';
 import { LayoutGrid, GripVertical, Layers, ChevronDown, Monitor } from 'lucide-react';
+import type { IVAggregateResponse } from '../../lib/services';
 
 type LayoutOption = 'movable' | 'tickers-only' | 'combined';
 
@@ -36,8 +38,10 @@ export function TopHeader({
 }: TopHeaderProps) {
   const { tier } = useAuth();
   const backend = useBackend();
+  const { selectedSymbol } = useSettings();
   const [showUpgrade, setShowUpgrade] = useState(false);
   const [ivScore, setIvScore] = useState(3.2);
+  const [ivData, setIvData] = useState<IVAggregateResponse | null>(null);
   const [vix, setVix] = useState(20);
   const [showLayoutDropdown, setShowLayoutDropdown] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -77,45 +81,35 @@ export function TopHeader({
     }
   ];
 
+  // Fetch IV Aggregate (includes VIX and computed IV score) - update every 30 seconds
   useEffect(() => {
-    const interval = setInterval(() => {
-      setIvScore(prev => Math.max(0, Math.min(10, prev + (Math.random() - 0.5) * 0.5)));
-    }, 10000);
-    return () => clearInterval(interval);
-  }, []);
-
-  // Fetch VIX value - update every 5 minutes
-  useEffect(() => {
-    const fetchVIX = async () => {
+    const fetchIVAggregate = async () => {
       try {
-        // Use the proper endpoint through the news client
-        const newsClient = (backend as any).news;
-        const baseClient = (newsClient as any).baseClient;
-        const response = await baseClient.callTypedAPI('/news/fetch-vix', { method: 'GET', body: undefined });
+        const data = await backend.riskflow.getIVAggregate({
+          instrument: selectedSymbol?.symbol || '/ES',
+        });
         
-        if (!response.ok) {
-          const errorText = await response.text();
-          console.error(`[VIX] API error: ${response.status} - ${errorText}`);
-          return;
-        }
-        
-        const data = await response.json();
-        if (data && typeof data.value === 'number') {
-          console.log(`[VIX] Successfully fetched: ${data.value}`);
-          setVix(data.value);
-        } else {
-          console.error('[VIX] Invalid response format:', data);
+        if (data && typeof data.score === 'number') {
+          setIvScore(data.score);
+          setIvData(data);
+          
+          // Also update VIX from the response
+          if (data.vix?.level) {
+            setVix(data.vix.level);
+          }
+          
+          console.log(`[IV] Score: ${data.score}, VIX: ${data.vix?.level}, Alert: ${data.alert || 'none'}`);
         }
       } catch (error) {
-        console.error('[VIX] Failed to fetch VIX:', error);
-        // Keep current value on error
+        console.error('[IV] Failed to fetch IV aggregate:', error);
+        // Keep current values on error
       }
     };
 
-    fetchVIX();
-    const interval = setInterval(fetchVIX, 300000); // Update every 5 minutes (300000ms)
+    fetchIVAggregate();
+    const interval = setInterval(fetchIVAggregate, 30000); // Update every 30 seconds
     return () => clearInterval(interval);
-  }, [backend]);
+  }, [backend, selectedSymbol?.symbol]);
 
   const getTierDisplayName = () => {
     switch (tier) {

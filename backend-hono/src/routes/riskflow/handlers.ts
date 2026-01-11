@@ -9,6 +9,17 @@ import * as watchlistService from '../../services/riskflow/watchlist-service.js'
 import { addClient, removeClient } from '../../services/riskflow/sse-broadcaster.js';
 import { corsConfig } from '../../config/cors.js';
 import type { FeedFilters, WatchlistUpdateRequest, NewsSource, MacroLevel } from '../../types/riskflow.js';
+import { fetchVIX, getVIXSpikeAdjustment, getVIXScoringMultiplier, getVIXBaseline } from '../../services/vix-service.js';
+import { 
+  calculateIVScoreV2, 
+  classifyEventType, 
+  calculateImpliedPoints,
+  getCurrentSession,
+  getInstrumentConfig,
+  getSupportedInstruments,
+  INSTRUMENT_BETAS,
+  type StackedEvent 
+} from '../../services/iv-scoring-v2.js';
 
 /**
  * Internal function to trigger feed pre-fetching
@@ -481,4 +492,136 @@ export async function handleCronPrefetch(c: Context) {
   const result = await preFetchFeed();
   const statusCode = result.success ? 200 : 500;
   return c.json(result, statusCode);
+}
+
+/**
+ * GET /api/riskflow/iv-aggregate
+ * Get aggregated IV score based on recent news and VIX
+ * Query params:
+ *   - instrument: User's selected instrument (default: /ES)
+ *   - price: Current price of the instrument (optional, for points calc)
+ */
+export async function handleGetIVAggregate(c: Context) {
+  const userId = c.get('userId') as string | undefined;
+
+  if (!userId) {
+    return c.json({ error: 'Unauthorized' }, 401);
+  }
+
+  try {
+    // Get query params
+    const instrument = c.req.query('instrument') || '/ES';
+    const priceParam = c.req.query('price');
+    
+    // Get instrument config from the scoring engine (includes default prices)
+    const instrumentConfig = getInstrumentConfig(instrument);
+    
+    // Use provided price or fallback to config price or 6000
+    const currentPrice = priceParam 
+      ? parseFloat(priceParam) 
+      : (instrumentConfig?.currentPrice ?? 6000);
+
+    // Fetch current VIX
+    const vixData = await fetchVIX();
+    console.log(`[IV Aggregate] VIX: ${vixData.level}, spike: ${vixData.isSpike}, stale: ${vixData.staleMinutes}min`);
+
+    // Get recent news items from database (last 2 hours)
+    const { sql, isDatabaseAvailable } = await import('../../config/database.js');
+    
+    let events: StackedEvent[] = [];
+    
+    if (isDatabaseAvailable() && sql) {
+      const recentItems = await sql`
+        SELECT headline, source, macro_level, iv_score, published_at, is_breaking
+        FROM news_feed_items
+        WHERE published_at >= NOW() - INTERVAL '2 hours'
+          AND macro_level >= 2
+        ORDER BY published_at DESC
+        LIMIT 20
+      `;
+
+      // Convert to StackedEvent format
+      events = recentItems.map((item: any) => {
+        // Create a pseudo-parsed headline for classification
+        const parsed = {
+          raw: item.headline,
+          eventType: null,
+          isBreaking: item.is_breaking,
+        };
+        
+        const eventType = classifyEventType(parsed as any);
+        const baseScore = item.iv_score || 3;
+        
+        return {
+          eventType,
+          baseScore,
+          timestamp: new Date(item.published_at),
+        };
+      });
+      
+      console.log(`[IV Aggregate] Found ${events.length} recent events`);
+    }
+
+    // Check if it's earnings season or FOMC week (simplified detection)
+    const now = new Date();
+    const dayOfWeek = now.getDay();
+    const dayOfMonth = now.getDate();
+    
+    // FOMC typically meets 8 times a year, often mid-month Tue-Wed
+    const isFOMCWeek = dayOfWeek >= 1 && dayOfWeek <= 3 && dayOfMonth >= 10 && dayOfMonth <= 20;
+    
+    // Earnings season: ~2 weeks after quarter end (mid-Jan, mid-Apr, mid-Jul, mid-Oct)
+    const month = now.getMonth();
+    const isEarningsSeason = [0, 3, 6, 9].includes(month) && dayOfMonth >= 10 && dayOfMonth <= 28;
+
+    // Calculate IV score using the v2 engine
+    const result = calculateIVScoreV2({
+      events,
+      vixLevel: vixData.level,
+      previousVixLevel: vixData.previousLevel,
+      vixUpdateMinutes: vixData.staleMinutes,
+      currentPrice,
+      instrument,
+      isMarketClosed: false, // TODO: Detect market hours
+      isEarningsSeason,
+      isFOMCWeek,
+      previousSessionScore: 0, // TODO: Store and retrieve previous session
+    });
+
+    // Get additional VIX context
+    const vixMultiplierInfo = getVIXScoringMultiplier(vixData.level);
+    const spikeAdjustment = getVIXSpikeAdjustment(vixData);
+
+    return c.json({
+      score: result.score,
+      impliedPoints: result.impliedPoints,
+      session: {
+        name: result.session.name,
+        multiplier: result.session.multiplier,
+      },
+      vix: {
+        level: vixData.level,
+        percentChange: vixData.percentChange,
+        isSpike: vixData.isSpike,
+        spikeDirection: vixData.spikeDirection,
+        multiplier: result.vixMultiplier,
+        context: result.vixContext,
+        staleMinutes: vixData.staleMinutes,
+      },
+      activity: {
+        eventCount: result.stackedEvents,
+        synergy: result.synergy,
+        baseline: result.activityBaseline,
+        isEarningsSeason,
+        isFOMCWeek,
+      },
+      rationale: result.rationale,
+      alert: result.alert,
+      instrument,
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error) {
+    console.error('[IV Aggregate] Error:', error);
+    return c.json({ error: error instanceof Error ? error.message : 'Failed to calculate IV score' }, 500);
+  }
 }

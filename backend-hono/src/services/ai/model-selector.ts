@@ -31,7 +31,7 @@ const HEALTH_CHECK_TTL_MS = 60_000
  * Task type to model routing
  * ALL models via OpenRouter:
  * - News/Sentiment: Grok 4.1 (OpenRouter)
- * - Chat/General: Llama 3.3 70B (OpenRouter)
+ * - Chat/General: Grok 4.1 primary, Llama 3.3 70B fallback (per user request)
  * - Research/Reasoning: Claude Opus 4.5 (OpenRouter)
  */
 const TASK_MODEL_PREFERENCES: Record<string, AiModelKey[]> = {
@@ -39,20 +39,20 @@ const TASK_MODEL_PREFERENCES: Record<string, AiModelKey[]> = {
   news: ['openrouter-grok', 'openrouter-llama', 'openrouter-sonnet'],
   sentiment: ['openrouter-grok', 'openrouter-llama', 'openrouter-sonnet'],
   
-  // Chat - General conversation
-  chat: ['openrouter-llama', 'openrouter-sonnet', 'openrouter-grok'],
-  general: ['openrouter-llama', 'openrouter-sonnet', 'openrouter-grok'],
+  // Chat - Grok 4.1 primary, Llama fallback (user request Jan 11)
+  chat: ['openrouter-grok', 'openrouter-llama', 'openrouter-sonnet'],
+  general: ['openrouter-grok', 'openrouter-llama', 'openrouter-sonnet'],
   
-  // Technical analysis - Fast Llama
-  technical: ['openrouter-llama', 'openrouter-grok', 'openrouter-sonnet'],
-  quickpulse: ['openrouter-llama', 'openrouter-grok', 'openrouter-sonnet'],
+  // Technical analysis - Grok 4.1 primary for speed
+  technical: ['openrouter-grok', 'openrouter-llama', 'openrouter-sonnet'],
+  quickpulse: ['openrouter-grok', 'openrouter-llama', 'openrouter-sonnet'],
   
   // Deep research / reasoning - Claude Opus 4.5
   research: ['openrouter-opus', 'openrouter-sonnet', 'openrouter-llama'],
   reasoning: ['openrouter-opus', 'openrouter-sonnet', 'openrouter-llama'],
   
-  // Default fallback chain
-  default: ['openrouter-llama', 'openrouter-sonnet', 'openrouter-grok'],
+  // Default fallback chain - Grok primary
+  default: ['openrouter-grok', 'openrouter-llama', 'openrouter-sonnet'],
 }
 
 /**

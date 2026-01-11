@@ -13,6 +13,7 @@ import { TopStepXBrowser } from '../TopStepXBrowser';
 import { FloatingWidget } from './FloatingWidget';
 import { PanelPosition } from './DraggablePanel';
 import { useBackend } from '../../lib/backend';
+import { useSettings } from '../../contexts/SettingsContext';
 import { EmotionalResonanceMonitor } from '../mission-control/EmotionalResonanceMonitor';
 import { BlindspotsWidget } from '../mission-control/BlindspotsWidget';
 import { AccountTrackerWidget } from '../mission-control/AccountTrackerWidget';
@@ -100,35 +101,32 @@ function MainLayoutInner({ onSettingsClick, signOut }: MainLayoutProps & { signO
     setPrevLayoutOption(layoutOption);
   }, [layoutOption, prevLayoutOption, lastMovableLayout]);
 
-  // Fetch VIX and IV Score for floating widget
+  // Fetch IV Aggregate (includes VIX and computed IV score) - update every 30 seconds
   useEffect(() => {
-    const fetchVIX = async () => {
+    const fetchIVAggregate = async () => {
       try {
-        const newsClient = (backend as any).news;
-        const baseClient = (newsClient as any).baseClient;
-        const response = await baseClient.callTypedAPI('/news/fetch-vix', { method: 'GET', body: undefined });
-        if (response.ok) {
-          const data = await response.json();
-          if (data && typeof data.value === 'number') {
-            setVix(data.value);
+        const data = await backend.riskflow.getIVAggregate({
+          instrument: '/ES', // Default to ES for floating widget
+        });
+        
+        if (data && typeof data.score === 'number') {
+          setIvScore(data.score);
+          
+          // Also update VIX from the response
+          if (data.vix?.level) {
+            setVix(data.vix.level);
           }
         }
       } catch (error) {
-        console.error('[VIX] Failed to fetch VIX:', error);
+        console.error('[IV] Failed to fetch IV aggregate:', error);
+        // Keep current values on error
       }
     };
 
-    fetchVIX();
-    const interval = setInterval(fetchVIX, 300000);
+    fetchIVAggregate();
+    const interval = setInterval(fetchIVAggregate, 30000); // Update every 30 seconds
     return () => clearInterval(interval);
   }, [backend]);
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setIvScore(prev => Math.max(0, Math.min(10, prev + (Math.random() - 0.5) * 0.5)));
-    }, 10000);
-    return () => clearInterval(interval);
-  }, []);
 
   // Fetch account data for combined panel collapsed state
   useEffect(() => {

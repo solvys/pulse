@@ -33,11 +33,12 @@ const SUGGESTION_CHIPS = [
 ];
 
 // AI Model Configuration with reasoning level categories
+// Grok 4.1 is primary for chat (fast + real-time), Llama fallback
 const AI_MODELS = [
   { id: 'claude-opus-4', name: 'Claude Opus 4', level: 'Complex Reasoning', description: 'Best for deep analysis' },
-  { id: 'grok-4', name: 'Grok 4', level: 'Complex Reasoning', description: 'X.AI reasoning model' },
+  { id: 'grok-4.1', name: 'Grok 4.1', level: 'Fast Reasoning', description: 'X.AI - Speed optimized, real-time' },
   { id: 'claude-sonnet-4.5', name: 'Claude Sonnet', level: 'Moderate Reasoning', description: 'Balanced performance' },
-  { id: 'groq-llama-3-70b', name: 'Llama 3 70B', level: 'Fast Reasoning', description: 'Speed optimized' },
+  { id: 'groq-llama-3-70b', name: 'Llama 3 70B', level: 'Fast Fallback', description: 'Backup model' },
 ] as const;
 
 const THINKING_TERMS = [
@@ -108,8 +109,8 @@ export default function ChatInterface() {
   // Local input state for textarea
   const [input, setInput] = useState("");
 
-  // Model selector state
-  const [selectedModel, setSelectedModel] = useState<string>('claude-opus-4');
+  // Model selector state - default to Grok 4.1 for fast reasoning
+  const [selectedModel, setSelectedModel] = useState<string>('grok-4.1');
   const [showModelSelector, setShowModelSelector] = useState(false);
 
   // Admin detection (hidden tier - not visible to regular users)
