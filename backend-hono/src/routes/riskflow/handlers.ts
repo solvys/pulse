@@ -332,6 +332,59 @@ export async function handleBreakingStream(c: Context) {
 }
 
 /**
+ * GET /api/riskflow/debug
+ * Debug endpoint to check database state
+ */
+export async function handleDebug(c: Context) {
+  const userId = c.get('userId') as string | undefined;
+  if (!userId) {
+    return c.json({ error: 'Unauthorized' }, 401);
+  }
+
+  try {
+    const { sql, isDatabaseAvailable } = await import('../../config/database.js');
+    
+    if (!isDatabaseAvailable() || !sql) {
+      return c.json({ error: 'Database not available' }, 503);
+    }
+
+    // Get raw counts
+    const totalCount = await sql`SELECT COUNT(*) as count FROM news_feed_items`;
+    const recentCount = await sql`
+      SELECT COUNT(*) as count FROM news_feed_items 
+      WHERE published_at >= NOW() - INTERVAL '48 hours'
+    `;
+    const level3Count = await sql`
+      SELECT COUNT(*) as count FROM news_feed_items 
+      WHERE published_at >= NOW() - INTERVAL '48 hours' 
+        AND (macro_level IS NULL OR macro_level >= 3)
+    `;
+    const sampleItems = await sql`
+      SELECT id, headline, source, macro_level, published_at, is_breaking
+      FROM news_feed_items
+      ORDER BY published_at DESC
+      LIMIT 5
+    `;
+
+    return c.json({
+      database: {
+        total: Number(totalCount[0]?.count ?? 0),
+        recent48h: Number(recentCount[0]?.count ?? 0),
+        level3Plus: Number(level3Count[0]?.count ?? 0),
+      },
+      sample: sampleItems,
+      env: {
+        hasXApiToken: !!process.env.X_API_BEARER_TOKEN,
+        nodeEnv: process.env.NODE_ENV,
+      }
+    });
+  } catch (error) {
+    console.error('[RiskFlow] Debug error:', error);
+    return c.json({ error: error instanceof Error ? error.message : 'Debug failed' }, 500);
+  }
+}
+
+/**
  * POST /api/riskflow/cron/prefetch
  * Cron job endpoint to pre-fetch and store news items
  * Protected by CRON_SECRET_TOKEN environment variable
