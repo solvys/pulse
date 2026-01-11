@@ -4,7 +4,7 @@
  */
 
 import type { Context } from 'hono'
-import { streamText } from 'ai'
+import { streamText, generateText } from 'ai'
 import { selectModel, createModelClient, logModelSelection, type AiModelKey } from '../../../services/ai/model-selector.js'
 import * as conversationStore from '../../../services/ai/conversation-store.js'
 import { defaultAiConfig } from '../../../config/ai-config.js'
@@ -115,8 +115,8 @@ export async function handleChat(c: Context) {
     // Set conversation ID header so frontend can track it
     c.header('X-Conversation-Id', conversation.id)
 
-    // Return Vercel AI SDK compatible text stream
-    return result.toTextStreamResponse({
+    // Return Vercel AI SDK UI message stream (what useChat expects)
+    return result.toUIMessageStreamResponse({
       headers: {
         'X-Conversation-Id': conversation.id,
       },
