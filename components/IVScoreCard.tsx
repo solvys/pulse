@@ -7,70 +7,77 @@ interface IVScoreCardProps {
 }
 
 // Instrument configurations with Grok-spec betas for point move calculations
+// Beta = correlation to SPX volatility (1.0 = moves with SPX, <1 = less volatile)
 // Based on Rule of 16: Implied % = VIX / 16, then adjusted by instrument beta
-const INSTRUMENT_CONFIG = {
-  "/MNQ": {
-    beta: 1.2,
-    currentPrice: 21000,
-    notes: 'Micro Nasdaq - Tech-heavy',
-  },
-  "/ES": {
-    beta: 1.0,
-    currentPrice: 6000,
-    notes: 'S&P 500 - Base',
-  },
-  "/NQ": {
-    beta: 1.2,
-    currentPrice: 21000,
-    notes: 'Nasdaq 100 - Tech-heavy',
-  },
-  "/YM": {
-    beta: 0.95,
-    currentPrice: 44000,
-    notes: 'Dow - Industrials',
-  },
-  "/RTY": {
-    beta: 1.1,
-    currentPrice: 2200,
-    notes: 'Russell 2000 - Small caps',
-  },
-  "/GC": {
-    beta: 0.2,
-    currentPrice: 2000,
-    notes: 'Gold - Safe-haven, low correlation',
-  },
-  "/SI": {
-    beta: 0.4,
-    currentPrice: 30,
-    notes: 'Silver - Industrial/vol proxy',
-  },
-} as const;
-
-// VIX baseline estimate (can be overridden by actual VIX from backend)
-const DEFAULT_VIX = 20;
+const INSTRUMENT_CONFIG: Record<string, { beta: number; tickValue: number; tickSize: number; currentPrice: number; notes: string }> = {
+  // Equity Index Futures
+  "/ES": { beta: 1.0, tickValue: 12.50, tickSize: 0.25, currentPrice: 6000, notes: 'E-mini S&P 500 - Base' },
+  "/MES": { beta: 1.0, tickValue: 1.25, tickSize: 0.25, currentPrice: 6000, notes: 'Micro E-mini S&P 500' },
+  "/NQ": { beta: 1.2, tickValue: 5.00, tickSize: 0.25, currentPrice: 21000, notes: 'E-mini Nasdaq 100 - Tech' },
+  "/MNQ": { beta: 1.2, tickValue: 0.50, tickSize: 0.25, currentPrice: 21000, notes: 'Micro E-mini Nasdaq 100' },
+  "/YM": { beta: 0.95, tickValue: 5.00, tickSize: 1.0, currentPrice: 44000, notes: 'E-mini Dow - Industrials' },
+  "/MYM": { beta: 0.95, tickValue: 0.50, tickSize: 1.0, currentPrice: 44000, notes: 'Micro E-mini Dow' },
+  "/RTY": { beta: 1.1, tickValue: 5.00, tickSize: 0.10, currentPrice: 2200, notes: 'E-mini Russell 2000 - Small caps' },
+  "/M2K": { beta: 1.1, tickValue: 0.50, tickSize: 0.10, currentPrice: 2200, notes: 'Micro E-mini Russell 2000' },
+  
+  // Commodities
+  "/CL": { beta: 0.6, tickValue: 10.00, tickSize: 0.01, currentPrice: 75, notes: 'Crude Oil' },
+  "/MCL": { beta: 0.6, tickValue: 1.00, tickSize: 0.01, currentPrice: 75, notes: 'Micro Crude Oil' },
+  "/GC": { beta: 0.2, tickValue: 10.00, tickSize: 0.10, currentPrice: 2650, notes: 'Gold - Safe-haven' },
+  "/MGC": { beta: 0.2, tickValue: 1.00, tickSize: 0.10, currentPrice: 2650, notes: 'Micro Gold' },
+  "/SI": { beta: 0.4, tickValue: 25.00, tickSize: 0.005, currentPrice: 30, notes: 'Silver' },
+  "/SIL": { beta: 0.4, tickValue: 2.50, tickSize: 0.005, currentPrice: 30, notes: 'Micro Silver' },
+  "/NG": { beta: 0.5, tickValue: 10.00, tickSize: 0.001, currentPrice: 3.50, notes: 'Natural Gas' },
+  
+  // Currencies
+  "/6E": { beta: 0.3, tickValue: 12.50, tickSize: 0.00005, currentPrice: 1.08, notes: 'Euro FX' },
+  "/6J": { beta: 0.25, tickValue: 12.50, tickSize: 0.0000005, currentPrice: 0.0067, notes: 'Japanese Yen' },
+  "/6B": { beta: 0.35, tickValue: 6.25, tickSize: 0.0001, currentPrice: 1.27, notes: 'British Pound' },
+  
+  // Bonds (inverse correlation)
+  "/ZB": { beta: -0.3, tickValue: 31.25, tickSize: 0.03125, currentPrice: 118, notes: '30-Year Treasury' },
+  "/ZN": { beta: -0.25, tickValue: 15.625, tickSize: 0.015625, currentPrice: 110, notes: '10-Year Treasury' },
+};
 
 function calculateExpectedMove(ivScore: number, symbol: string) {
-  const config = INSTRUMENT_CONFIG[symbol as keyof typeof INSTRUMENT_CONFIG];
-  if (!config) return null;
+  const config = INSTRUMENT_CONFIG[symbol];
+  if (!config) {
+    // Fallback to /ES if symbol not found
+    const esConfig = INSTRUMENT_CONFIG["/ES"];
+    return calculateMoveFromConfig(ivScore, esConfig, symbol);
+  }
+  return calculateMoveFromConfig(ivScore, config, symbol);
+}
 
+function calculateMoveFromConfig(
+  ivScore: number, 
+  config: typeof INSTRUMENT_CONFIG[keyof typeof INSTRUMENT_CONFIG],
+  symbol: string
+) {
   // Use IV score to estimate VIX-like volatility (score 0-10 maps to roughly VIX 10-35)
   const estimatedVix = 10 + (ivScore * 2.5);
   
   // Rule of 16: Implied daily % move = VIX / 16
+  // e.g., VIX 20 = 1.25% expected daily move
   const impliedPct = estimatedVix / 16;
   
-  // Base points = price * implied %
+  // Base points = price × implied %
   const basePoints = config.currentPrice * (impliedPct / 100);
   
-  // Adjust by instrument beta
-  const adjustedPoints = basePoints * config.beta;
-
-  // Calculate as percentage of current price
-  const expectedPercent = (adjustedPoints / config.currentPrice) * 100;
+  // Adjust by instrument beta (use absolute value for display)
+  const adjustedPoints = basePoints * Math.abs(config.beta);
+  
+  // Calculate ticks for context
+  const adjustedTicks = adjustedPoints / config.tickSize;
+  
+  // Calculate dollar risk per contract
+  const dollarRisk = adjustedTicks * config.tickValue;
 
   return {
     points: Math.round(adjustedPoints * 10) / 10,
-    percent: Math.round(expectedPercent * 100) / 100,
+    ticks: Math.round(adjustedTicks),
+    dollarRisk: Math.round(dollarRisk),
+    percent: Number(impliedPct.toFixed(2)),
     beta: config.beta,
   };
 }

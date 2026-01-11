@@ -15,6 +15,8 @@ import {
   classifyEventType, 
   calculateImpliedPoints,
   getCurrentSession,
+  getInstrumentConfig,
+  getSupportedInstruments,
   INSTRUMENT_BETAS,
   type StackedEvent 
 } from '../../services/iv-scoring-v2.js';
@@ -511,18 +513,13 @@ export async function handleGetIVAggregate(c: Context) {
     const instrument = c.req.query('instrument') || '/ES';
     const priceParam = c.req.query('price');
     
-    // Default prices by instrument (fallback if not provided)
-    const defaultPrices: Record<string, number> = {
-      '/ES': 6000,
-      '/NQ': 21000,
-      '/MNQ': 21000,
-      '/YM': 44000,
-      '/RTY': 2200,
-      '/GC': 2000,
-      '/SI': 30,
-    };
+    // Get instrument config from the scoring engine (includes default prices)
+    const instrumentConfig = getInstrumentConfig(instrument);
     
-    const currentPrice = priceParam ? parseFloat(priceParam) : (defaultPrices[instrument] || 6000);
+    // Use provided price or fallback to config price or 6000
+    const currentPrice = priceParam 
+      ? parseFloat(priceParam) 
+      : (instrumentConfig?.currentPrice ?? 6000);
 
     // Fetch current VIX
     const vixData = await fetchVIX();
