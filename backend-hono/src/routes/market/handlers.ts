@@ -16,7 +16,8 @@ export async function handleGetVix(c: Context) {
     return c.json(vixData);
   } catch (error) {
     console.error('[Market] VIX fetch error:', error);
-    return c.json({ error: 'Failed to fetch VIX data' }, 500);
+    // If missing API key or upstream failure, return 503 so frontend doesn't trust mock data
+    return c.json({ error: 'Failed to fetch VIX data (upstream unavailable)' }, 503);
   }
 }
 

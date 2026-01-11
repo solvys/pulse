@@ -10,6 +10,29 @@ import { addClient, removeClient } from '../../services/riskflow/sse-broadcaster
 import type { FeedFilters, WatchlistUpdateRequest, NewsSource } from '../../types/riskflow.js';
 
 /**
+ * Internal function to trigger feed pre-fetching
+ * This is called by the cron job endpoint
+ */
+async function preFetchFeed(): Promise<{ success: boolean; itemsFetched: number; error?: string }> {
+  try {
+    // Force a fresh fetch by calling getFeed with a dummy userId
+    // This will trigger the X API fetch and database storage
+    const result = await feedService.getFeed('cron-job', { limit: 50 });
+    return {
+      success: true,
+      itemsFetched: result.items.length,
+    };
+  } catch (error) {
+    console.error('[RiskFlow] Pre-fetch error:', error);
+    return {
+      success: false,
+      itemsFetched: 0,
+      error: error instanceof Error ? error.message : String(error),
+    };
+  }
+}
+
+/**
  * GET /api/riskflow/feed
  * Get news feed with optional filters
  */
@@ -228,4 +251,28 @@ export async function handleBreakingStream(c: Context) {
       Connection: 'keep-alive',
     },
   });
+}
+
+/**
+ * POST /api/riskflow/cron/prefetch
+ * Cron job endpoint to pre-fetch and store news items
+ * Protected by CRON_SECRET_TOKEN environment variable
+ */
+export async function handleCronPrefetch(c: Context) {
+  // Verify cron secret token
+  const providedToken = c.req.header('X-Cron-Secret') || c.req.query('token');
+  const expectedToken = process.env.CRON_SECRET_TOKEN;
+
+  if (!expectedToken) {
+    console.warn('[RiskFlow] CRON_SECRET_TOKEN not configured');
+    return c.json({ error: 'Cron job not configured' }, 500);
+  }
+
+  if (providedToken !== expectedToken) {
+    return c.json({ error: 'Unauthorized' }, 401);
+  }
+
+  const result = await preFetchFeed();
+  const statusCode = result.success ? 200 : 500;
+  return c.json(result, statusCode);
 }

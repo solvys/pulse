@@ -25,7 +25,14 @@ export function registerRoutes(app: Hono): void {
   app.use('/api/notifications/*', authMiddleware);
   app.use('/api/trading/*', authMiddleware);
   app.use('/api/projectx/*', authMiddleware);
-  app.use('/api/riskflow/*', authMiddleware);
+  // RiskFlow routes - exclude cron endpoint from auth
+  app.use('/api/riskflow/*', async (c, next) => {
+    // Skip auth for cron endpoints (they use secret token)
+    if (c.req.path.includes('/cron/')) {
+      return next();
+    }
+    return authMiddleware(c, next);
+  });
   app.use('/api/psych/*', authMiddleware);
   app.use('/api/ai/*', authMiddleware);
   app.use('/api/agents/*', authMiddleware);

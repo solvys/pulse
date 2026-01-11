@@ -35,7 +35,7 @@ const FMP_BASE_URL = 'https://financialmodelingprep.com/api/v3';
  */
 async function fetchVixFromFmp(): Promise<VixData | null> {
   if (!FMP_API_KEY) {
-    console.warn('[Market] FMP_API_KEY not set, using mock data');
+    console.error('[Market] FMP_API_KEY not set - cannot fetch real VIX');
     return null;
   }
 
@@ -71,27 +71,8 @@ async function fetchVixFromFmp(): Promise<VixData | null> {
 }
 
 /**
- * Generate mock VIX data for development
- */
-function generateMockVix(): VixData {
-  // Base VIX around 16-22 range (typical market)
-  const baseValue = 18 + (Math.random() * 4 - 2);
-  const change = (Math.random() * 2 - 1);
-  const changePercent = (change / baseValue) * 100;
-
-  return {
-    symbol: 'VIX',
-    value: Math.round(baseValue * 100) / 100,
-    change: Math.round(change * 100) / 100,
-    changePercent: Math.round(changePercent * 100) / 100,
-    timestamp: new Date().toISOString(),
-    source: 'mock',
-  };
-}
-
-/**
  * Get current VIX value
- * Uses FMP API with fallback to mock data
+ * Uses FMP API only (no mock fallback)
  */
 export async function getVix(): Promise<VixData> {
   // Check cache first
@@ -110,13 +91,7 @@ export async function getVix(): Promise<VixData> {
     return fmpData;
   }
 
-  // Fallback to mock data
-  const mockData = generateMockVix();
-  vixCache = {
-    data: mockData,
-    expiresAt: Date.now() + VIX_CACHE_TTL_MS,
-  };
-  return mockData;
+  throw new Error('VIX data unavailable (FMP_API_KEY missing or fetch failed)');
 }
 
 /**

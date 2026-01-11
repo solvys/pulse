@@ -13,6 +13,7 @@ import {
   handleAddSymbols,
   handleRemoveSymbols,
   handleBreakingStream,
+  handleCronPrefetch,
 } from './handlers.js';
 
 export function createRiskFlowRoutes(): Hono {
@@ -41,6 +42,9 @@ export function createRiskFlowRoutes(): Hono {
 
   // DELETE /api/riskflow/watchlist/symbols - Remove symbols
   router.delete('/watchlist/symbols', handleRemoveSymbols);
+
+  // POST /api/riskflow/cron/prefetch - Cron job to pre-fetch news (protected by secret token)
+  router.post('/cron/prefetch', handleCronPrefetch);
 
   return router;
 }

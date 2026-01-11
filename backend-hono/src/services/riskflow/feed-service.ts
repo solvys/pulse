@@ -110,8 +110,9 @@ function getHigherUrgency(a: UrgencyLevel, b: UrgencyLevel): UrgencyLevel {
 
 /**
  * Batch enrich feed items with analysis
+ * Exported for use by feed poller
  */
-async function enrichFeedWithAnalysis(items: FeedItem[]): Promise<FeedItem[]> {
+export async function enrichFeedWithAnalysis(items: FeedItem[]): Promise<FeedItem[]> {
   if (!ENABLE_AI_ANALYSIS || items.length === 0) {
     return items;
   }

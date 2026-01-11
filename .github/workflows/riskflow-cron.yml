@@ -1,0 +1,42 @@
+name: Riskflow Prefetch Cron
+
+# GitHub Actions minimum cron interval is 5 minutes. This workflow runs every 5 minutes
+# and the job itself calls the endpoint three times with 2-minute sleeps between calls,
+# approximating a 2-minute interval between requests.
+on:
+  schedule:
+    - cron: '*/5 * * * *'
+  workflow_dispatch:
+
+jobs:
+  prefetch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Call Riskflow endpoint looped every 2 minutes (3 attempts)
+        env:
+          URL: https://pulse-api-withered-dust-1394.fly.dev/api/riskflow/cron/prefetch
+          # Recommended: create a repository secret named CRON_SECRET_TOKEN and set it there.
+          # If the secret is not defined, the script will fall back to the literal token below.
+          CRON_SECRET_TOKEN: ${{ secrets.CRON_SECRET_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          # If CRON_SECRET_TOKEN is empty, fall back to literal token. Replace '[YOUR_TOKEN]' with your token,
+          # or better: set a repository secret named CRON_SECRET_TOKEN.
+          : "${CRON_SECRET_TOKEN:='f0d6123339ba216079100a957149b52fefaf0868565905226345dd18ea6b72a6'}"
+
+          echo "Starting prefetched POST loop to ${URL}"
+          for i in 1 2 3; do
+            echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] POST attempt $i"
+            # Use curl to POST. Adjust -d '{}' or remove depending on whether the endpoint expects a body.
+            curl -sS -X POST \
+              -H "Content-Type: application/json" \
+              -H "X-Cron-Secret: ${CRON_SECRET_TOKEN}" \
+              "${URL}" \
+              || echo "Request failed (attempt $i)"
+            # Sleep 120s between attempts except after the last one
+            if [ "$i" -lt 3 ]; then
+              sleep 120
+            fi
+          done
