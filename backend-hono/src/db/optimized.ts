@@ -12,7 +12,6 @@ export class DatabaseError extends Error {
     this.name = 'DatabaseError';
     this.status = options.status ?? 503;
     this.code = options.code;
-    // Preserve original error for debugging/logging.
     (this as { cause?: unknown }).cause = options.cause;
   }
 }
@@ -35,9 +34,7 @@ class LruCache<K, V> {
 
   get(key: K): V | null {
     const entry = this.map.get(key);
-    if (!entry) {
-      return null;
-    }
+    if (!entry) return null;
     if (Date.now() > entry.expiresAt) {
       this.map.delete(key);
       return null;
@@ -48,55 +45,59 @@ class LruCache<K, V> {
   }
 
   set(key: K, value: V, ttlOverride?: number) {
-    if (this.map.has(key)) {
-      this.map.delete(key);
-    }
+    if (this.map.has(key)) this.map.delete(key);
     const ttl = ttlOverride ?? this.ttlMs;
     this.map.set(key, { value, expiresAt: Date.now() + ttl });
     if (this.map.size > this.maxEntries) {
       const oldestKey = this.map.keys().next().value as K | undefined;
-      if (oldestKey !== undefined) {
-        this.map.delete(oldestKey);
-      }
+      if (oldestKey !== undefined) this.map.delete(oldestKey);
     }
   }
 }
 
-const resolvedDatabase = (() => {
+const isDev = process.env.NODE_ENV !== 'production';
+
+const resolveConnectionString = (): string | null => {
   const neon = process.env.NEON_DATABASE_URL;
-  if (neon) {
-    return { connectionString: neon, source: 'NEON_DATABASE_URL' as const };
-  }
+  if (neon) return neon;
 
   const legacy = process.env.DATABASE_URL;
   if (legacy) {
-    console.warn(
-      '[db] DATABASE_URL detected. Please migrate to NEON_DATABASE_URL to avoid downtime.',
-    );
-    return { connectionString: legacy, source: 'DATABASE_URL' as const };
+    console.warn('[db] DATABASE_URL detected. Prefer NEON_DATABASE_URL.');
+    return legacy;
   }
 
-  throw new Error('Missing NEON_DATABASE_URL (preferred) or DATABASE_URL (legacy fallback)');
-})();
+  if (isDev) {
+    console.warn('[db] No database URL - using mock mode in development');
+    return null;
+  }
 
-const buildPoolConfig = (): PoolConfig => ({
-  connectionString: resolvedDatabase.connectionString,
-  max: Number.parseInt(process.env.DB_POOL_MAX ?? '10', 10),
-  idleTimeoutMillis: Number.parseInt(process.env.DB_IDLE_TIMEOUT_MS ?? '30000', 10),
-  connectionTimeoutMillis: Number.parseInt(
-    process.env.DB_CONNECT_TIMEOUT_MS ?? '5000',
-    10,
-  ),
-});
+  throw new Error('Missing NEON_DATABASE_URL or DATABASE_URL');
+};
 
-const pool = new Pool(buildPoolConfig());
+const connectionString = resolveConnectionString();
 
-pool.on('error', (error) => {
-  console.error('[db] pool error', {
-    name: error instanceof Error ? error.name : 'UnknownError',
-    message: error instanceof Error ? error.message : String(error),
+const buildPoolConfig = (): PoolConfig | null => {
+  if (!connectionString) return null;
+  return {
+    connectionString,
+    max: Number.parseInt(process.env.DB_POOL_MAX ?? '10', 10),
+    idleTimeoutMillis: Number.parseInt(process.env.DB_IDLE_TIMEOUT_MS ?? '30000', 10),
+    connectionTimeoutMillis: Number.parseInt(process.env.DB_CONNECT_TIMEOUT_MS ?? '5000', 10),
+  };
+};
+
+const poolConfig = buildPoolConfig();
+const pool = poolConfig ? new Pool(poolConfig) : null;
+
+if (pool) {
+  pool.on('error', (error) => {
+    console.error('[db] pool error', {
+      name: error instanceof Error ? error.name : 'UnknownError',
+      message: error instanceof Error ? error.message : String(error),
+    });
   });
-});
+}
 
 const cache = new LruCache<string, QueryResult>(200, 60_000);
 
@@ -111,15 +112,13 @@ const getErrorCode = (error: unknown): string | undefined => {
 const isConnectionError = (error: unknown): boolean => {
   const code = getErrorCode(error);
   if (!code) return false;
-  return (
-    code === 'ECONNREFUSED' ||
-    code === 'ECONNRESET' ||
-    code === 'ETIMEDOUT' ||
-    code === 'ENOTFOUND'
-  );
+  return ['ECONNREFUSED', 'ECONNRESET', 'ETIMEDOUT', 'ENOTFOUND'].includes(code);
 };
 
-const wrapDbError = (error: unknown, context: { label: string; text: string; params: readonly unknown[] }) => {
+const wrapDbError = (
+  error: unknown,
+  context: { label: string; text: string; params: readonly unknown[] }
+) => {
   const code = getErrorCode(error);
   const status = isConnectionError(error) ? 503 : 500;
   const message = error instanceof Error ? error.message : String(error);
@@ -141,6 +140,8 @@ const buildCacheKey = (text: string, params: readonly unknown[]) => {
   return `${text}::${serializedParams}`;
 };
 
+export const isPoolAvailable = (): boolean => pool !== null;
+
 export const dbPool = () => pool;
 
 export async function cachedQuery<T = unknown>(
@@ -148,11 +149,13 @@ export async function cachedQuery<T = unknown>(
   params: readonly unknown[] = [],
   options: { cacheKey?: string; ttlMs?: number } = {},
 ): Promise<QueryResult<T>> {
+  if (!pool) {
+    throw new DatabaseError('Database not configured', { status: 503 });
+  }
+
   const key = options.cacheKey ?? buildCacheKey(text, params);
   const cached = cache.get(key);
-  if (cached) {
-    return cached as QueryResult<T>;
-  }
+  if (cached) return cached as QueryResult<T>;
 
   try {
     const result = await pool.query<T>(text, params as unknown[]);
@@ -167,6 +170,10 @@ export async function query<T = unknown>(
   text: string,
   params: readonly unknown[] = [],
 ): Promise<QueryResult<T>> {
+  if (!pool) {
+    throw new DatabaseError('Database not configured', { status: 503 });
+  }
+
   try {
     return await pool.query<T>(text, params as unknown[]);
   } catch (error) {
@@ -175,5 +182,8 @@ export async function query<T = unknown>(
 }
 
 export async function pingDb(): Promise<void> {
+  if (!pool) {
+    throw new DatabaseError('Database not configured', { status: 503 });
+  }
   await query('SELECT 1');
 }

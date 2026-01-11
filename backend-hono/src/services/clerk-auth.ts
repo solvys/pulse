@@ -11,9 +11,17 @@ class ClerkConfigError extends Error {
 type VerifyTokenParams = Parameters<typeof verifyToken>[1]
 type TokenPayload = Awaited<ReturnType<typeof verifyToken>>
 
-const buildVerifyOptions = (): VerifyTokenParams => {
+// Check if in development mode without Clerk
+const isDev = process.env.NODE_ENV !== 'production'
+const hasClerkSecret = Boolean(process.env.CLERK_SECRET_KEY)
+
+const buildVerifyOptions = (): VerifyTokenParams | null => {
   const secretKey = process.env.CLERK_SECRET_KEY
   if (!secretKey) {
+    if (isDev) {
+      console.warn('[Clerk] CLERK_SECRET_KEY not set - using mock auth in dev mode')
+      return null
+    }
     throw new ClerkConfigError('CLERK_SECRET_KEY is missing. Set it in Fly secrets.')
   }
 
@@ -58,6 +66,16 @@ export const verifyClerkToken = async (token: string): Promise<TokenPayload> => 
     throw new Error('Missing token')
   }
 
+  // Development mode: return mock payload
+  if (!verifyOptions) {
+    return {
+      sub: 'dev-user-123',
+      userId: 'dev-user-123',
+      iat: Math.floor(Date.now() / 1000),
+      exp: Math.floor(Date.now() / 1000) + 3600,
+    } as unknown as TokenPayload
+  }
+
   return retryWithBackoff(
     async () => verifyToken(token, verifyOptions),
     { label: 'clerk-verify', shouldRetry: shouldRetryClerk }
@@ -65,7 +83,8 @@ export const verifyClerkToken = async (token: string): Promise<TokenPayload> => 
 }
 
 export const clerkHealth = () => ({
-  hasSecret: Boolean(process.env.CLERK_SECRET_KEY),
+  hasSecret: hasClerkSecret,
+  mockMode: !hasClerkSecret && isDev,
   issuer: process.env.CLERK_JWT_ISSUER ?? null,
   template: process.env.CLERK_JWT_TEMPLATE ?? null
 })

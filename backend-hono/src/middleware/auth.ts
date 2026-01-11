@@ -28,6 +28,17 @@ export const authMiddleware = async (c: Context, next: Next) => {
   try {
     const payload = await verifyClerkToken(token);
     c.set('auth', payload);
+    // Extract userId for convenience (Clerk uses 'sub' or 'userId')
+    const userId = (payload as { userId?: string; sub?: string }).userId ||
+                   (payload as { sub?: string }).sub;
+    if (userId) {
+      c.set('userId', userId);
+    }
+    // Extract email if available
+    const email = (payload as { email?: string }).email;
+    if (email) {
+      c.set('email', email);
+    }
     return await next();
   } catch (error) {
     const name = error instanceof Error ? error.name : 'UnknownError';
