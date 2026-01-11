@@ -141,17 +141,26 @@ export async function listConversations(
     return { conversations: items, hasMore: all.length > limit }
   }
 
-  const archivedFilter = includeArchived ? sql`` : sql`AND is_archived = false`
-  
-  const result = await sql`
-    SELECT c.*, COUNT(m.id) as message_count, MAX(m.created_at) as last_message_at
-    FROM ai_conversations c
-    LEFT JOIN ai_messages m ON m.conversation_id = c.id
-    WHERE c.user_id = ${userId} ${archivedFilter}
-    GROUP BY c.id
-    ORDER BY c.updated_at DESC
-    LIMIT ${limit + 1}
-  `
+  // Use SQL condition directly - Neon doesn't support template fragment interpolation
+  const result = includeArchived
+    ? await sql`
+        SELECT c.*, COUNT(m.id) as message_count, MAX(m.created_at) as last_message_at
+        FROM ai_conversations c
+        LEFT JOIN ai_messages m ON m.conversation_id = c.id
+        WHERE c.user_id = ${userId}
+        GROUP BY c.id
+        ORDER BY c.updated_at DESC
+        LIMIT ${limit + 1}
+      `
+    : await sql`
+        SELECT c.*, COUNT(m.id) as message_count, MAX(m.created_at) as last_message_at
+        FROM ai_conversations c
+        LEFT JOIN ai_messages m ON m.conversation_id = c.id
+        WHERE c.user_id = ${userId} AND (c.is_archived = false OR c.is_archived IS NULL)
+        GROUP BY c.id
+        ORDER BY c.updated_at DESC
+        LIMIT ${limit + 1}
+      `
 
   const hasMore = result.length > limit
   const rows = result.slice(0, limit)
