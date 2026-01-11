@@ -11,6 +11,7 @@ import { analyzeHeadline, type AnalyzedHeadline } from '../analysis/grok-analyze
 import { calculateIVScore } from '../analysis/iv-scorer.js';
 import { broadcastLevel4 } from './sse-broadcaster.js';
 import * as newsCache from './news-cache.js';
+import { fetchEconomicFeed } from './economic-feed.js';
 import type { NewsSource as AnalysisNewsSource } from '../../types/news-analysis.js';
 
 const MAX_FEED_ITEMS = 50;
@@ -47,11 +48,12 @@ function tweetToFeedItem(tweet: ParsedTweetNews): FeedItem {
  */
 function mapToAnalysisSource(source: NewsSource): AnalysisNewsSource {
   const sourceMap: Record<NewsSource, AnalysisNewsSource> = {
-    'FinancialJuice': 'FinancialJuice',
-    'InsiderWire': 'InsiderWire',
-    'Reuters': 'Reuters',
-    'Bloomberg': 'Bloomberg',
-    'Custom': 'Custom',
+    FinancialJuice: 'FinancialJuice',
+    InsiderWire: 'InsiderWire',
+    EconomicCalendar: 'Custom',
+    TrendSpider: 'Custom',
+    Barchart: 'Custom',
+    Custom: 'Custom',
   };
   return sourceMap[source] ?? 'Custom';
 }
@@ -181,13 +183,24 @@ function applyFilters(items: FeedItem[], filters: FeedFilters): FeedItem[] {
 }
 
 /**
- * Fetch fresh feed from X API
+ * Fetch fresh feed from X API plus economic prints fallback
  */
 async function fetchFreshFeed(): Promise<FeedItem[]> {
   try {
     const xApiService = createXApiService();
-    const tweets = await xApiService.fetchLatestTweets();
-    return tweets.map(tweetToFeedItem);
+    const [tweets, econItems] = await Promise.all([
+      xApiService.fetchLatestTweets(),
+      fetchEconomicFeed(),
+    ]);
+
+    const tweetItems = tweets.map(tweetToFeedItem);
+
+    // Merge and dedupe by id
+    const merged = [...econItems, ...tweetItems].filter(
+      (item, idx, arr) => idx === arr.findIndex(i => i.id === item.id)
+    );
+
+    return merged;
   } catch (error) {
     console.error('[RiskFlow] X API fetch error:', error);
     return [];

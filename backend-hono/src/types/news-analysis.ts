@@ -1,8 +1,9 @@
 export type NewsSource =
   | 'FinancialJuice'
   | 'InsiderWire'
-  | 'Reuters'
-  | 'Bloomberg'
+  | 'EconomicCalendar'
+  | 'TrendSpider'
+  | 'Barchart'
   | 'Grok'
   | 'Custom'
 
