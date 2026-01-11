@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { FileText, Trash2 } from 'lucide-react';
 import { FeedItem as FeedItemType, IVIndicator } from '../../types/feed';
 import { useBackend } from '../../lib/backend';
@@ -7,6 +7,7 @@ import { FeedItem } from './FeedItem';
 import { NTNReportModal } from '../NTNReportModal';
 import { useSettings } from '../../contexts/SettingsContext';
 import { generateInitialFeed, generateMockFeedItem } from '../../utils/mockDataGenerator';
+import { useBreakingNews } from '../../hooks/useBreakingNews';
 
 // Convert RiskFlowItem to FeedItem format
 // Filters out raw/unprocessed data and ensures only interpreted messages are shown
@@ -142,10 +143,18 @@ export function FeedSection() {
     initializeNews();
 
     // Then fetch every 30 seconds (just refresh the list, don't sync every time)
-    const interval = setInterval(fetchNews, 30000);
+    const interval = setInterval(fetchNews, 15000);
 
     return () => clearInterval(interval);
   }, [backend, mockDataEnabled]);
+
+  const handleBreakingNews = useCallback((item: RiskFlowItem) => {
+    const converted = convertRiskFlowToFeedItem(item);
+    if (!converted) return;
+    setFeedItems((prev) => [converted, ...prev].slice(0, 50));
+  }, []);
+
+  useBreakingNews(handleBreakingNews);
 
   const handleClear = () => {
     if (confirm("Clear all tape items?")) {

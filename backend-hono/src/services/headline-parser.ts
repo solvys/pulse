@@ -10,6 +10,13 @@ const actionPattern =
   /(FED|ECB|BOE|BOJ|PBOC|POWELL|YELLEN|TREASURY|CONGRESS|CHINA|US|UK|EU|GERMANY|JAPAN|OPEC)\s+(raises|cuts|hikes|slashes|holds|signals|warns|confirms)\s+([\w\s%]+?)(?:\s+by\s+([\d.,]+)\s*(bps|%|points))?(?=$|\.)/i
 
 const symbolRegex = /\$[A-Z]{1,5}\b/g
+export const LEVEL4_EMOJIS = ['⚠️', '🔴']
+export const MAJOR_MACRO_PRINTS = ['cpiPrint', 'ppiPrint', 'nfpPrint', 'gdpPrint', 'fedDecision']
+
+export function hasLevel4Emoji(text: string): boolean {
+  return LEVEL4_EMOJIS.some((emoji) => text.includes(emoji))
+}
+
 const knownTickers = ['SPY', 'QQQ', 'ES', 'NQ', 'IWM', 'TLT', 'ZN', 'ZB', 'DXY', 'VIX', 'CL', 'GC', 'BTC', 'ETH']
 
 const defaultParsedHeadline = (text: string, source: NewsSource): ParsedHeadline => ({

@@ -12,6 +12,7 @@ import {
   handleUpdateWatchlist,
   handleAddSymbols,
   handleRemoveSymbols,
+  handleBreakingStream,
 } from './handlers.js';
 
 export function createRiskFlowRoutes(): Hono {
@@ -22,6 +23,9 @@ export function createRiskFlowRoutes(): Hono {
 
   // GET /api/riskflow/breaking - Get breaking news only
   router.get('/breaking', handleGetBreaking);
+
+  // GET /api/riskflow/stream - Level 4 SSE updates
+  router.get('/stream', handleBreakingStream);
 
   // GET /api/riskflow/preload - Pre-load 15 tweets, last 48h, level 3+
   router.get('/preload', handlePreload);

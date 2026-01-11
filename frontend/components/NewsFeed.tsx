@@ -1,10 +1,11 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { useBackend } from "../lib/backend";
 import { useSettings } from "../contexts/SettingsContext";
 import type { RiskFlowItem } from "../types/api";
 import { TrendingUp, AlertTriangle, Info } from "lucide-react";
 import { Button } from "./ui/Button";
 import { IVScoreCard } from "./IVScoreCard";
+import { useBreakingNews } from "../hooks/useBreakingNews";
 
 export default function NewsFeed() {
   const backend = useBackend();
@@ -34,13 +35,19 @@ export default function NewsFeed() {
     prevSymbolRef.current = currentSymbol;
     loadRiskFlow(currentSymbol);
 
-    // Set up 30s polling
+    // Set up 15s polling
     const interval = setInterval(() => {
       loadRiskFlow(currentSymbol);
-    }, 30000);
+    }, 15000);
 
     return () => clearInterval(interval);
   }, [selectedSymbol.symbol]);
+
+  const handleBreakingNews = useCallback((item: RiskFlowItem) => {
+    setRiskflow((prev) => [item, ...prev].slice(0, 15));
+  }, []);
+
+  useBreakingNews(handleBreakingNews);
 
   const loadRiskFlow = async (symbol?: string) => {
     if (isLoading) return;

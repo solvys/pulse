@@ -9,6 +9,7 @@ import { createXApiService, type ParsedTweetNews } from '../x-api-service.js';
 import { getWatchlist, matchesWatchlist } from './watchlist-service.js';
 import { analyzeHeadline, type AnalyzedHeadline } from '../analysis/grok-analyzer.js';
 import { calculateIVScore } from '../analysis/iv-scorer.js';
+import { broadcastLevel4 } from './sse-broadcaster.js';
 import * as newsCache from './news-cache.js';
 import type { NewsSource as AnalysisNewsSource } from '../../types/news-analysis.js';
 
@@ -20,7 +21,7 @@ const ENABLE_AI_ANALYSIS = process.env.ENABLE_AI_ANALYSIS !== 'false';
 
 // In-memory cache (short-term) - DB cache is primary
 let feedCache: { items: FeedItem[]; fetchedAt: number } | null = null;
-const CACHE_TTL_MS = 60_000; // 1 minute (for in-memory)
+const CACHE_TTL_MS = 15_000; // 15 seconds (in-memory cache)
 const FETCH_INTERVAL_MS = 5 * 60_000; // 5 minutes between X API calls
 let lastXApiFetch: number = 0;
 
@@ -70,27 +71,25 @@ async function enrichWithAnalysis(item: FeedItem): Promise<FeedItem> {
       timestamp: new Date(item.publishedAt),
     });
 
-    return {
+    const enriched = {
       ...item,
-      // Merge symbols from analysis if more comprehensive
-      symbols: analyzed.parsed.symbols.length > item.symbols.length 
-        ? analyzed.parsed.symbols 
+      symbols: analyzed.parsed.symbols.length > item.symbols.length
+        ? analyzed.parsed.symbols
         : item.symbols,
-      // Merge tags
       tags: [...new Set([...item.tags, ...analyzed.parsed.tags])],
-      // Use analysis breaking status if different
       isBreaking: item.isBreaking || analyzed.parsed.isBreaking,
-      // Use analysis urgency if higher priority
       urgency: getHigherUrgency(item.urgency, analyzed.parsed.urgency),
-      // Add sentiment
       sentiment: ivResult.sentiment as SentimentDirection,
-      // Add IV score
       ivScore: ivResult.score,
-      // Add macro level (1-4)
       macroLevel: ivResult.macroLevel as MacroLevel,
-      // Add analyzed timestamp
       analyzedAt: new Date().toISOString(),
     };
+
+    if (enriched.macroLevel === 4) {
+      broadcastLevel4(enriched);
+    }
+
+    return enriched;
   } catch (error) {
     console.error('[RiskFlow] Analysis enrichment failed for item:', item.id, error);
     return item;

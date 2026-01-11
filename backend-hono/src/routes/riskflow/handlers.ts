@@ -6,6 +6,7 @@
 import type { Context } from 'hono';
 import * as feedService from '../../services/riskflow/feed-service.js';
 import * as watchlistService from '../../services/riskflow/watchlist-service.js';
+import { addClient, removeClient } from '../../services/riskflow/sse-broadcaster.js';
 import type { FeedFilters, WatchlistUpdateRequest, NewsSource } from '../../types/riskflow.js';
 
 /**
@@ -189,4 +190,42 @@ export async function handleRemoveSymbols(c: Context) {
     console.error('[RiskFlow] Remove symbols error:', error);
     return c.json({ error: 'Failed to remove symbols' }, 500);
   }
+}
+
+/**
+ * GET /api/riskflow/stream
+ * SSE stream for Level 4 alerts
+ */
+export async function handleBreakingStream(c: Context) {
+  const userId = c.get('userId') || 'anonymous';
+  let heartbeatId: ReturnType<typeof setInterval> | null = null;
+
+  const stream = new ReadableStream({
+    start(controller) {
+      addClient(controller, userId);
+      heartbeatId = setInterval(() => {
+        try {
+          controller.enqueue(new TextEncoder().encode(': heartbeat\n\n'));
+        } catch (error) {
+          console.warn('[SSE] Heartbeat failed, closing stream', error);
+          heartbeatId && clearInterval(heartbeatId);
+          removeClient(controller);
+        }
+      }, 30000);
+    },
+    cancel(controller) {
+      if (heartbeatId) {
+        clearInterval(heartbeatId);
+      }
+      removeClient(controller);
+    },
+  });
+
+  return new Response(stream, {
+    headers: {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache',
+      Connection: 'keep-alive',
+    },
+  });
 }

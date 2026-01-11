@@ -5,6 +5,7 @@
  */
 
 import type { ParsedHeadline, HotPrint, IVScoreResult } from '../../types/news-analysis.js'
+import { hasLevel4Emoji, MAJOR_MACRO_PRINTS } from '../headline-parser.js'
 
 // Base impact weights by event type
 const EVENT_WEIGHTS: Record<string, number> = {
@@ -151,7 +152,7 @@ export function calculateIVScore(input: IVScoreInput): ExtendedIVScore {
   const { es, nq } = scoreToPoints(score)
 
   // Determine macro level (1-4 scale)
-  const macroLevel = calculateMacroLevel(score, parsed.isBreaking, hotPrint)
+  const macroLevel = calculateMacroLevel(score, parsed, hotPrint)
 
   // Determine sentiment
   const sentiment = determineSentiment(parsed, hotPrint)
@@ -213,10 +214,13 @@ function scoreToPoints(score: number): { es: number; nq: number } {
  */
 function calculateMacroLevel(
   score: number,
-  isBreaking: boolean,
+  parsed: ParsedHeadline,
   hotPrint: HotPrint | null | undefined
 ): 1 | 2 | 3 | 4 {
-  if (isBreaking || hotPrint?.impact === 'high' || score >= 8) return 4
+  const hasEmoji = hasLevel4Emoji(parsed.raw)
+  const isMajorPrint = MAJOR_MACRO_PRINTS.includes(parsed.eventType ?? '')
+
+  if (hasEmoji || isMajorPrint) return 4
   if (hotPrint?.impact === 'medium' || score >= 6) return 3
   if (score >= 4) return 2
   return 1
