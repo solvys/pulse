@@ -225,22 +225,36 @@ export class RiskFlowService {
     try {
       const response = await this.client.get<{ items?: any[]; total?: number; hasMore?: boolean; fetchedAt?: string; error?: string }>(endpoint);
       
+      // Check if response is actually an object or if it's empty
+      if (!response || typeof response !== 'object' || Object.keys(response).length === 0) {
+        console.error(`[RiskFlowService] Response is empty or invalid:`, response);
+        console.error(`[RiskFlowService] Response type:`, typeof response);
+        console.error(`[RiskFlowService] Response keys:`, response ? Object.keys(response) : 'null/undefined');
+        return {
+          items: [],
+          total: 0,
+        };
+      }
+      
       console.log(`[RiskFlowService] Raw response:`, {
         hasItems: !!response.items,
         itemsLength: response.items?.length ?? 0,
         total: response.total,
         hasMore: response.hasMore,
         hasError: !!response.error,
-        error: response.error
+        error: response.error,
+        responseKeys: Object.keys(response),
+        responseType: typeof response
       });
       
       // Backend returns { items: FeedItem[], total: number, hasMore: boolean, fetchedAt: string }
-      const items = response.items || [];
+      const items = Array.isArray(response.items) ? response.items : [];
       
       console.log(`[RiskFlowService] Received ${items.length} items from backend (total: ${response.total ?? 0})`);
       if (items.length === 0) {
         console.warn(`[RiskFlowService] Empty response from backend - check database cache and filters`);
         console.warn(`[RiskFlowService] Full response object:`, JSON.stringify(response, null, 2));
+        console.warn(`[RiskFlowService] Response.items type:`, typeof response.items, Array.isArray(response.items));
       }
 
       // Transform backend FeedItem to frontend RiskFlowItem format

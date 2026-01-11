@@ -173,10 +173,19 @@ class ApiClient {
         // Handle empty responses
         const contentType = response.headers.get('content-type');
         if (!contentType || !contentType.includes('application/json')) {
+          console.warn(`[API] Unexpected content-type: ${contentType} for ${endpoint}, returning empty object`);
+          console.warn(`[API] Response status: ${response.status}, headers:`, Object.fromEntries(response.headers.entries()));
           return {} as T;
         }
 
-        return await response.json();
+        const jsonData = await response.json();
+        console.log(`[API] Response for ${endpoint}:`, {
+          status: response.status,
+          contentType,
+          dataKeys: Object.keys(jsonData),
+          dataType: typeof jsonData
+        });
+        return jsonData;
       } catch (error) {
         const isApiError = error && typeof error === 'object' && 'code' in error;
         if (!isApiError && attempt < MAX_RETRIES) {
