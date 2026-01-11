@@ -212,38 +212,50 @@ export class RiskFlowService {
     const query = new URLSearchParams();
     if (params?.limit) query.append('limit', params.limit.toString());
     if (params?.offset) query.append('offset', params.offset.toString());
-    if (params?.symbol) query.append('symbol', params.symbol);
+    if (params?.symbol) query.append('symbols', params.symbol); // Backend expects 'symbols' not 'symbol'
 
     const queryString = query.toString();
     const endpoint = `/api/riskflow/feed${queryString ? `?${queryString}` : ''}`;
     try {
-      const response = await this.client.get<{ articles?: any[] }>(endpoint);
-      // Handle both response formats: { articles: [...] } or { items: [...] }
-      const articles = response.articles || (response as any).items || [];
+      const response = await this.client.get<{ items?: any[]; total?: number }>(endpoint);
+      
+      // Backend returns { items: FeedItem[], total: number, hasMore: boolean, fetchedAt: string }
+      const items = response.items || [];
 
-      // Transform backend response to match frontend expectations
+      // Transform backend FeedItem to frontend RiskFlowItem format
       return {
-        items: (Array.isArray(articles) ? articles : []).map(article => ({
-          id: article.id?.toString() || '',
-          title: article.title || '',
-          content: article.summary || article.content || '',
-          source: article.source || '',
-          url: article.url,
-          publishedAt: article.publishedAt || article.published_at || new Date(),
-          impact: article.ivImpact || article.iv_impact
-            ? (article.ivImpact || article.iv_impact) > 7 ? 'high'
-              : (article.ivImpact || article.iv_impact) > 4 ? 'medium'
-                : 'low'
-            : undefined,
-          symbols: article.symbols || [],
-          sentiment: article.sentiment,
-          ivScore: article.ivImpact || article.iv_impact || 0,
-          category: article.category || article.source || '',
-        })),
-        total: Array.isArray(articles) ? articles.length : 0,
+        items: items.map((item: any) => {
+          // Backend uses 'headline', frontend expects 'title'
+          // Backend uses 'body', frontend expects 'content'
+          // Backend uses 'ivScore', frontend expects 'ivScore' (same)
+          // Backend uses 'macroLevel', frontend expects 'macroLevel' (same)
+          const ivScore = item.ivScore ?? 0;
+          const macroLevel = item.macroLevel ?? 1;
+          
+          return {
+            id: item.id?.toString() || '',
+            title: item.headline || item.title || '', // Map headline to title
+            content: item.body || item.content || '', // Map body to content
+            summary: item.body || item.content || '', // Also set summary for compatibility
+            source: item.source || '',
+            url: item.url,
+            publishedAt: item.publishedAt || item.published_at || new Date().toISOString(),
+            impact: ivScore > 7 ? 'high' : ivScore > 4 ? 'medium' : 'low',
+            symbols: item.symbols || [],
+            sentiment: item.sentiment || 'neutral',
+            ivScore: ivScore,
+            ivImpact: ivScore, // Also set ivImpact for backward compatibility
+            macroLevel: macroLevel,
+            isBreaking: item.isBreaking || false,
+            category: item.source || '',
+            tags: item.tags || [],
+            urgency: item.urgency || 'normal',
+          };
+        }),
+        total: response.total ?? items.length,
       };
     } catch (error: any) {
-      console.error('Failed to fetch RiskFlow:', error);
+      console.error('[RiskFlowService] Failed to fetch RiskFlow:', error);
       // Return empty response on error
       return {
         items: [],
