@@ -4,7 +4,7 @@ export type NewsSource =
   | 'EconomicCalendar'
   | 'TrendSpider'
   | 'Barchart'
-  | 'Grok'
+  | 'Polymarket'
   | 'Custom'
 
 export type UrgencyLevel = 'immediate' | 'high' | 'normal'

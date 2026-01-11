@@ -3,7 +3,7 @@
  * Type definitions for RiskFlow news feed
  */
 
-export type NewsSource = 'FinancialJuice' | 'InsiderWire' | 'EconomicCalendar' | 'TrendSpider' | 'Barchart' | 'Custom';
+export type NewsSource = 'FinancialJuice' | 'InsiderWire' | 'EconomicCalendar' | 'TrendSpider' | 'Barchart' | 'Polymarket' | 'Custom';
 export type UrgencyLevel = 'immediate' | 'high' | 'normal';
 export type SentimentDirection = 'bullish' | 'bearish' | 'neutral';
 
