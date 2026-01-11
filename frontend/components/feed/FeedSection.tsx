@@ -7,7 +7,7 @@ import { FeedItem } from './FeedItem';
 import { NTNReportModal } from '../NTNReportModal';
 import { useSettings } from '../../contexts/SettingsContext';
 import { generateInitialFeed, generateMockFeedItem } from '../../utils/mockDataGenerator';
-import { useBreakingNews } from '../../hooks/useBreakingNews';
+import { useRiskFlow } from '../../hooks/useRiskFlow';
 
 // Convert RiskFlowItem to FeedItem format
 // Filters out raw/unprocessed data and ensures only interpreted messages are shown
@@ -154,7 +154,7 @@ export function FeedSection() {
     setFeedItems((prev) => [converted, ...prev].slice(0, 50));
   }, []);
 
-  useBreakingNews(handleBreakingNews);
+  useRiskFlow(handleBreakingNews);
 
   const handleClear = () => {
     if (confirm("Clear all tape items?")) {

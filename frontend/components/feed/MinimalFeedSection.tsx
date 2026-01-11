@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { FeedItem as FeedItemType, IVIndicator } from '../../types/feed';
 import { useBackend } from '../../lib/backend';
 import type { RiskFlowItem } from '../../types/api';
-import { useBreakingNews } from '../../hooks/useBreakingNews';
+import { useRiskFlow } from '../../hooks/useRiskFlow';
 import { FeedItem } from './FeedItem';
 import { MoveLeft, MoveRight, GripVertical, X, ChevronLeft, ChevronRight } from 'lucide-react';
 import { PanelPosition } from '../layout/DraggablePanel';
@@ -135,7 +135,7 @@ export function MinimalFeedSection({
     setUnreadCount((prev) => prev + 1);
   }, []);
 
-  useBreakingNews(handleBreakingNews);
+  useRiskFlow(handleBreakingNews);
 
   // Mark as read when panel is opened
   useEffect(() => {

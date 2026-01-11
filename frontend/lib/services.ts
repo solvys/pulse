@@ -221,6 +221,11 @@ export class RiskFlowService {
       
       // Backend returns { items: FeedItem[], total: number, hasMore: boolean, fetchedAt: string }
       const items = response.items || [];
+      
+      console.log(`[RiskFlowService] Received ${items.length} items from backend (total: ${response.total ?? 0})`);
+      if (items.length === 0) {
+        console.warn(`[RiskFlowService] Empty response from backend - check database cache and filters`);
+      }
 
       // Transform backend FeedItem to frontend RiskFlowItem format
       return {

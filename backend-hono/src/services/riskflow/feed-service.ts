@@ -375,13 +375,17 @@ async function getCachedFeed(): Promise<FeedItem[]> {
 /**
  * Get feed with user watchlist applied
  * Default: Only returns macroLevel 3+ (high importance headlines)
+ * If no items found with minMacroLevel 3+, falls back to all items (for initial load)
  */
 export async function getFeed(userId: string, filters?: FeedFilters): Promise<FeedResponse> {
   const allItems = await getCachedFeed();
+  console.log(`[RiskFlow] getFeed: ${allItems.length} total items from cache`);
+  
   const watchlist = getWatchlist(userId);
 
   // Apply watchlist filtering
   let items = allItems.filter(item => matchesWatchlist(watchlist, item));
+  console.log(`[RiskFlow] After watchlist filter: ${items.length} items`);
 
   // Default to macroLevel 3+ (high importance only)
   const effectiveFilters: FeedFilters = {
@@ -391,6 +395,15 @@ export async function getFeed(userId: string, filters?: FeedFilters): Promise<Fe
 
   // Apply filters (including macroLevel)
   items = applyFilters(items, effectiveFilters);
+  console.log(`[RiskFlow] After filters (minMacroLevel: ${effectiveFilters.minMacroLevel}): ${items.length} items`);
+  
+  // If no items with minMacroLevel 3+, fall back to all items (for initial load)
+  if (items.length === 0 && effectiveFilters.minMacroLevel === 3 && !filters?.minMacroLevel) {
+    console.log(`[RiskFlow] No level 3+ items found, falling back to all items`);
+    const fallbackItems = allItems.filter(item => matchesWatchlist(watchlist, item));
+    items = applyFilters(fallbackItems, { ...effectiveFilters, minMacroLevel: 1 });
+    console.log(`[RiskFlow] Fallback items: ${items.length}`);
+  }
 
   // Sort by macro level (highest first), then by published date
   items.sort((a, b) => {

@@ -8,7 +8,7 @@ import * as feedService from '../../services/riskflow/feed-service.js';
 import * as watchlistService from '../../services/riskflow/watchlist-service.js';
 import { addClient, removeClient } from '../../services/riskflow/sse-broadcaster.js';
 import { corsConfig } from '../../config/cors.js';
-import type { FeedFilters, WatchlistUpdateRequest, NewsSource } from '../../types/riskflow.js';
+import type { FeedFilters, WatchlistUpdateRequest, NewsSource, MacroLevel } from '../../types/riskflow.js';
 
 /**
  * Internal function to trigger feed pre-fetching
@@ -73,7 +73,23 @@ export async function handleGetFeed(c: Context) {
       filters.limit = parseInt(limit, 10);
     }
 
+    // Allow override of minMacroLevel via query param (for debugging/fallback)
+    const minMacroLevel = c.req.query('minMacroLevel');
+    if (minMacroLevel) {
+      const level = parseInt(minMacroLevel, 10);
+      if (level >= 1 && level <= 4) {
+        filters.minMacroLevel = level as MacroLevel;
+      }
+    }
+
     const feed = await feedService.getFeed(userId, filters);
+    
+    // Log feed response for debugging
+    console.log(`[RiskFlow] Feed response for user ${userId}: ${feed.items.length} items (total: ${feed.total}, hasMore: ${feed.hasMore})`);
+    if (feed.items.length === 0) {
+      console.warn(`[RiskFlow] Empty feed returned - check database cache and filters`);
+    }
+    
     return c.json(feed);
   } catch (error) {
     console.error('[RiskFlow] Feed error:', error);

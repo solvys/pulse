@@ -2,14 +2,18 @@ import { useEffect, useRef } from 'react'
 import { useAuth } from '@clerk/clerk-react'
 import type { RiskFlowItem } from '../types/api'
 
-export function useBreakingNews(onBreaking: (item: RiskFlowItem) => void) {
+/**
+ * useRiskFlow Hook
+ * Connects to RiskFlow SSE stream for real-time Level 4 news alerts
+ */
+export function useRiskFlow(onItem: (item: RiskFlowItem) => void) {
   const sourceRef = useRef<EventSource | null>(null)
   const { getToken, isSignedIn } = useAuth()
 
   useEffect(() => {
     // Don't connect if user is not signed in
     if (!isSignedIn) {
-      console.warn('[BreakingNews] User not signed in, skipping SSE connection')
+      console.warn('[RiskFlow] User not signed in, skipping SSE connection')
       return
     }
 
@@ -21,7 +25,7 @@ export function useBreakingNews(onBreaking: (item: RiskFlowItem) => void) {
         const token = await getToken({ template: 'neon' }) || await getToken()
         
         if (!token) {
-          console.warn('[BreakingNews] No auth token available, skipping SSE connection')
+          console.warn('[RiskFlow] No auth token available, skipping SSE connection')
           return
         }
 
@@ -35,7 +39,7 @@ export function useBreakingNews(onBreaking: (item: RiskFlowItem) => void) {
         sourceRef.current = source
 
         source.onopen = () => {
-          console.log('[BreakingNews] SSE connection opened')
+          console.log('[RiskFlow] SSE connection opened')
         }
 
         source.onmessage = (event) => {
@@ -45,21 +49,21 @@ export function useBreakingNews(onBreaking: (item: RiskFlowItem) => void) {
               return
             }
             const item = JSON.parse(event.data) as RiskFlowItem
-            onBreaking(item)
+            onItem(item)
           } catch (error) {
-            console.warn('[BreakingNews] Failed to parse SSE payload', error)
+            console.warn('[RiskFlow] Failed to parse SSE payload', error)
           }
         }
 
         source.onerror = (event) => {
-          console.warn('[BreakingNews] SSE error, letting browser retry', event)
+          console.warn('[RiskFlow] SSE error, letting browser retry', event)
           // EventSource will automatically retry, but we can log the state
           if (source.readyState === EventSource.CLOSED) {
-            console.warn('[BreakingNews] SSE connection closed, will retry automatically')
+            console.warn('[RiskFlow] SSE connection closed, will retry automatically')
           }
         }
       } catch (error) {
-        console.error('[BreakingNews] Failed to establish SSE connection', error)
+        console.error('[RiskFlow] Failed to establish SSE connection', error)
       }
     }
 
@@ -72,5 +76,8 @@ export function useBreakingNews(onBreaking: (item: RiskFlowItem) => void) {
         sourceRef.current = null
       }
     }
-  }, [onBreaking, getToken, isSignedIn])
+  }, [onItem, getToken, isSignedIn])
 }
+
+// Backward compatibility alias
+export const useBreakingNews = useRiskFlow
