@@ -309,8 +309,8 @@
   CLERK_SECRET_KEY=
   PROJECTX_API_KEY=
   PROJECTX_USERNAME=
-  X_API_KEY=
-  X_API_SECRET=
+  X_API_BEARER_TOKEN=
+  X_API_BASE_URL=https://api.twitter.com/2
   REDIS_URL=
   ```
 - [ ] Run database migrations
