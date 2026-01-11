@@ -116,9 +116,9 @@ const getPrimaryProvider = (): AiProviderType => {
 
 const enableProviderFallback = getEnv('AI_ENABLE_PROVIDER_FALLBACK') !== 'false'
 
-// Default to groq since it doesn't require a separate API key
-// Change to 'grok' once XAI_API_KEY is configured on Fly.io
-const defaultModel = resolveModelKey(getEnv('AI_DEFAULT_MODEL')) ?? 'groq'
+// Default to openrouter-llama since Vercel AI Gateway is not working
+// OpenRouter is available and configured
+const defaultModel = resolveModelKey(getEnv('AI_DEFAULT_MODEL')) ?? 'openrouter-llama'
 
 export const defaultAiConfig: AiConfig = {
   models: {

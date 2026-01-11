@@ -126,7 +126,8 @@ export async function handleChat(c: Context) {
 async function generateAiResponse(
   modelKey: string,
   message: string,
-  history: { role: 'user' | 'assistant'; content: string }[]
+  history: { role: 'user' | 'assistant'; content: string }[],
+  triedModels: Set<string> = new Set()
 ): Promise<{
   content: string
   inputTokens?: number
@@ -134,6 +135,12 @@ async function generateAiResponse(
   totalTokens?: number
   costUsd?: number
 }> {
+  // Prevent infinite loop - track which models we've tried
+  if (triedModels.has(modelKey)) {
+    throw new Error(`All fallback models exhausted. Tried: ${Array.from(triedModels).join(', ')}`)
+  }
+  triedModels.add(modelKey)
+
   const systemPrompt = defaultAiConfig.systemPrompt ?? 'You are a helpful AI trading assistant.'
   
   const messages = [
@@ -170,12 +177,16 @@ async function generateAiResponse(
       costUsd,
     }
   } catch (error) {
-    // Try fallback model
-    const fallback = getFallbackModel(modelKey as Parameters<typeof getFallbackModel>[0])
+    console.error(`[AI Chat] Model ${modelKey} failed:`, error instanceof Error ? error.message : error)
     
-    if (fallback) {
-      console.warn(`[AI Chat] Primary model ${modelKey} failed, trying fallback ${fallback.model}`)
-      return generateAiResponse(fallback.model, message, history)
+    // Try fallback model (only if we haven't exhausted all options)
+    if (triedModels.size < 5) {
+      const fallback = getFallbackModel(modelKey as Parameters<typeof getFallbackModel>[0])
+      
+      if (fallback && !triedModels.has(fallback.model)) {
+        console.warn(`[AI Chat] Trying fallback ${fallback.model}`)
+        return generateAiResponse(fallback.model, message, history, triedModels)
+      }
     }
 
     throw error
