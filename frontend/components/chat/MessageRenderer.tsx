@@ -13,6 +13,9 @@ interface MessageRendererProps {
 export function MessageRenderer({ content, onRenderWidget }: MessageRendererProps) {
     const [isThinkingExpanded, setIsThinkingExpanded] = useState(false);
 
+    // Handle undefined or empty content
+    const safeContent = content || '';
+
     // Parse content to separate "thinking" block from response
     // Assuming a format where thinking is potentially enclosed in <thinking> tags
     // or detecting "Thinking..." patterns. 
@@ -22,9 +25,9 @@ export function MessageRenderer({ content, onRenderWidget }: MessageRendererProp
     // <thought>...</thought>
     // Let's support that pattern.
 
-    const thoughtMatch = content.match(/<thought>([\s\S]*?)<\/thought>/);
+    const thoughtMatch = safeContent.match(/<thought>([\s\S]*?)<\/thought>/);
     const thoughtContent = thoughtMatch ? thoughtMatch[1] : null;
-    const mainContent = thoughtMatch ? content.replace(thoughtMatch[0], '') : content;
+    const mainContent = thoughtMatch ? safeContent.replace(thoughtMatch[0], '') : safeContent;
 
     // If no explicit tag, maybe look for terms at start? 
     // Ideally backend should structure this. 
