@@ -325,51 +325,72 @@ async function getCachedFeed(): Promise<FeedItem[]> {
     limit: MAX_FEED_ITEMS, 
     hoursBack: 48 
   });
+  
+  console.log(`[RiskFlow] getCachedFeed: Found ${dbItems.length} items in database cache`);
 
   // Check if we need to fetch fresh data from X API
   const shouldFetchFresh = Date.now() - lastXApiFetch >= FETCH_INTERVAL_MS;
+  const isDatabaseEmpty = dbItems.length === 0;
 
-  if (dbItems.length >= 15 && !shouldFetchFresh) {
-    // Use database cache
-    feedCache = { items: dbItems, fetchedAt: Date.now() };
-    return dbItems;
+  // If database is empty or we have < 15 items, always fetch fresh
+  if (isDatabaseEmpty || dbItems.length < 15 || shouldFetchFresh) {
+    console.log(`[RiskFlow] Fetching fresh data from X API (empty: ${isDatabaseEmpty}, count: ${dbItems.length}, shouldFetch: ${shouldFetchFresh})...`);
+    lastXApiFetch = Date.now();
+    
+    const rawItems = await fetchFreshFeed();
+    console.log(`[RiskFlow] Fetched ${rawItems.length} raw items from X API`);
+
+    // If fetch failed and we have database items, use them
+    if (rawItems.length === 0 && dbItems.length > 0) {
+      console.log(`[RiskFlow] X API fetch failed, using ${dbItems.length} items from database cache`);
+      feedCache = { items: dbItems, fetchedAt: Date.now() };
+      return dbItems;
+    }
+
+    // If fetch failed and database is empty, return empty (or use mock in dev)
+    if (rawItems.length === 0 && dbItems.length === 0) {
+      console.warn(`[RiskFlow] No items from X API and database is empty`);
+      if (isDev) {
+        // In dev, generate mock data if everything fails
+        const mockItems = generateMockFeed();
+        const enrichedItems = await enrichFeedWithAnalysis(mockItems);
+        feedCache = { items: enrichedItems, fetchedAt: Date.now() };
+        return enrichedItems;
+      }
+      return [];
+    }
+
+    // Check which items are already in cache
+    const existingIds = await newsCache.getCachedTweetIds(rawItems.map(i => i.id));
+    const newItems = rawItems.filter(item => !existingIds.has(item.id));
+
+    console.log(`[RiskFlow] ${newItems.length} new items to analyze (${existingIds.size} already cached)`);
+
+    // Only analyze new items
+    let enrichedNewItems: FeedItem[] = [];
+    if (newItems.length > 0) {
+      enrichedNewItems = await enrichFeedWithAnalysis(newItems);
+      // Store new items in database
+      await newsCache.storeFeedItems(enrichedNewItems);
+      console.log(`[RiskFlow] Stored ${enrichedNewItems.length} enriched items in database`);
+    }
+
+    // Merge new items with existing database items
+    const allItems = [...enrichedNewItems, ...dbItems]
+      .filter((item, index, self) => 
+        index === self.findIndex(i => i.id === item.id)
+      )
+      .slice(0, MAX_FEED_ITEMS);
+
+    feedCache = { items: allItems, fetchedAt: Date.now() };
+    console.log(`[RiskFlow] Returning ${allItems.length} total items (${enrichedNewItems.length} new, ${dbItems.length} cached)`);
+    return allItems;
   }
 
-  // Fetch fresh data from X API
-  console.log('[RiskFlow] Fetching fresh data from X API...');
-  lastXApiFetch = Date.now();
-  
-  const rawItems = await fetchFreshFeed();
-
-  // If fetch failed, use database cache
-  if (rawItems.length === 0 && dbItems.length > 0) {
-    feedCache = { items: dbItems, fetchedAt: Date.now() };
-    return dbItems;
-  }
-
-  // Check which items are already in cache
-  const existingIds = await newsCache.getCachedTweetIds(rawItems.map(i => i.id));
-  const newItems = rawItems.filter(item => !existingIds.has(item.id));
-
-  console.log(`[RiskFlow] ${newItems.length} new items to analyze (${existingIds.size} already cached)`);
-
-  // Only analyze new items
-  let enrichedNewItems: FeedItem[] = [];
-  if (newItems.length > 0) {
-    enrichedNewItems = await enrichFeedWithAnalysis(newItems);
-    // Store new items in database
-    await newsCache.storeFeedItems(enrichedNewItems);
-  }
-
-  // Merge new items with existing database items
-  const allItems = [...enrichedNewItems, ...dbItems]
-    .filter((item, index, self) => 
-      index === self.findIndex(i => i.id === item.id)
-    )
-    .slice(0, MAX_FEED_ITEMS);
-
-  feedCache = { items: allItems, fetchedAt: Date.now() };
-  return allItems;
+  // Use database cache (we have enough items and don't need to fetch)
+  console.log(`[RiskFlow] Using ${dbItems.length} items from database cache (no fresh fetch needed)`);
+  feedCache = { items: dbItems, fetchedAt: Date.now() };
+  return dbItems;
 }
 
 /**
