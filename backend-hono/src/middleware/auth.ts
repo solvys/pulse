@@ -1,5 +1,4 @@
 import type { Context, Next } from 'hono';
-import type { Context, Next } from 'hono';
 import { ClerkConfigError, verifyClerkToken } from '../services/clerk-auth.js';
 
 const getBearerToken = (c: Context) => {

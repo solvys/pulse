@@ -1,4 +1,4 @@
-import { verifyToken, type VerifyTokenOptions, type TokenPayload } from '@clerk/backend'
+import { verifyToken } from '@clerk/backend'
 import { retryWithBackoff } from '../middleware/auth-retry.js'
 
 class ClerkConfigError extends Error {
@@ -8,13 +8,16 @@ class ClerkConfigError extends Error {
   }
 }
 
-const buildVerifyOptions = (): VerifyTokenOptions => {
+type VerifyTokenParams = Parameters<typeof verifyToken>[1]
+type TokenPayload = Awaited<ReturnType<typeof verifyToken>>
+
+const buildVerifyOptions = (): VerifyTokenParams => {
   const secretKey = process.env.CLERK_SECRET_KEY
   if (!secretKey) {
     throw new ClerkConfigError('CLERK_SECRET_KEY is missing. Set it in Fly secrets.')
   }
 
-  const options: VerifyTokenOptions = {
+  const options: Record<string, unknown> = {
     secretKey,
     clockSkewInMs: Number.parseInt(process.env.CLERK_CLOCK_SKEW_MS ?? '5000', 10)
   }
@@ -32,7 +35,7 @@ const buildVerifyOptions = (): VerifyTokenOptions => {
     options.authorizedParties = [process.env.CLERK_JWT_AUTHORIZED_PARTY]
   }
 
-  return options
+  return options as VerifyTokenParams
 }
 
 const verifyOptions = buildVerifyOptions()

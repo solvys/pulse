@@ -1,5 +1,6 @@
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
+import type { ContentfulStatusCode } from 'hono/utils/http-status';
 import { serve } from '@hono/node-server';
 import { createAiChatRoutes } from './routes/ai-chat.js';
 import { createPsychAssistRoutes } from './routes/psych-assist.js';
@@ -38,7 +39,8 @@ const buildRequestId = () => {
 
 app.get('/health', async (c) => {
   const health = await healthService.checkAll();
-  const statusCode = health.status === 'ok' ? 200 : health.status === 'degraded' ? 207 : 503;
+  const statusCode: ContentfulStatusCode =
+    health.status === 'ok' ? 200 : health.status === 'degraded' ? 207 : 503;
   return c.json(health, statusCode);
 });
 
@@ -49,7 +51,7 @@ app.route('/api/agents', createAnalystRoutes());
 app.onError((err, c) => {
   const requestId = c.req.header('x-request-id') ?? buildRequestId();
   const status =
-    (err as { status?: number }).status ?? (err as { statusCode?: number }).statusCode ?? 500;
+    ((err as { status?: number }).status ?? (err as { statusCode?: number }).statusCode ?? 500) as ContentfulStatusCode;
 
   console.error('[api] unhandled error', {
     requestId,

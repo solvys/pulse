@@ -1,4 +1,4 @@
-import type { ParsedHeadline, NewsSource, UrgencyLevel } from '../types/news-analysis.js'
+import type { ParsedHeadline, NewsSource, UrgencyLevel, MarketDirection } from '../types/news-analysis.js'
 
 const breakingPatterns = [/^BREAKING[:\s-]/i, /^JUST IN[:\s-]/i, /^ALERT[:\s-]/i, /^URGENT[:\s-]/i]
 const econDataPatterns = [
@@ -78,12 +78,20 @@ const parseActionStatement = (text: string) => {
   }
 }
 
-const inferMarketReaction = (text: string) => {
+const inferMarketReaction = (
+  text: string
+): { direction: MarketDirection; intensity: 'mild' | 'moderate' | 'severe' } | undefined => {
   if (/markets?\s+(?:tumble|drop|sell off|sink|slide)/i.test(text)) {
-    return { direction: 'down' as const, intensity: /tumble|plunge|crash/i.test(text) ? 'severe' : 'moderate' }
+    return {
+      direction: 'down',
+      intensity: /tumble|plunge|crash/i.test(text) ? 'severe' : 'moderate'
+    }
   }
   if (/markets?\s+(?:surge|jump|rally|rip)/i.test(text)) {
-    return { direction: 'up' as const, intensity: /surge|rip|soar/i.test(text) ? 'severe' : 'moderate' }
+    return {
+      direction: 'up',
+      intensity: /surge|rip|soar/i.test(text) ? 'severe' : 'moderate'
+    }
   }
   return undefined
 }
