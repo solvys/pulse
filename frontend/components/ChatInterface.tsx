@@ -126,7 +126,9 @@ export default function ChatInterface() {
     .map((msg: any) => {
       // Handle potential parts array if present (multi-modal) or fallback to content string
       // The AI SDK Message type might have parts or content.
-      let content = msg.content;
+      let content = msg.content || '';
+      
+      // Try extracting from parts array (UI message format)
       if (msg.parts && Array.isArray(msg.parts)) {
         const textParts = msg.parts
           .filter((part: any) => part.type === 'text')
@@ -134,11 +136,21 @@ export default function ChatInterface() {
           .join('');
         if (textParts) content = textParts;
       }
+      
+      // Fallback: if still empty, try text property
+      if (!content && msg.text) {
+        content = msg.text;
+      }
+      
+      // Debug log for message structure
+      if (!content) {
+        console.warn('[ChatInterface] Message has no content:', JSON.stringify(msg, null, 2));
+      }
 
       return {
         id: msg.id,
         role: msg.role === 'user' ? 'user' : 'assistant',
-        content: content,
+        content: content || '', // Ensure never undefined
         timestamp: msg.createdAt || new Date(),
         cancelled: msg.cancelled || false, // Preserve cancelled flag
       };
