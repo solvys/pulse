@@ -74,13 +74,23 @@ export async function handleChat(c: Context) {
     console.log(`[AI Chat] Using model: ${selection.model}`)
 
     const systemPrompt = defaultAiConfig.systemPrompt ?? 'You are a helpful AI trading assistant.'
-    const aiModel = createModelClient(selection.model as AiModelKey)
+    
+    let aiModel
+    try {
+      aiModel = createModelClient(selection.model as AiModelKey)
+      console.log(`[AI Chat] Model client created successfully`)
+    } catch (err) {
+      console.error(`[AI Chat] Failed to create model client:`, err)
+      throw err
+    }
 
     const messages = [
       { role: 'system' as const, content: systemPrompt },
       ...history,
       { role: 'user' as const, content: message },
     ]
+
+    console.log(`[AI Chat] Calling streamText with ${messages.length} messages`)
 
     // Stream response using Vercel AI SDK
     const result = streamText({
@@ -89,6 +99,7 @@ export async function handleChat(c: Context) {
       temperature: 0.4,
       maxOutputTokens: 2048,
       onFinish: async ({ text }) => {
+        console.log(`[AI Chat] Stream finished, saving response (${text.length} chars)`)
         // Store assistant message after streaming completes
         await conversationStore.addMessage(conversation!.id, {
           conversationId: conversation!.id,
@@ -98,6 +109,8 @@ export async function handleChat(c: Context) {
         })
       },
     })
+    
+    console.log(`[AI Chat] streamText called, returning response`)
 
     // Set conversation ID header so frontend can track it
     c.header('X-Conversation-Id', conversation.id)
