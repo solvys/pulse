@@ -1,14 +1,23 @@
-# Production runtime for Pulse API
+# Production build for Pulse API
 FROM node:20-alpine
 
 WORKDIR /app
 
-# Copy package files and install production dependencies
+# Copy package files
 COPY package.json package-lock.json* ./
-RUN npm ci --omit=dev || npm install --omit=dev
 
-# Copy compiled application
-COPY dist ./dist
+# Install ALL dependencies (need typescript for build)
+RUN npm ci
+
+# Copy source code
+COPY src ./src
+COPY tsconfig.json ./
+
+# Build TypeScript
+RUN npm run build
+
+# Remove dev dependencies
+RUN npm prune --omit=dev
 
 ENV NODE_ENV=production
 ENV PORT=8080
